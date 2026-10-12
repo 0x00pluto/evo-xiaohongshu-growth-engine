@@ -1,0 +1,144 @@
+<div class="flex flex-col gap-6 px-4 py-6 lg:px-8" x-data="notePage()">
+  <header class="flex flex-col gap-3">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <h1 class="text-2xl font-medium">写一篇笔记</h1>
+      <button id="open-history" class="btn btn-ghost" type="button" @click="onOpenHistory()">以前的笔记</button>
+    </div>
+    <p class="max-w-3xl text-sm leading-6">说清楚你要发什么。写好后整篇复制，再配上图，自己去小红书发。</p>
+    <div class="steps w-full" role="tablist" aria-label="进度">
+      <button id="step-materials" class="step" type="button" role="tab" :class="stepOn('materials') ? 'step-primary' : ''" :aria-selected="phase === 'materials'" @click="go('materials')">要发什么</button>
+      <button id="step-copy" class="step" type="button" role="tab" :class="stepOn('copy') ? 'step-primary' : ''" :aria-selected="phase === 'copy'" :disabled="!canGo('copy')" @click="go('copy')">这篇笔记</button>
+      <button id="step-images" class="step" type="button" role="tab" :class="stepOn('images') ? 'step-primary' : ''" :aria-selected="phase === 'images'" :disabled="!canGo('images')" @click="go('images')">配图</button>
+    </div>
+    <p id="job-status" class="text-sm" aria-live="polite" x-show="job.running">进行中：<span x-text="stepText(job.step)"></span></p>
+    <p id="job-error" class="text-sm text-error" role="alert" x-show="job.error && !job.running" x-text="job.error"></p>
+    <p id="notice" class="text-sm text-error" role="alert" x-show="notice" x-text="notice"></p>
+    <p id="copied" class="text-sm" aria-live="polite" x-show="copied" x-text="copied"></p>
+  </header>
+
+  <section class="flex max-w-3xl flex-col gap-4" x-show="phase === 'materials'" aria-labelledby="materials-title">
+    <h2 id="materials-title" class="text-lg font-medium">要发什么</h2>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium" for="business">这篇想讲什么</label>
+      <textarea
+        id="business"
+        class="textarea min-h-24 w-full wrap"
+        x-ref="business"
+        x-model="business"
+        :readonly="job.running"
+        :aria-invalid="errors.business ? 'true' : 'false'"
+        aria-describedby="business-hint business-error"
+        @input="clearError('business')"
+        @blur="persist()"
+      ></textarea>
+      <p id="business-hint" class="text-sm leading-6">用一句话说。卖什么、给谁看。</p>
+      <p id="business-error" class="text-sm text-error" role="alert" x-show="errors.business" x-text="errors.business"></p>
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium" for="article">有原文就贴上</label>
+      <textarea
+        id="article"
+        class="textarea min-h-40 w-full wrap"
+        x-ref="article"
+        x-model="article"
+        :readonly="job.running"
+        :aria-invalid="errors.article ? 'true' : 'false'"
+        aria-describedby="article-hint article-error"
+        @input="clearError('article')"
+        @blur="persist()"
+      ></textarea>
+      <p id="article-hint" class="text-sm leading-6">没有也行。有的话拿来当素材，不原样照搬。现在 <span x-text="articleLength"></span> 字。</p>
+      <p id="article-error" class="text-sm text-error" role="alert" x-show="errors.article" x-text="errors.article"></p>
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium" for="gallery-count">封面之外还要几张图</label>
+      <input
+        id="gallery-count"
+        class="input w-28"
+        type="number"
+        min="0"
+        max="9"
+        step="1"
+        inputmode="numeric"
+        x-ref="galleryCount"
+        x-model.number="galleryCount"
+        :readonly="job.running"
+        :aria-invalid="errors.galleryCount ? 'true' : 'false'"
+        aria-describedby="gallery-hint gallery-error"
+        @change="onCountChange()"
+      />
+      <p id="gallery-hint" class="text-sm leading-6">0 到 9，封面另外有 1 张。</p>
+      <p id="gallery-error" class="text-sm text-error" role="alert" x-show="errors.galleryCount" x-text="errors.galleryCount"></p>
+    </div>
+    <button id="generate-draft" class="btn btn-primary w-fit" type="button" @click="onGenerateDraft()" :disabled="!hostReady || job.running">写成笔记</button>
+  </section>
+
+  <section class="flex flex-col gap-4" x-show="phase === 'copy'" aria-labelledby="copy-title">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <h2 id="copy-title" class="text-lg font-medium">这篇笔记</h2>
+      <button id="copy-post" class="btn btn-primary w-fit" type="button" @click="onCopyPost()" :disabled="!postText()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+        复制这篇笔记
+      </button>
+    </div>
+    <p class="text-sm leading-6" x-show="!draft">笔记还在写，出来后可以改，再整篇复制。</p>
+    <p class="text-sm leading-6" x-show="promptsWaiting"><span class="badge badge-outline">待重算</span> 你改过字了。配图之前，先让画面跟上这篇。</p>
+    <button id="regenerate-prompts" class="btn btn-primary w-fit" type="button" x-show="promptsWaiting" @click="onGeneratePrompts()" :disabled="!hostReady || job.running">让画面跟上</button>
+    <template x-if="draft">
+      <div class="grid items-start gap-8 lg:grid-cols-2">
+        <div class="flex flex-col gap-4">
+          <div class="flex flex-col gap-2">
+            <label class="text-sm font-medium" for="draft-title-input">标题</label>
+            <input id="draft-title-input" class="input w-full" type="text" x-model="draft.title" :readonly="job.running" @blur="persist()" />
+          </div>
+          <div class="flex flex-col gap-2">
+            <label class="text-sm font-medium" for="draft-body">正文</label>
+            <textarea id="draft-body" class="textarea min-h-48 w-full wrap" x-model="draft.body" :readonly="job.running" @blur="persist()"></textarea>
+          </div>
+          <div class="flex flex-col gap-2">
+            <span class="text-sm font-medium" id="topics-label">话题</span>
+            <div class="flex flex-col gap-2" role="group" aria-labelledby="topics-label">
+              <template x-for="(topic, index) in draft.topics" :key="index">
+                <input class="input w-full" type="text" :aria-label="'话题 ' + (index + 1)" x-model="draft.topics[index]" :readonly="job.running" @blur="persist()" />
+              </template>
+            </div>
+          </div>
+          <div class="flex flex-col gap-2">
+            <label class="text-sm font-medium" for="cover-line">封面上的那句话</label>
+            <input id="cover-line" class="input w-full" type="text" x-model="draft.coverLine" :readonly="job.running" @blur="persist()" />
+            <p class="text-sm leading-6">这句不进复制出去的正文。</p>
+          </div>
+        </div>
+        <article id="post-preview" class="flex flex-col gap-4 border border-base-300 bg-base-100 p-4" aria-label="笔记预览">
+          <h3 class="text-base font-medium" x-text="draft.title"></h3>
+          <p class="wrap text-sm leading-6" x-text="draft.body"></p>
+          <p class="text-sm leading-6" x-text="formatTopics(draft.topics)"></p>
+        </article>
+      </div>
+    </template>
+  </section>
+
+  <section class="flex flex-col gap-4" x-show="phase === 'images'" aria-labelledby="images-title">
+    <h2 id="images-title" class="text-lg font-medium">配图</h2>
+    <button id="generate-images" class="btn btn-primary w-fit" type="button" @click="onGenerateImages()" :disabled="imagesDisabled">做出封面和配图</button>
+    <p class="text-sm leading-6" x-show="!draft">封面和配图会按竖图出现在这里。</p>
+    <p class="text-sm leading-6 break-all" x-show="directory">图片文件夹：<span x-text="directory"></span></p>
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" x-show="draft">
+      <template x-for="item in imageSlots" :key="item.slot + item.index">
+        <article class="flex flex-col gap-3 border border-base-300 p-4">
+          <div class="flex items-center justify-between gap-2">
+            <h3 class="text-sm font-medium" x-text="item.label"></h3>
+            <span class="badge badge-outline" x-text="statusLabel(item.image.status)"></span>
+          </div>
+          <div class="aspect-[3/4] bg-base-200">
+            <img class="h-full w-full object-cover" x-show="item.image.status === '成功' && previews[item.image.path]" :src="previews[item.image.path] || ''" :alt="item.label" />
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button class="btn btn-ghost btn-sm" type="button" x-show="item.image.status === '失败'" @click="onRetry(item)" :disabled="!hostReady || job.running">重试这张</button>
+            <button class="btn btn-ghost btn-sm" type="button" x-show="item.image.status === '成功'" @click="onReveal(item)" :disabled="!hostReady">显示文件</button>
+          </div>
+        </article>
+      </template>
+    </div>
+  </section>
+</div>

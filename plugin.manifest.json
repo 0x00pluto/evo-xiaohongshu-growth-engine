@@ -1,0 +1,40 @@
+{
+  "id": "xhs-growth-engine",
+  "displayName": "小红书增长引擎",
+  "version": "0.1.0",
+  "type": "ui",
+  "description": "一句业务、可选文章，生成一篇可复制去发的小红书图文，含封面和配图。",
+  "category": "流量密码",
+  "main": "index.js",
+  "uiEntry": "src/studio/static/index.html",
+  "configSchema": {
+    "DEEPSEEK_API_KEY": {
+      "type": "string",
+      "title": "DeepSeek 密钥",
+      "description": "用于写稿和画面提示词。在 https://platform.deepseek.com/api_keys 申请。",
+      "default": "",
+      "secret": true,
+      "group": "文案"
+    },
+    "DEEPSEEK_BASE_URL": {
+      "type": "string",
+      "title": "DeepSeek 接口地址",
+      "default": "https://api.deepseek.com",
+      "group": "文案"
+    },
+    "DEEPSEEK_MODEL": {
+      "type": "string",
+      "title": "DeepSeek 模型",
+      "default": "deepseek-chat",
+      "group": "文案"
+    },
+    "REPLICATE_API_TOKEN": {
+      "type": "string",
+      "title": "Replicate 密钥",
+      "description": "用于生成封面和配图。只在生图时读取。",
+      "default": "",
+      "secret": true,
+      "group": "生图"
+    }
+  }
+}

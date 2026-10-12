@@ -1,0 +1,19 @@
+# Document index
+
+## Index
+
+- `docs/mvp-map.md`: 增长引擎竖切地图；每刀出口是一篇可复制去发的稿；studio 只放页面，业务在 src 其他包
+- `docs/builtin-workflows/post-task-reflect.md`: 任务后反思（白痴指数 → 删 → 程序化 → 鲁棒 → 加速）；用户明确要求时触发，不自动跑
+- `docs/builtin-workflows/extract-experience.md`: 提取经验 → 项目无关最佳实践；用户明确要求时触发；落盘须问或读 experience_target，默认本仓 docs/best-practices/
+- `docs/builtin-workflows/consolidate-memory.md`: 记忆巩固与遗忘（冲突消解 → 情景提纯 → 剪枝）；仅用户显式触发；与反思 / 提取经验互不串联
+- `docs/builtin-workflows/publish-evo-agent-pack.md`: 仅首次 / 改合同时发布或核对 evo_agent_pack.json 工牌；日常发版勿进门；打 tag 改走 cut-release-tag；不做安装器
+- `docs/builtin-workflows/cut-release-tag.md`: 日常发版唯一入口；汇总变更 → upgrades → 对齐 version → tag → 推送 → gh 或网页建 Release；major 须人指定
+- `docs/workflows/one-post-studio.md`: 一篇图文操作台；本机命令与 Dex Buddy 共用页面，插件包范围见 dex-buddy-plugin.pack
+- `docs/workflows/_TEMPLATE.md`: 业务 workflow 六段骨架；新建业务工作流时复制并改名，写完后删掉本行或改成真实条目
+- `docs/DESIGN.md`: 页侧视觉事实源（HTML First、Alpine、daisyUI 5 浅色）；改外观前先读
+- `specs/prds/prd-wiki-index.md`: PRD 索引，不计入序号；产品经理追加一行，工程验收官可回写状态
+- `.cursor/commands/team/product-manager.md`: 产品经理，`/team:product-manager`，写 PRD
+- `.cursor/commands/team/prd-accept.md`: 工程验收官，`/team:prd-accept`，回写 PRD 文末状态
+- `.cursor/commands/team/front-enginer.md`: 前端工程师，`/team:front-enginer`，HTML First
+- `.cursor/commands/team/test-enginer.md`: 测试工程师，`/team:test-enginer`，手工排障
+- `.cursor/commands/team/feature-dev.md`: 自主交付工程师，`/team:feature-dev`，S1 到 S3

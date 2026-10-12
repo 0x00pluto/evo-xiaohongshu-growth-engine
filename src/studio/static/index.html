@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>小红书增长引擎</title>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <script src="shell.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
+  <style>
+    :focus-visible {
+      outline: 2px solid currentColor;
+      outline-offset: 2px;
+    }
+    [x-cloak] { display: none !important; }
+    .wrap {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-base-100 text-base-content" x-data="shell()" x-cloak>
+  <div class="drawer lg:drawer-open">
+    <input id="studio-drawer" class="drawer-toggle" type="checkbox" x-ref="drawer" />
+    <div class="drawer-content flex min-h-screen flex-col">
+      <div class="flex items-center border-b border-base-300 px-4 py-3 lg:hidden">
+        <label class="btn btn-ghost btn-sm" for="studio-drawer">菜单</label>
+      </div>
+      <div id="host-banner" class="alert mx-4 mt-4" role="status" x-show="!hostReady">
+        <span>请在 Dex Buddy 工作台中打开，或在本机运行操作台。离开这两种入口时，生成按钮不可用。</span>
+      </div>
+      <p id="page-error" class="px-4 pt-4 text-sm text-error" role="alert" x-show="pageError" x-text="pageError"></p>
+      <div id="workspace" class="min-w-0 flex-1" x-ref="workspace"></div>
+    </div>
+    <div class="drawer-side z-20">
+      <label class="drawer-overlay" for="studio-drawer" aria-label="关闭菜单"></label>
+      <aside class="flex min-h-full w-64 flex-col gap-6 border-r border-base-300 bg-base-100 p-4">
+        <p class="px-2 text-sm font-medium">小红书增长引擎</p>
+        <ul class="menu w-full gap-1 p-0">
+          <template x-for="item in menu" :key="item.id">
+            <li>
+              <button
+                class="justify-between"
+                type="button"
+                :id="'nav-' + item.id"
+                :disabled="!item.ready"
+                :class="page === item.id ? 'menu-active' : ''"
+                :aria-current="page === item.id ? 'page' : false"
+                @click="open(item)"
+              >
+                <span x-text="item.label"></span>
+                <span class="badge badge-ghost badge-sm" x-show="!item.ready">还没做</span>
+              </button>
+            </li>
+          </template>
+        </ul>
+      </aside>
+    </div>
+  </div>
+</body>
+</html>

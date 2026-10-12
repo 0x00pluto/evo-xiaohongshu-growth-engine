@@ -1,0 +1,26 @@
+<div class="flex flex-col gap-6 px-4 py-6 lg:px-8" x-data="historyPage()">
+  <header class="flex flex-col gap-3">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <h1 class="text-2xl font-medium">以前的笔记</h1>
+      <button id="write-new" class="btn btn-primary" type="button" @click="onWriteNew()">写新的一篇</button>
+    </div>
+    <p class="max-w-3xl text-sm leading-6">点开可以接着改。也可以直接把整篇复制走。</p>
+    <p id="history-copied" class="text-sm" aria-live="polite" x-show="copied" x-text="copied"></p>
+    <p id="history-notice" class="text-sm text-error" role="alert" x-show="notice" x-text="notice"></p>
+  </header>
+  <p id="history-empty" class="text-sm leading-6" x-show="posts.length === 0">还没有写过。</p>
+  <ul class="flex max-w-3xl flex-col gap-3">
+    <template x-for="item in posts" :key="item.id">
+      <li class="flex flex-wrap items-center justify-between gap-3 border border-base-300 p-4">
+        <div class="min-w-0">
+          <p class="truncate text-sm font-medium" x-text="item.title"></p>
+          <p class="text-sm leading-6" x-text="when(item.createdAt)"></p>
+        </div>
+        <div class="flex gap-2">
+          <button class="btn btn-ghost btn-sm" type="button" :disabled="!item.postText" @click="onCopy(item)">复制</button>
+          <button class="btn btn-ghost btn-sm" type="button" @click="onOpen(item)">打开</button>
+        </div>
+      </li>
+    </template>
+  </ul>
+</div>
