@@ -107,7 +107,7 @@ Studio 只放页面。选题、成稿和以后的加厚项放在 `src/` 的其�
 本文件不建目录。下一轮按第一刀实现时按这个形状长：
 
 ```text
-plugin.manifest.json          # 仓库根，Dex Buddy 合同；uiEntry 指向页面
+plugin.manifest.json          # 仓库根，Dex Buddy 合同；uiEntry 指向页面；icon 指向 icon.png
 index.js                      # 仓库根薄桥：dex.call 转到 src 里的包
 src/studio/static/index.html  # 只有页面
 src/topic/                    # 选题

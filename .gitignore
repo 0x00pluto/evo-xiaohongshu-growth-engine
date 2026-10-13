@@ -3,12 +3,25 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .DS_Store
+Thumbs.db
 cache/
 temp/
 output/
+dist/
+coverage/
+*.log
+npm-debug.log*
+pnpm-debug.log*
 .env
 .env.*
 !.env.example
+
+# 编辑器与本机工具
+.idea/
+.vscode/
+.cursor/
+*.swp
+*.swo
 
 # assets/ 大媒体默认不入库；小文本 / 小图可提交
 assets/**/*.pdf

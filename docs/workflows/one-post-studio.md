@@ -23,11 +23,11 @@ node scripts/run-studio.js --open
 }
 ```
 
-`config.dev.json` 只在未打包的开发版里生效。改 `index.js` 或页面后重启 Dex Buddy。侧边栏名字是「小红书增长引擎」。
+`config.dev.json` 只在未打包的开发版里生效。改 `index.js` 或页面后重启 Dex Buddy。侧边栏名字是「小红书增长引擎」，图标是仓库根上的 `icon.png`。
 
 开发、或 `config.dev.json` 挂进来时，`ctx.dirs.data` 就是本仓，笔记写在 `output/one-post/posts/`。从插件中心装进 Dex Buddy 之后，`ctx.dirs.data` 是用户数据目录 `plugin-data/xhs-growth-engine/`。`assets/` 仍从安装目录读。
 
-插件中心发版只改 `plugin.manifest.json` 的 `version`（`X.Y.Z`，不要前导 0），提交并推送，再打 tag `vX.Y.Z` 并推送。`v` 后面必须和清单版本相同。根上的 `dex-buddy-plugin.pack` 只列入清单、`index.js`、`src/` 和 `assets/`。`scripts/`、测试、文档和 `.env` 不进这份 zip。这不是 `dex-buddy-plugin-pack.json`，仓库根上有那份旧文件时发布会失败。把仓库和这个 tag 告诉 Dex Buddy 维护者，由他在 Actions 里运行 Publish Plugin。
+插件中心发版只改 `plugin.manifest.json` 的 `version`（`X.Y.Z`，不要前导 0），提交并推送，再打 tag `vX.Y.Z` 并推送。`v` 后面必须和清单版本相同。根上的 `dex-buddy-plugin.pack` 只列入清单、`index.js`、`icon.png`、`src/` 和 `assets/`。`scripts/`、测试、文档和 `.env` 不进这份 zip。这不是 `dex-buddy-plugin-pack.json`，仓库根上有那份旧文件时发布会失败。把仓库和这个 tag 告诉 Dex Buddy 维护者，由他在 Actions 里运行 Publish Plugin。
 
 在 Dex Buddy 里从侧栏底部「设置」选「小红书增长引擎」。文案一组填 DeepSeek 密钥、接口地址和模型，生图一组填 Replicate 令牌，然后点「保存」。仓库里的 `.env` 只给本机命令行用，不进 zip。工作台注入的值优先，`.env` 只补空位。
 
