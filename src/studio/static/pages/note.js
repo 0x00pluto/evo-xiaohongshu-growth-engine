@@ -2,6 +2,8 @@ function notePage() {
   return {
     business: '',
     article: '',
+    articleType: '素人',
+    articleOpen: false,
     galleryCount: 1,
     draft: null,
     prompts: { cover: '', gallery: [], stale: false, basis: null },
@@ -17,6 +19,9 @@ function notePage() {
     phase: 'materials',
     postId: '',
     slots: [],
+    promptOpen: {},
+    bodyDraft: '',
+    activeKey: 'cover-0',
 
     hostReady: window.studioHost.ready,
     get articleLength() {
@@ -61,6 +66,40 @@ function notePage() {
       this.slots = slots;
     },
 
+    // 小红书计字：半角两个算一个，全角算一个，半角落单时向上取整。
+    charCount(text) {
+      let units = 0;
+      for (const ch of Array.from(String(text || ''))) {
+        units += ch.codePointAt(0) <= 0xff ? 1 : 2;
+      }
+      return Math.ceil(units / 2);
+    },
+    composeBody() {
+      if (!this.draft) return '';
+      const body = String(this.draft.body || '').replace(/\s+$/, '');
+      const topics = this.formatTopics(this.draft.topics);
+      if (!topics || body.endsWith(topics)) return body;
+      return body ? `${body}\n\n${topics}` : topics;
+    },
+    splitBodyTopics(text) {
+      const source = String(text || '');
+      const tail = source.match(/((?:\s*#[^#\n]+)+\s*)$/);
+      if (!tail) return { body: source.replace(/\s+$/, ''), topics: [] };
+      const chunk = tail[1];
+      const body = source.slice(0, source.length - chunk.length).replace(/\s+$/, '');
+      const topics = [...chunk.matchAll(/#([^#\n]+)/g)].map((item) => item[1].trim()).filter(Boolean);
+      return { body, topics };
+    },
+    syncBodyDraft() {
+      this.bodyDraft = this.composeBody();
+    },
+    onBodyDraft() {
+      if (!this.draft) return;
+      const text = String(this.bodyDraft || '');
+      const split = this.splitBodyTopics(text);
+      this.draft.body = split.body;
+      this.draft.topics = split.topics;
+    },
     formatTopics(topics) {
       return (topics || [])
         .map((topic) => String(topic).trim())
@@ -90,17 +129,81 @@ function notePage() {
       return '等待';
     },
     stepOn(name) {
-      const order = { materials: 1, copy: 2, images: 3 };
+      const order = { materials: 1, copy: 2 };
       return order[this.phase] >= order[name];
     },
     canGo(name) {
       if (name === 'materials') return true;
-      if (name === 'copy') return Boolean(this.draft) || this.phase === 'copy';
-      return Boolean(this.draft) && !this.promptsWaiting && Boolean(String(this.prompts.cover || '').trim());
+      return Boolean(this.draft) || this.phase === 'copy';
     },
     go(name) {
       if (!this.canGo(name)) return;
       this.phase = name;
+      if (name === 'copy') this.loadPreviews();
+    },
+    promptKey(item) {
+      return `${item.slot}-${item.index}`;
+    },
+    promptIsOpen(item) {
+      return Boolean(item && this.promptOpen[this.promptKey(item)]);
+    },
+    get activeSlot() {
+      return this.slots.find((item) => this.promptKey(item) === this.activeKey) || this.slots[0] || null;
+    },
+    get imageTotal() {
+      return this.slots.length;
+    },
+    get imageIndex() {
+      if (!this.slots.length) return 0;
+      const index = this.slots.findIndex((item) => this.promptKey(item) === this.activeKey);
+      return (index < 0 ? 0 : index) + 1;
+    },
+    slotSelected(item) {
+      const active = this.activeSlot;
+      return Boolean(active && item && this.promptKey(active) === this.promptKey(item));
+    },
+    slotPreview(item) {
+      if (!item || !item.image || item.image.status !== '成功' || !item.image.path) return '';
+      return this.previews[item.image.path] || '';
+    },
+    drawKey(item) {
+      // 键带上能不能点。列表复用旧节点时，disabled 会停在第一次算出来的结果。
+      const status = item && item.image && item.image.status ? item.image.status : '空';
+      return `${this.promptKey(item)}-${status}-${this.slotDrawDisabled(item) ? 'off' : 'on'}`;
+    },
+    get hasGeneratedImage() {
+      return this.slots.some((item) => item.image && item.image.status === '成功' && item.image.path);
+    },
+    selectImage(item) {
+      if (!item) return;
+      this.activeKey = this.promptKey(item);
+      this.promptOpen = { [this.activeKey]: true };
+    },
+    showSlide(index) {
+      const item = this.slots[Number(index)];
+      if (!item) return;
+      this.activeKey = this.promptKey(item);
+      if (Object.values(this.promptOpen).some(Boolean)) {
+        this.promptOpen = { [this.activeKey]: true };
+      }
+    },
+    stepImage(delta) {
+      if (!this.slots.length) return;
+      const index = this.slots.findIndex((item) => this.promptKey(item) === this.activeKey);
+      const current = index < 0 ? 0 : index;
+      const next = (current + delta + this.slots.length) % this.slots.length;
+      this.showSlide(next);
+    },
+    resetPreview() {
+      this.previewMode = 'note';
+      this.activeKey = 'cover-0';
+      this.promptOpen = {};
+    },
+    get coverSlot() {
+      return this.slots.find((item) => item.slot === 'cover') || null;
+    },
+    get gallerySlots() {
+      return this.slots.filter((item) => item.slot === 'gallery');
     },
     clearError(field) {
       this.errors[field] = '';
@@ -121,6 +224,7 @@ function notePage() {
       }
       const first = ['business', 'article', 'galleryCount'].find((field) => this.errors[field]);
       if (!first) return true;
+      if (first === 'article') this.articleOpen = true;
       this.focusField(first);
       return false;
     },
@@ -139,13 +243,24 @@ function notePage() {
       this.directory = next.directory || '';
       this.postId = next.id || '';
       this.syncSlots();
+      this.syncBodyDraft();
+    },
+    resetBrief() {
+      this.articleType = '素人';
+      this.articleOpen = this.articleLength > 0;
     },
     async loadPreviews() {
+      const next = { ...this.previews };
+      let changed = false;
       for (const item of this.slots) {
-        if (item.image.status !== '成功' || !item.image.path || this.previews[item.image.path]) continue;
+        if (item.image.status !== '成功' || !item.image.path || next[item.image.path]) continue;
         const result = await this.call('previewImage', { slot: item.slot, index: item.index });
-        if (result && result.ok && result.dataUrl) this.previews[item.image.path] = result.dataUrl;
+        if (result && result.ok && result.dataUrl) {
+          next[item.image.path] = result.dataUrl;
+          changed = true;
+        }
       }
+      if (changed) this.previews = next;
     },
     stopPoll() {
       if (!this.pollTimer) return;
@@ -181,10 +296,14 @@ function notePage() {
       const fresh = await this.call('startNew');
       if (fresh && fresh.ok === false) {
         await this.refresh();
+        this.resetBrief();
+        this.resetPreview();
         if (this.draft) this.phase = 'copy';
         return;
       }
       this.applyServer(fresh);
+      this.resetBrief();
+      this.resetPreview();
       this.phase = 'materials';
     },
     editorPayload() {
@@ -213,6 +332,7 @@ function notePage() {
       if (!result || result.ok !== false) return false;
       if (result.field && Object.prototype.hasOwnProperty.call(this.errors, result.field)) {
         this.errors[result.field] = result.message;
+        if (result.field === 'article') this.articleOpen = true;
         this.focusField(result.field);
       } else {
         this.notice = result.message || '没有完成';
@@ -334,6 +454,8 @@ function notePage() {
       this.errors = { business: '', article: '', galleryCount: '' };
       this.clearCopied();
       this.applyServer(fresh);
+      this.resetBrief();
+      this.resetPreview();
       this.phase = 'materials';
     },
     async onOpen(item) {
@@ -347,7 +469,10 @@ function notePage() {
       this.errors = { business: '', article: '', galleryCount: '' };
       this.clearCopied();
       this.applyServer(result);
+      this.resetBrief();
+      this.resetPreview();
       this.phase = result.draft ? 'copy' : 'materials';
+      await this.loadPreviews();
     },
     async onCountChange() {
       const count = Number(this.galleryCount);
