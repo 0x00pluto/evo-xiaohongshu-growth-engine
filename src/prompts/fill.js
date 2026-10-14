@@ -4,10 +4,21 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { validateDraftFace, normalizeFace } = require('../draft/validate');
 
-const PROMPT_FILES = new Set(['draft.md', 'cover.md', 'gallery.md']);
+const COVER_TYPES = new Set(['story', 'compare']);
+
+const PROMPT_FILES = new Set([
+  'draft.md',
+  'gallery.md',
+  'cover/tone-amateur.md',
+  'cover/large-type.md',
+  'cover/sentence.md',
+  'cover/choose-type.md',
+  'cover/types/story.md',
+  'cover/types/compare.md',
+]);
 
 function readPromptFile(promptsDir, name) {
-  if (!PROMPT_FILES.has(name)) {
+  if (typeof name !== 'string' || !PROMPT_FILES.has(name)) {
     throw new Error('未知提示词文件');
   }
   const file = path.join(promptsDir, name);
@@ -15,6 +26,13 @@ function readPromptFile(promptsDir, name) {
     throw new Error(`找不到提示词文件 ${name}`);
   }
   return fs.readFileSync(file, 'utf8');
+}
+
+function coverTypePromptName(type) {
+  if (!COVER_TYPES.has(type)) {
+    throw new Error('封面类型不在允许列表');
+  }
+  return `cover/types/${type}.md`;
 }
 
 function fillPrompt(template, vars) {
@@ -50,21 +68,41 @@ function parseJsonObject(text) {
 
 function parseDraftText(text) {
   const data = parseJsonObject(text);
+  // 封面那句话改由封面流程写入。成稿若仍返回 coverLine，这里丢掉，避免两套句子并存。
   const face = {
     title: typeof data.title === 'string' ? data.title : '',
     body: typeof data.body === 'string' ? data.body : '',
     topics: Array.isArray(data.topics) ? data.topics : [],
-    coverLine: typeof data.coverLine === 'string' ? data.coverLine : '',
+    coverLine: '',
   };
   const message = validateDraftFace(face);
   if (message) throw new Error(message);
   return normalizeFace(face);
 }
 
-function parseCoverText(text) {
+function parseCoverLineText(text) {
+  const data = parseJsonObject(text);
+  const coverLine = typeof data.coverLine === 'string' ? data.coverLine.trim() : '';
+  if (!coverLine) throw new Error('封面那句话是空的');
+  return coverLine;
+}
+
+function parseCoverTypeText(text) {
+  const data = parseJsonObject(text);
+  const type = typeof data.type === 'string' ? data.type.trim() : '';
+  if (!COVER_TYPES.has(type)) throw new Error('封面类型不在允许列表');
+  return type;
+}
+
+function parseCoverText(text, options) {
   const data = parseJsonObject(text);
   const prompt = typeof data.prompt === 'string' ? data.prompt.trim() : '';
   if (!prompt) throw new Error('封面提示词不是 1 条');
+  const type = options && options.type;
+  const coverLine = options && typeof options.coverLine === 'string' ? options.coverLine.trim() : '';
+  if (type === 'story' && (!coverLine || !prompt.includes(coverLine))) {
+    throw new Error('故事句封面没有写上封面那句话');
+  }
   return prompt;
 }
 
@@ -89,9 +127,13 @@ function faceVars(face, galleryCount) {
 }
 
 module.exports = {
+  COVER_TYPES,
+  coverTypePromptName,
   faceVars,
   fillPrompt,
+  parseCoverLineText,
   parseCoverText,
+  parseCoverTypeText,
   parseDraftText,
   parseGalleryText,
   parseJsonObject,

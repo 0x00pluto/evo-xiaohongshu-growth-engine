@@ -5,3 +5,5 @@
 | 序号 | 文件 | 说明 |
 |------|------|------|
 | 00001 | `specs/prds/prd-00001-one-post-from-article.md` | 一句业务必填、文章可选，生成一篇可复制的小红书图文、封面和 0–9 张配图。工程 partial |
+| 00002 | `specs/prds/prd-00002-cover-feed-hook.md` | 封面先由模型选定故事句或对比，再套用该类型的画面和文字规则。封面上的那句话单独成模块。 |
+| 00003 | `specs/prds/prd-00003-studio-cal-palette.md` | 操作台三页只换 Cal.com 色板。技术栈、信息架构和交互不动。 |

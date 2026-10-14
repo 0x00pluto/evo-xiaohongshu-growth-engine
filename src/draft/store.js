@@ -17,9 +17,10 @@ function emptyState() {
   return {
     business: '',
     article: '',
+    coverLineSpecified: '',
     galleryCount: 1,
     draft: null,
-    prompts: { cover: '', gallery: [], stale: false, basis: null },
+    prompts: { cover: '', coverType: '', gallery: [], stale: false, basis: null },
     images: { cover: emptySlot(), gallery: [] },
     job: { running: false, step: '', error: '' },
   };
@@ -40,7 +41,9 @@ function normalizeBasis(basis) {
     body: typeof basis.body === 'string' ? basis.body : '',
     topics: Array.isArray(basis.topics) ? basis.topics.map((topic) => String(topic)) : [],
     coverLine: typeof basis.coverLine === 'string' ? basis.coverLine : '',
+    coverLineSpecified: typeof basis.coverLineSpecified === 'string' ? basis.coverLineSpecified : '',
     galleryCount: count,
+    coverRules: typeof basis.coverRules === 'string' ? basis.coverRules : '',
   };
 }
 
@@ -49,6 +52,7 @@ function normalize(raw) {
   const source = raw && typeof raw === 'object' ? raw : {};
   base.business = typeof source.business === 'string' ? source.business : '';
   base.article = typeof source.article === 'string' ? source.article : '';
+  base.coverLineSpecified = typeof source.coverLineSpecified === 'string' ? source.coverLineSpecified : '';
   const count = Number(source.galleryCount);
   base.galleryCount = Number.isInteger(count) && count >= 0 && count <= 9 ? count : 1;
   if (source.draft && typeof source.draft === 'object') {
@@ -62,6 +66,7 @@ function normalize(raw) {
   const prompts = source.prompts && typeof source.prompts === 'object' ? source.prompts : {};
   base.prompts = {
     cover: typeof prompts.cover === 'string' ? prompts.cover : '',
+    coverType: prompts.coverType === 'story' || prompts.coverType === 'compare' ? prompts.coverType : '',
     gallery: Array.isArray(prompts.gallery) ? prompts.gallery.map((item) => String(item)) : [],
     stale: Boolean(prompts.stale),
     basis: normalizeBasis(prompts.basis),

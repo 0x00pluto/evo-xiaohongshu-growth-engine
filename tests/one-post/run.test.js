@@ -18,16 +18,34 @@ function tempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'one-post-run-'));
 }
 
-function writePrompts(dir, { gallery = true } = {}) {
-  fs.mkdirSync(dir, { recursive: true });
+function writePrompts(dir, { gallery = true, sentence = true, story = true, compare = true } = {}) {
+  fs.mkdirSync(path.join(dir, 'cover', 'types'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'draft.md'), 'DRAFT {{business}} {{article}}');
-  fs.writeFileSync(path.join(dir, 'cover.md'), 'COVER {{title}} {{body}} {{topics}} {{coverLine}}');
-  if (gallery) fs.writeFileSync(path.join(dir, 'gallery.md'), 'GALLERY {{galleryCount}} {{title}}');
+  fs.writeFileSync(path.join(dir, 'cover', 'tone-amateur.md'), 'TONE 素人');
+  fs.writeFileSync(path.join(dir, 'cover', 'large-type.md'), 'LARGE 文字是第一视觉主体');
+  if (sentence) {
+    fs.writeFileSync(path.join(dir, 'cover', 'sentence.md'), 'SENTENCE {{title}} {{body}} {{topics}}\n{{tone}}');
+  }
+  fs.writeFileSync(path.join(dir, 'cover', 'choose-type.md'), 'CHOOSE {{title}} {{body}} {{topics}} {{coverLine}}');
+  if (story) {
+    fs.writeFileSync(path.join(dir, 'cover', 'types', 'story.md'), 'STORY {{type}} {{title}} {{tone}}\nLINE:{{coverLine}}');
+  }
+  if (compare) {
+    fs.writeFileSync(path.join(dir, 'cover', 'types', 'compare.md'), 'COMPARE {{type}} {{title}} {{tone}}\nLINE:{{coverLine}}');
+  }
+  if (gallery) fs.writeFileSync(path.join(dir, 'gallery.md'), 'GALLERY {{galleryCount}} {{title}} {{coverLine}}');
 }
 
 function responseFor(prompt, galleryCount, galleryBody) {
-  if (prompt.startsWith('DRAFT')) return JSON.stringify(face);
-  if (prompt.startsWith('COVER')) return JSON.stringify({ prompt: '封面画面' });
+  if (prompt.startsWith('DRAFT')) {
+    return JSON.stringify({ title: '标题', body: '正文', topics: ['甲', '乙', '丙'] });
+  }
+  if (prompt.startsWith('SENTENCE')) return JSON.stringify({ coverLine: '一句' });
+  if (prompt.startsWith('CHOOSE')) return JSON.stringify({ type: 'story' });
+  if (prompt.startsWith('STORY') || prompt.startsWith('COMPARE')) {
+    const line = (prompt.split('LINE:')[1] || '').trim();
+    return JSON.stringify({ prompt: `封面画面 ${line}` });
+  }
   if (prompt.startsWith('GALLERY')) {
     return JSON.stringify({
       prompts: galleryBody || Array.from({ length: galleryCount }, (_, index) => `配图${index + 1}`),
@@ -97,12 +115,20 @@ test('配图张数为 0 时不读配图提示词，重跑成稿会删掉旧图',
   assert.equal(runner.generateDraft({ business: '卖课', article: '', galleryCount: 0 }).ok, true);
   const drafted = await untilIdle(runner);
   assert.equal(drafted.draft.title, '标题');
-  assert.equal(drafted.prompts.cover, '封面画面');
+  assert.equal(drafted.draft.coverLine, '一句');
+  assert.equal(drafted.prompts.coverType, 'story');
+  assert.equal(drafted.prompts.cover, '封面画面 一句');
   assert.deepEqual(drafted.prompts.gallery, []);
   assert.equal(seen.some((prompt) => prompt.startsWith('GALLERY')), false);
+  assert.equal(seen.some((prompt) => prompt.startsWith('SENTENCE')), true);
+  assert.equal(seen.some((prompt) => prompt.startsWith('COVER')), false);
+  const choose = seen.find((prompt) => prompt.startsWith('CHOOSE'));
+  const story = seen.find((prompt) => prompt.startsWith('STORY'));
+  assert.equal(choose.includes('TONE 素人'), false);
+  assert.equal(story.includes('TONE 素人'), true);
   assert.equal(drafted.job.error, '');
 
-  assert.equal(runner.generateImages({}).ok, true);
+  assert.equal(runner.generateImages({ slot: 'cover' }).ok, true);
   const imaged = await untilIdle(runner);
   assert.equal(imaged.images.cover.status, '成功');
   assert.equal(fs.existsSync(path.join(runner.loadLatest().directory, 'cover.png')), true);
@@ -133,7 +159,7 @@ test('提示词条数不对时不生图', async () => {
   assert.match(latest.job.error, /配图提示词应为 2 条/);
   assert.equal(latest.draft.title, '标题');
   assert.equal(images, 0);
-  assert.equal(runner.generateImages({}).ok, false);
+  assert.equal(runner.generateImages({ slot: 'cover' }).ok, false);
 });
 
 test('进行中的第二次调用被拒绝', async () => {
@@ -188,7 +214,9 @@ test('失败的一张可以单独重试，另一张文件不变', async () => {
 
   runner.generateDraft({ business: '卖课', article: '素材', galleryCount: 1 });
   await untilIdle(runner);
-  runner.generateImages({});
+  runner.generateImages({ slot: 'gallery', index: 1 });
+  await untilIdle(runner);
+  runner.generateImages({ slot: 'cover' });
   const partial = await untilIdle(runner);
   assert.equal(partial.images.cover.status, '失败');
   assert.equal(partial.images.gallery[0].status, '成功');
@@ -229,7 +257,7 @@ test('改稿面后要重算提示词，重算本身不跑成稿', async () => {
   const stale = runner.loadLatest();
   assert.equal(stale.prompts.stale, true);
   assert.equal(fs.existsSync(path.join(runner.loadLatest().directory, 'cover.png')), false);
-  assert.equal(runner.generateImages({}).message, '提示词待重算');
+  assert.equal(runner.generateImages({ slot: 'cover' }).message, '提示词待重算');
 
   const before = seen.length;
   runner.generatePrompts({});
@@ -237,7 +265,7 @@ test('改稿面后要重算提示词，重算本身不跑成稿', async () => {
   assert.equal(refreshed.prompts.stale, false);
   assert.equal(refreshed.prompts.basis.title, '新标题');
   assert.equal(seen.slice(before).some((prompt) => prompt.startsWith('DRAFT')), false);
-  assert.equal(seen.slice(before).some((prompt) => prompt.startsWith('COVER')), true);
+  assert.equal(seen.slice(before).some((prompt) => prompt.startsWith('STORY')), true);
 });
 
 test('缺密钥时停在对应步骤，稿面还在', async () => {
@@ -277,11 +305,11 @@ test('缺密钥时停在对应步骤，稿面还在', async () => {
   assert.equal(fetched, false);
 
   fetched = false;
-  runner.generateImages({});
+  runner.generateImages({ slot: 'cover' });
   const imaged = await untilIdle(runner);
   assert.match(imaged.job.error, /缺少 REPLICATE_API_TOKEN/);
   assert.equal(imaged.draft.title, '标题');
-  assert.equal(imaged.prompts.cover, '封面画面');
+  assert.equal(imaged.prompts.cover, '封面画面 一句');
   assert.equal(fetched, false);
 });
 
@@ -384,4 +412,214 @@ test('连续生成两篇，空态不打开历史第一篇', async () => {
   assert.equal(opened.business, '第一篇');
   assert.equal(fs.existsSync(path.join(root, 'posts', first.id, 'draft.json')), true);
   assert.equal(fs.existsSync(path.join(root, 'posts', second.id, 'draft.json')), true);
+});
+
+test('稿里存着指定句时，封面那句话仍由句子模块写出', async () => {
+  const root = tempDir();
+  const promptsDir = path.join(root, 'prompts');
+  writePrompts(promptsDir, { gallery: false });
+  const seen = [];
+  const runner = createRunner({
+    postsDir: path.join(root, 'posts'),
+    promptsDir,
+    complete: async (prompt) => {
+      seen.push(prompt);
+      return responseFor(prompt, 0);
+    },
+  });
+
+  runner.generateDraft({
+    business: '卖课',
+    article: '',
+    galleryCount: 0,
+    coverLineSpecified: '  我指定的  ',
+  });
+  const drafted = await untilIdle(runner);
+  assert.equal(drafted.coverLineSpecified, '我指定的');
+  assert.equal(drafted.draft.coverLine, '一句');
+  assert.equal(drafted.prompts.cover, '封面画面 一句');
+  assert.equal(seen.some((prompt) => prompt.startsWith('SENTENCE')), true);
+});
+
+test('不带槽位不能生图，再抽只换这一张', async () => {
+  const root = tempDir();
+  const promptsDir = path.join(root, 'prompts');
+  const postsDir = path.join(root, 'posts');
+  writePrompts(promptsDir);
+  const seen = [];
+  const runner = createRunner({
+    postsDir,
+    promptsDir,
+    complete: async (prompt) => responseFor(prompt, 1),
+    generateImage: async ({ prompt, outputPath }) => {
+      seen.push(prompt);
+      fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+      fs.writeFileSync(outputPath, prompt);
+    },
+  });
+  runner.generateDraft({ business: '卖课', article: '', galleryCount: 1 });
+  await untilIdle(runner);
+  const missing = runner.generateImages({});
+  assert.equal(missing.ok, false);
+  assert.equal(missing.message, '要指明封面或配图序号');
+
+  runner.generateImages({ slot: 'gallery', index: 1 });
+  await untilIdle(runner);
+  runner.generateImages({ slot: 'cover' });
+  const first = await untilIdle(runner);
+  assert.equal(first.images.cover.status, '成功');
+  assert.equal(first.images.gallery[0].status, '成功');
+  const galleryBytes = fs.readFileSync(path.join(first.directory, 'gallery-01.png'), 'utf8');
+
+  const cleared = runner.saveEditor({
+    prompts: { cover: first.prompts.cover, gallery: [''] },
+  });
+  assert.equal(cleared.ok, true);
+  const emptyGallery = runner.generateImages({ slot: 'gallery', index: 1 });
+  assert.equal(emptyGallery.ok, false);
+  assert.equal(emptyGallery.message, '还没有这一张的提示词');
+  const coverStill = runner.generateImages({
+    slot: 'cover',
+    prompts: { cover: '改过的封面提示词', gallery: [''] },
+  });
+  assert.equal(coverStill.ok, true);
+  const redrawn = await untilIdle(runner);
+  assert.equal(redrawn.images.cover.status, '成功');
+  assert.equal(fs.readFileSync(path.join(redrawn.directory, 'cover.png'), 'utf8'), '改过的封面提示词');
+  assert.equal(fs.readFileSync(path.join(redrawn.directory, 'gallery-01.png'), 'utf8'), galleryBytes);
+  assert.equal(seen.includes('改过的封面提示词'), true);
+});
+
+test('类型不在允许列表时不写封面提示词，也不生图', async () => {
+  const root = tempDir();
+  const promptsDir = path.join(root, 'prompts');
+  writePrompts(promptsDir, { gallery: false, story: false, compare: false });
+  let images = 0;
+  const runner = createRunner({
+    postsDir: path.join(root, 'posts'),
+    promptsDir,
+    complete: async (prompt) => {
+      if (prompt.startsWith('CHOOSE')) return JSON.stringify({ type: 'poster' });
+      return responseFor(prompt, 0);
+    },
+    generateImage: async () => {
+      images += 1;
+    },
+  });
+  runner.generateDraft({ business: '卖课', article: '', galleryCount: 0 });
+  const failed = await untilIdle(runner);
+  assert.match(failed.job.error, /封面类型不在允许列表/);
+  assert.equal(failed.draft.title, '标题');
+  assert.equal(failed.draft.coverLine, '');
+  assert.equal(failed.prompts.cover, '');
+  assert.equal(failed.prompts.coverType, '');
+  assert.equal(images, 0);
+  assert.equal(runner.generateImages({ slot: 'cover' }).ok, false);
+});
+
+test('已有封面时非法类型不覆盖上一份提示词', async () => {
+  const root = tempDir();
+  const promptsDir = path.join(root, 'prompts');
+  writePrompts(promptsDir, { gallery: false });
+  let chooseType = 'story';
+  let images = 0;
+  const runner = createRunner({
+    postsDir: path.join(root, 'posts'),
+    promptsDir,
+    complete: async (prompt) => {
+      if (prompt.startsWith('CHOOSE')) return JSON.stringify({ type: chooseType });
+      return responseFor(prompt, 0);
+    },
+    generateImage: async () => {
+      images += 1;
+    },
+  });
+  runner.generateDraft({ business: '卖课', article: '', galleryCount: 0 });
+  const drafted = await untilIdle(runner);
+  assert.equal(drafted.prompts.cover, '封面画面 一句');
+
+  chooseType = 'poster';
+  runner.generatePrompts({});
+  const failed = await untilIdle(runner);
+  assert.match(failed.job.error, /封面类型不在允许列表/);
+  assert.equal(failed.prompts.cover, '封面画面 一句');
+  assert.equal(failed.prompts.coverType, 'story');
+  assert.equal(failed.draft.title, '标题');
+  assert.equal(images, 0);
+});
+
+test('对比封面只读对比规则，配图张数为 0 时仍有封面', async () => {
+  const root = tempDir();
+  const promptsDir = path.join(root, 'prompts');
+  writePrompts(promptsDir, { gallery: false, story: false });
+  const seen = [];
+  const runner = createRunner({
+    postsDir: path.join(root, 'posts'),
+    promptsDir,
+    complete: async (prompt) => {
+      seen.push(prompt);
+      if (prompt.startsWith('CHOOSE')) return JSON.stringify({ type: 'compare' });
+      if (prompt.startsWith('COMPARE')) return JSON.stringify({ prompt: '左：没搞懂 右：弄明白了' });
+      return responseFor(prompt, 0);
+    },
+    generateImage: async ({ outputPath }) => {
+      fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+      fs.writeFileSync(outputPath, 'png');
+    },
+  });
+  runner.generateDraft({ business: '卖课', article: '', galleryCount: 0 });
+  const drafted = await untilIdle(runner);
+  assert.equal(drafted.prompts.coverType, 'compare');
+  assert.equal(drafted.prompts.cover, '左：没搞懂 右：弄明白了');
+  assert.equal(drafted.draft.coverLine, '一句');
+  assert.equal(seen.some((prompt) => prompt.startsWith('COMPARE')), true);
+  assert.equal(seen.some((prompt) => prompt.startsWith('STORY')), false);
+  assert.equal(seen.some((prompt) => prompt.startsWith('GALLERY')), false);
+  assert.equal(runner.generateImages({ slot: 'cover' }).ok, true);
+  const imaged = await untilIdle(runner);
+  assert.equal(imaged.images.cover.status, '成功');
+  assert.equal(imaged.prompts.gallery.length, 0);
+});
+
+test('旧规则版本的封面提示词待重算，打开时不删图', () => {
+  const root = tempDir();
+  const postsDir = path.join(root, 'posts');
+  const id = '20261013-181604';
+  const dir = path.join(postsDir, id);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'cover.png'), 'png');
+  fs.writeFileSync(path.join(dir, 'draft.json'), JSON.stringify({
+    business: '卖课',
+    article: '',
+    galleryCount: 1,
+    draft: face,
+    prompts: {
+      cover: '旧封面提示词',
+      gallery: ['配图'],
+      stale: false,
+      basis: { ...face, coverLineSpecified: '', galleryCount: 1 },
+    },
+    images: {
+      cover: { status: '成功', path: 'cover.png' },
+      gallery: [{ status: '成功', path: 'gallery-01.png' }],
+    },
+    job: { running: false, step: '', error: '' },
+  }));
+  fs.writeFileSync(path.join(postsDir, 'index.json'), JSON.stringify({
+    posts: [{ id, createdAt: '2026-10-13T10:00:00.000Z', updatedAt: '2026-10-13T10:00:00.000Z', title: '标题' }],
+  }));
+  const runner = createRunner({
+    postsDir,
+    promptsDir: tempDir(),
+    complete: async () => '{}',
+  });
+  const opened = runner.openPost({ id });
+  assert.equal(opened.prompts.stale, true);
+  assert.equal(opened.images.cover.status, '成功');
+  assert.equal(fs.existsSync(path.join(dir, 'cover.png')), true);
+  const blocked = runner.generateImages({ slot: 'cover' });
+  assert.equal(blocked.ok, false);
+  assert.match(blocked.message, /提示词待重算/);
+  assert.equal(fs.existsSync(path.join(dir, 'cover.png')), true);
+  assert.equal(runner.loadLatest().images.cover.status, '成功');
 });

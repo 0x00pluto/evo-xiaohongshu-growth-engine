@@ -11,6 +11,8 @@ const ROOT = path.resolve(__dirname, '..');
 const STATIC_DIR = path.join(ROOT, 'src', 'studio', 'static');
 const DEFAULT_PORT = 8768;
 const MAX_BODY = 1_500_000;
+const RELOAD_DEBOUNCE_MS = 100;
+const RELOAD_SNIPPET = '<script>(function(){var s=new EventSource("/api/dev/reload");s.onmessage=function(){location.reload();};})();</script>';
 const METHODS = new Set([
   'loadLatest',
   'openPost',
@@ -115,6 +117,48 @@ function contentType(filePath) {
   return 'application/octet-stream';
 }
 
+function entryDocument(pathname) {
+  return pathname === '/' || pathname === '/index.html';
+}
+
+function injectReload(body) {
+  const text = body.toString('utf8');
+  const at = text.lastIndexOf('</body>');
+  const next = at === -1 ? `${text}${RELOAD_SNIPPET}` : `${text.slice(0, at)}${RELOAD_SNIPPET}${text.slice(at)}`;
+  return Buffer.from(next);
+}
+
+function createReloadHub() {
+  const clients = new Set();
+  let timer = null;
+  return {
+    add(res) {
+      clients.add(res);
+    },
+    remove(res) {
+      clients.delete(res);
+    },
+    schedule() {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = null;
+        const payload = Buffer.from('data: reload\n\n');
+        for (const res of clients) res.write(payload);
+      }, RELOAD_DEBOUNCE_MS);
+    },
+    close() {
+      if (timer) clearTimeout(timer);
+      timer = null;
+      for (const res of clients) res.end();
+      clients.clear();
+    },
+  };
+}
+
+function watchStatic(staticDir, onChange) {
+  return fs.watch(staticDir, { recursive: true }, () => onChange());
+}
+
 function resolveStatic(staticDir, pathname) {
   let rel = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
   try {
@@ -129,17 +173,34 @@ function resolveStatic(staticDir, pathname) {
   return full;
 }
 
-function createHandler(runner, staticDir) {
+function createHandler(runner, staticDir, reloadHub) {
   return async function handle(req, res) {
     try {
       const url = new URL(req.url || '/', 'http://127.0.0.1');
+      if (req.method === 'GET' && url.pathname === '/api/dev/reload') {
+        if (!reloadHub) {
+          sendJson(res, 404, { ok: false, message: '没有这个地址' });
+          return;
+        }
+        res.writeHead(200, {
+          'Content-Type': 'text/event-stream; charset=utf-8',
+          'Cache-Control': 'no-store',
+          Connection: 'keep-alive',
+        });
+        res.write(': ok\n\n');
+        reloadHub.add(res);
+        req.on('close', () => reloadHub.remove(res));
+        return;
+      }
       if (req.method === 'GET' && !url.pathname.startsWith('/api/')) {
         const filePath = resolveStatic(staticDir, url.pathname);
         if (!filePath || !fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
           sendJson(res, 404, { ok: false, message: '没有这个地址' });
           return;
         }
-        const body = fs.readFileSync(filePath);
+        let body = fs.readFileSync(filePath);
+        // pages/*.html 会被 innerHTML 塞进页面，脚本插进去不会执行，也污染片段。
+        if (reloadHub && entryDocument(url.pathname)) body = injectReload(body);
         res.writeHead(200, {
           'Content-Type': contentType(filePath),
           'Content-Length': body.length,
@@ -170,9 +231,16 @@ function startServer(options) {
     throw error;
   }
   const runner = options.runner || createStudio(options);
-  const server = http.createServer(createHandler(runner, options.staticDir || STATIC_DIR));
+  const staticDir = options.staticDir || STATIC_DIR;
+  const reloadHub = options.reload ? createReloadHub() : null;
+  const watcher = reloadHub ? watchStatic(staticDir, () => reloadHub.schedule()) : null;
+  const server = http.createServer(createHandler(runner, staticDir, reloadHub));
   return new Promise((resolve, reject) => {
-    const onError = (err) => reject(err);
+    const onError = (err) => {
+      if (watcher) watcher.close();
+      if (reloadHub) reloadHub.close();
+      reject(err);
+    };
     server.once('error', onError);
     server.listen(options.port == null ? DEFAULT_PORT : options.port, host, () => {
       server.removeListener('error', onError);
@@ -183,6 +251,8 @@ function startServer(options) {
         port: address.port,
         url: `http://${printedHost}:${address.port}/`,
         close() {
+          if (watcher) watcher.close();
+          if (reloadHub) reloadHub.close();
           return new Promise((done, fail) => {
             server.close((err) => (err ? fail(err) : done()));
           });
@@ -202,15 +272,16 @@ async function main(argv) {
   const args = parseArgs(argv);
   if (args.help) {
     process.stdout.write('用法: node scripts/run-studio.js [--host 127.0.0.1] [--port 8768] [--open]\n');
+    process.stdout.write('改 src/studio/static 后，浏览器会自动刷新。改 src/one-post 或本脚本需要重启。\n');
     return 0;
   }
   if (!localHostAllowed(args.host)) {
     process.stderr.write('拒绝非本机绑定：请使用 127.0.0.1\n');
     return 2;
   }
-  const started = await startServer({ host: args.host, port: args.port });
+  const started = await startServer({ host: args.host, port: args.port, reload: true });
   process.stdout.write(`一篇图文 → ${started.url}\n`);
-  process.stdout.write('Ctrl+C 停止。\n');
+  process.stdout.write('改页面会自动刷新。Ctrl+C 停止。\n');
   if (args.open) openBrowser(started.url);
   return 0;
 }

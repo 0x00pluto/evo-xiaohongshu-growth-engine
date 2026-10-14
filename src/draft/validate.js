@@ -45,7 +45,6 @@ function validateDraftFace(draft) {
   if (draft.topics.some((topic) => typeof topic !== 'string' || !topic.trim())) {
     return '话题要有 3 到 5 个';
   }
-  if (typeof draft.coverLine !== 'string' || !draft.coverLine.trim()) return '封面一句是空的';
   return '';
 }
 
@@ -54,24 +53,29 @@ function normalizeFace(draft) {
     title: String(draft.title).trim(),
     body: String(draft.body).trim(),
     topics: draft.topics.map((topic) => String(topic).trim()),
-    coverLine: String(draft.coverLine).trim(),
+    coverLine: typeof draft.coverLine === 'string' ? draft.coverLine.trim() : '',
   };
 }
 
-function basisFrom(draft, galleryCount) {
+function basisFrom(draft, galleryCount, coverLineSpecified) {
   const face = normalizeFace(draft);
   return {
     title: face.title,
     body: face.body,
     topics: face.topics,
     coverLine: face.coverLine,
+    coverLineSpecified: typeof coverLineSpecified === 'string' ? coverLineSpecified.trim() : '',
     galleryCount,
+    // 大字规则改版后，旧封面提示词对不上这一版，打开时标待重算，不在这里删图。
+    coverRules: 'large-type-1',
   };
 }
 
 function basisEqual(left, right) {
   if (!left || !right) return false;
   if (left.title !== right.title || left.body !== right.body || left.coverLine !== right.coverLine) return false;
+  if ((left.coverLineSpecified || '') !== (right.coverLineSpecified || '')) return false;
+  if ((left.coverRules || '') !== (right.coverRules || '')) return false;
   if (left.galleryCount !== right.galleryCount) return false;
   if (!Array.isArray(left.topics) || !Array.isArray(right.topics) || left.topics.length !== right.topics.length) {
     return false;

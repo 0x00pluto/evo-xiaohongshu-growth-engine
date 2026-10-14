@@ -8,6 +8,7 @@ const {
   charLength,
   formatPost,
   formatTopics,
+  validateDraftFace,
   validateInputs,
 } = require('../../src/draft/validate');
 
@@ -41,4 +42,21 @@ test('整帖是标题、正文、话题，中间空一行', () => {
     coverLine: '不进帖子',
   }), '夏天出门\n\n第一段\n第二段\n\n#夏天穿搭 #通勤');
   assert.equal(formatPost({ title: '只有标题', body: '  ', topics: [] }), '只有标题');
+});
+
+test('封面流程还没成功时，空的封面那句话可以通过成稿校验', () => {
+  assert.equal(validateDraftFace({
+    title: '标题',
+    body: '正文',
+    topics: ['甲', '乙', '丙'],
+    coverLine: '',
+  }), '');
+  const inputs = validateInputs({
+    business: '卖课',
+    article: '',
+    galleryCount: 1,
+    coverLineSpecified: '   ',
+  });
+  assert.equal(inputs.ok, true);
+  assert.equal(inputs.field, undefined);
 });

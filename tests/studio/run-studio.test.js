@@ -18,13 +18,21 @@ test('本机服务的 loadLatest 在空目录返回空态', async () => {
   try {
     const page = await fetch(started.url);
     assert.equal(page.status, 200);
-    assert.match(await page.text(), /本机运行操作台/);
+    const html = await page.text();
+    assert.match(html, /本机运行操作台/);
+    assert.doesNotMatch(html, /EventSource/);
     const shellFile = await fetch(`${started.url}shell.js`);
     assert.equal(shellFile.status, 200);
     assert.match(await shellFile.text(), /生成笔记/);
     const noteFile = await fetch(`${started.url}pages/note.html`);
     assert.equal(noteFile.status, 200);
-    assert.match(await noteFile.text(), /复制这篇笔记/);
+    const noteHtml = await noteFile.text();
+    assert.match(noteHtml, /复制这篇笔记/);
+    assert.match(noteHtml, /这张的提示词/);
+    assert.match(noteHtml, /drawLabel\(item\)/);
+    assert.doesNotMatch(noteHtml, /封面上的这句话/);
+    assert.doesNotMatch(noteHtml, /做出封面和配图/);
+    assert.doesNotMatch(noteHtml, /id="cover-type"/);
 
     const response = await fetch(`${started.url}api/one-post/loadLatest`, {
       method: 'POST',
@@ -49,6 +57,57 @@ test('本机服务的 loadLatest 在空目录返回空态', async () => {
     assert.equal(rejected.message, '先用一句话说你要发什么。');
     assert.equal(fs.existsSync(path.join(root, 'output', 'one-post', 'latest', 'draft.json')), false);
   } finally {
+    await started.close();
+  }
+});
+
+test('改静态文件会通知浏览器刷新，片段页不插脚本', async () => {
+  const staticDir = fs.mkdtempSync(path.join(os.tmpdir(), 'one-post-static-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'one-post-studio-'));
+  fs.writeFileSync(path.join(staticDir, 'index.html'), '<html><body>入口</body></html>');
+  fs.mkdirSync(path.join(staticDir, 'pages'));
+  fs.writeFileSync(path.join(staticDir, 'pages', 'note.html'), '<p>片段</p>');
+  const started = await startServer({
+    host: '127.0.0.1',
+    port: 0,
+    root,
+    env: {},
+    staticDir,
+    reload: true,
+  });
+  let reader;
+  try {
+    const page = await fetch(started.url);
+    const html = await page.text();
+    assert.match(html, /EventSource\("\/api\/dev\/reload"\)/);
+    assert.match(html, /<\/script><\/body>/);
+    const note = await fetch(`${started.url}pages/note.html`);
+    assert.doesNotMatch(await note.text(), /EventSource/);
+
+    const stream = await fetch(`${started.url}api/dev/reload`);
+    assert.equal(stream.headers.get('content-type'), 'text/event-stream; charset=utf-8');
+    reader = stream.body.getReader();
+    const decoder = new TextDecoder();
+    let received = '';
+    const pending = (async () => {
+      while (!received.includes('data: reload')) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        received += decoder.decode(chunk.value, { stream: true });
+      }
+      return received;
+    })();
+    await new Promise((resolve) => { setTimeout(resolve, 50); });
+    fs.writeFileSync(path.join(staticDir, 'shell.js'), 'console.log(1)\n');
+    const body = await Promise.race([
+      pending,
+      new Promise((resolve, reject) => {
+        setTimeout(() => reject(new Error('没有收到刷新')), 2000);
+      }),
+    ]);
+    assert.match(body, /data: reload/);
+  } finally {
+    if (reader) await reader.cancel();
     await started.close();
   }
 });

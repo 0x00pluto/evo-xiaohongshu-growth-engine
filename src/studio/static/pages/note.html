@@ -13,7 +13,6 @@
     <p id="job-status" class="text-sm" aria-live="polite" x-show="job.running">进行中：<span x-text="stepText(job.step)"></span></p>
     <p id="job-error" class="text-sm text-error" role="alert" x-show="job.error && !job.running" x-text="job.error"></p>
     <p id="notice" class="text-sm text-error" role="alert" x-show="notice" x-text="notice"></p>
-    <p id="copied" class="text-sm" aria-live="polite" x-show="copied" x-text="copied"></p>
   </header>
 
   <section class="flex max-w-3xl flex-col gap-4" x-show="phase === 'materials'" aria-labelledby="materials-title">
@@ -73,72 +72,67 @@
     <button id="generate-draft" class="btn btn-primary w-fit" type="button" @click="onGenerateDraft()" :disabled="!hostReady || job.running">写成笔记</button>
   </section>
 
-  <section class="flex flex-col gap-4" x-show="phase === 'copy'" aria-labelledby="copy-title">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <h2 id="copy-title" class="text-lg font-medium">这篇笔记</h2>
-      <button id="copy-post" class="btn btn-primary w-fit" type="button" @click="onCopyPost()" :disabled="!postText()">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-        复制这篇笔记
-      </button>
-    </div>
-    <p class="text-sm leading-6" x-show="!draft">笔记还在写，出来后可以改，再整篇复制。</p>
-    <p class="text-sm leading-6" x-show="promptsWaiting"><span class="badge badge-outline">待重算</span> 你改过字了。配图之前，先让画面跟上这篇。</p>
-    <button id="regenerate-prompts" class="btn btn-primary w-fit" type="button" x-show="promptsWaiting" @click="onGeneratePrompts()" :disabled="!hostReady || job.running">让画面跟上</button>
+  <section class="mx-auto flex w-full max-w-2xl flex-col gap-4" x-show="phase === 'copy'" aria-labelledby="copy-title">
+    <h2 id="copy-title" class="text-lg font-medium">这篇笔记</h2>
+    <p class="text-sm leading-6" x-show="!draft">笔记还在写，出来后可以整篇复制。</p>
+    <p class="text-sm leading-6" x-show="promptsWaiting && !job.running"><span class="badge badge-outline">待重算</span> 画面还对不上这篇。配图之前，先让画面跟上。</p>
+    <button id="regenerate-prompts" class="btn btn-primary w-fit" type="button" x-show="promptsWaiting && !job.running" @click="onGeneratePrompts()" :disabled="!hostReady || job.running">让画面跟上</button>
     <template x-if="draft">
-      <div class="grid items-start gap-8 lg:grid-cols-2">
-        <div class="flex flex-col gap-4">
-          <div class="flex flex-col gap-2">
-            <label class="text-sm font-medium" for="draft-title-input">标题</label>
-            <input id="draft-title-input" class="input w-full" type="text" x-model="draft.title" :readonly="job.running" @blur="persist()" />
-          </div>
-          <div class="flex flex-col gap-2">
-            <label class="text-sm font-medium" for="draft-body">正文</label>
-            <textarea id="draft-body" class="textarea min-h-48 w-full wrap" x-model="draft.body" :readonly="job.running" @blur="persist()"></textarea>
-          </div>
-          <div class="flex flex-col gap-2">
-            <span class="text-sm font-medium" id="topics-label">话题</span>
-            <div class="flex flex-col gap-2" role="group" aria-labelledby="topics-label">
-              <template x-for="(topic, index) in draft.topics" :key="index">
-                <input class="input w-full" type="text" :aria-label="'话题 ' + (index + 1)" x-model="draft.topics[index]" :readonly="job.running" @blur="persist()" />
-              </template>
-            </div>
-          </div>
-          <div class="flex flex-col gap-2">
-            <label class="text-sm font-medium" for="cover-line">封面上的那句话</label>
-            <input id="cover-line" class="input w-full" type="text" x-model="draft.coverLine" :readonly="job.running" @blur="persist()" />
-            <p class="text-sm leading-6">这句不进复制出去的正文。</p>
-          </div>
-        </div>
-        <article id="post-preview" class="flex flex-col gap-4 border border-base-300 bg-base-100 p-4" aria-label="笔记预览">
-          <h3 class="text-base font-medium" x-text="draft.title"></h3>
-          <p class="wrap text-sm leading-6" x-text="draft.body"></p>
-          <p class="text-sm leading-6" x-text="formatTopics(draft.topics)"></p>
-        </article>
-      </div>
+      <article id="post-preview" class="relative flex flex-col gap-4 border border-base-300 bg-base-100 p-4" aria-label="笔记预览">
+        <button id="copy-post" class="btn btn-ghost btn-sm btn-square absolute top-2 right-2" type="button" aria-label="复制这篇笔记" @click="onCopyPost()" :disabled="!postText()">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+        </button>
+        <h3 class="pr-10 text-base font-medium" x-text="draft.title"></h3>
+        <p class="wrap text-sm leading-6" x-text="draft.body"></p>
+        <p class="text-sm leading-6" x-text="formatTopics(draft.topics)"></p>
+      </article>
     </template>
   </section>
 
   <section class="flex flex-col gap-4" x-show="phase === 'images'" aria-labelledby="images-title">
     <h2 id="images-title" class="text-lg font-medium">配图</h2>
-    <button id="generate-images" class="btn btn-primary w-fit" type="button" @click="onGenerateImages()" :disabled="imagesDisabled">做出封面和配图</button>
-    <p class="text-sm leading-6" x-show="!draft">封面和配图会按竖图出现在这里。</p>
+    <p class="text-sm leading-6" x-show="promptsWaiting && draft && !job.running"><span class="badge badge-outline">待重算</span> 画面还对不上这篇。先让画面跟上，再抽这一张。</p>
+    <button id="regenerate-prompts-images" class="btn btn-primary w-fit" type="button" x-show="promptsWaiting && draft && !job.running" @click="onGeneratePrompts()" :disabled="!hostReady || job.running">让画面跟上</button>
+    <p class="text-sm leading-6" x-show="!draft">封面和配图的提示词会先出现在这里，再一张一张生成。</p>
     <p class="text-sm leading-6 break-all" x-show="directory">图片文件夹：<span x-text="directory"></span></p>
-    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" x-show="draft">
-      <template x-for="item in imageSlots" :key="item.slot + item.index">
-        <article class="flex flex-col gap-3 border border-base-300 p-4">
-          <div class="flex items-center justify-between gap-2">
-            <h3 class="text-sm font-medium" x-text="item.label"></h3>
-            <span class="badge badge-outline" x-text="statusLabel(item.image.status)"></span>
+    <div class="flex flex-col gap-4" x-show="draft">
+      <template x-for="item in slots" :key="item.slot + '-' + item.index">
+        <article class="flex flex-col gap-4 border border-base-300 p-4 lg:flex-row lg:items-stretch">
+          <div class="flex min-w-0 flex-1 flex-col gap-2">
+            <div class="flex items-center justify-between gap-2">
+              <h3 class="text-sm font-medium" x-text="item.label"></h3>
+              <span class="badge badge-outline" x-text="statusLabel(item.image.status)"></span>
+            </div>
+            <label class="text-sm font-medium" :for="'slot-prompt-' + item.slot + '-' + item.index">这张的提示词</label>
+            <textarea
+              class="textarea min-h-40 w-full flex-1 wrap"
+              :id="'slot-prompt-' + item.slot + '-' + item.index"
+              x-model="item.prompt"
+              :readonly="job.running"
+              @input="setSlotPrompt(item)"
+              @blur="persist()"
+            ></textarea>
+            <p class="text-sm leading-6" x-show="promptsWaiting">提示词待重算</p>
+            <p class="text-sm leading-6" x-show="!promptsWaiting && !String(item.prompt || '').trim()">还没有这一张的提示词</p>
           </div>
-          <div class="aspect-[3/4] bg-base-200">
-            <img class="h-full w-full object-cover" x-show="item.image.status === '成功' && previews[item.image.path]" :src="previews[item.image.path] || ''" :alt="item.label" />
+          <div class="flex items-center lg:flex-col lg:justify-center">
+            <button class="btn btn-primary" type="button" @click="onDraw(item)" :disabled="!hostReady || job.running || !draft || promptsWaiting || !String(item.prompt || '').trim()" x-text="drawLabel(item)"></button>
           </div>
-          <div class="flex flex-wrap gap-2">
-            <button class="btn btn-ghost btn-sm" type="button" x-show="item.image.status === '失败'" @click="onRetry(item)" :disabled="!hostReady || job.running">重试这张</button>
-            <button class="btn btn-ghost btn-sm" type="button" x-show="item.image.status === '成功'" @click="onReveal(item)" :disabled="!hostReady">显示文件</button>
+          <div class="flex w-full shrink-0 flex-col gap-2 lg:w-52">
+            <div class="aspect-[3/4] bg-base-200">
+              <img class="h-full w-full object-cover" x-show="item.image.status === '成功' && previews[item.image.path]" :src="previews[item.image.path] || ''" :alt="item.label" />
+            </div>
+            <button class="btn btn-ghost btn-sm w-fit" type="button" x-show="item.image.status === '成功'" @click="onReveal(item)" :disabled="!hostReady">显示文件</button>
           </div>
         </article>
       </template>
     </div>
   </section>
+  <template x-if="copied">
+    <div class="toast toast-top toast-end">
+      <div class="alert" role="status">
+        <span x-text="copied"></span>
+      </div>
+    </div>
+  </template>
 </div>

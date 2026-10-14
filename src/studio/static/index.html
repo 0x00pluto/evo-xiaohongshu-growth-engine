@@ -9,6 +9,24 @@
   <script src="shell.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
   <style>
+    /* Cal 色板只覆盖语义变量，圆角和控件尺寸仍跟 daisyUI。子页注入本页，不必再写一份。 */
+    [data-theme="light"] {
+      color-scheme: light;
+      --color-base-100: #ffffff;
+      --color-base-200: #f5f5f5;
+      --color-base-300: #e5e7eb;
+      --color-base-content: #111111;
+      --color-primary: #111111;
+      --color-primary-content: #ffffff;
+      --color-accent: #3b82f6;
+      --color-accent-content: #ffffff;
+      --color-success: #10b981;
+      --color-success-content: #ffffff;
+      --color-warning: #f59e0b;
+      --color-warning-content: #111111;
+      --color-error: #ef4444;
+      --color-error-content: #ffffff;
+    }
     :focus-visible {
       outline: 2px solid currentColor;
       outline-offset: 2px;

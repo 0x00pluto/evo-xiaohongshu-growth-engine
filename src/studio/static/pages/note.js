@@ -10,11 +10,13 @@ function notePage() {
     errors: { business: '', article: '', galleryCount: '' },
     notice: '',
     copied: '',
+    copiedTimer: null,
     directory: '',
     previews: {},
     pollTimer: null,
     phase: 'materials',
     postId: '',
+    slots: [],
 
     hostReady: window.studioHost.ready,
     get articleLength() {
@@ -34,23 +36,29 @@ function notePage() {
         || basisTopics.length !== topics.length
         || basisTopics.some((topic, index) => topic !== topics[index]);
     },
-    get imagesDisabled() {
-      return !this.hostReady
-        || this.job.running
-        || !this.draft
-        || this.promptsWaiting
-        || !String(this.prompts.cover || '').trim();
-    },
-    get imageSlots() {
+    syncSlots() {
       const cover = this.images.cover || { status: '空', path: '' };
-      const slots = [{ slot: 'cover', index: 0, label: '封面', image: cover }];
+      const slots = [{
+        slot: 'cover',
+        index: 0,
+        label: '封面',
+        image: cover,
+        prompt: String(this.prompts.cover || ''),
+      }];
       const count = Number(this.galleryCount);
       const total = Number.isInteger(count) && count > 0 ? count : 0;
       for (let index = 1; index <= total; index += 1) {
         const image = (this.images.gallery && this.images.gallery[index - 1]) || { status: '空', path: '' };
-        slots.push({ slot: 'gallery', index, label: `配图 ${index}`, image });
+        const prompt = (this.prompts.gallery && this.prompts.gallery[index - 1]) || '';
+        slots.push({
+          slot: 'gallery',
+          index,
+          label: `配图 ${index}`,
+          image,
+          prompt: String(prompt),
+        });
       }
-      return slots;
+      this.slots = slots;
     },
 
     formatTopics(topics) {
@@ -130,9 +138,10 @@ function notePage() {
       this.job = next.job || { running: false, step: '', error: '' };
       this.directory = next.directory || '';
       this.postId = next.id || '';
+      this.syncSlots();
     },
     async loadPreviews() {
-      for (const item of this.imageSlots) {
+      for (const item of this.slots) {
         if (item.image.status !== '成功' || !item.image.path || this.previews[item.image.path]) continue;
         const result = await this.call('previewImage', { slot: item.slot, index: item.index });
         if (result && result.ok && result.dataUrl) this.previews[item.image.path] = result.dataUrl;
@@ -238,26 +247,41 @@ function notePage() {
       this.ensurePoll();
       await this.refresh();
     },
-    async onGenerateImages() {
-      if (this.imagesDisabled) return;
+    setSlotPrompt(item) {
+      const value = String(item.prompt || '');
+      if (item.slot === 'cover') {
+        this.prompts.cover = value;
+        return;
+      }
+      const gallery = Array.isArray(this.prompts.gallery) ? this.prompts.gallery.slice() : [];
+      while (gallery.length < item.index) gallery.push('');
+      gallery[item.index - 1] = value;
+      this.prompts.gallery = gallery;
+    },
+    slotDrawDisabled(item) {
+      return !this.hostReady
+        || this.job.running
+        || !this.draft
+        || this.promptsWaiting
+        || !String(item.prompt || '').trim();
+    },
+    drawLabel(item) {
+      return item.image && item.image.status === '成功' ? '再抽一张' : '生成这张';
+    },
+    async onDraw(item) {
+      if (this.slotDrawDisabled(item)) return;
       this.notice = '';
       const count = Number(this.galleryCount) || 0;
       const result = await this.call('generateImages', {
+        slot: item.slot,
+        index: item.index,
         prompts: {
           cover: this.prompts.cover,
-          gallery: this.prompts.gallery.slice(0, count),
+          gallery: (this.prompts.gallery || []).slice(0, count),
         },
       });
       if (this.noteRejection(result)) return;
-      this.job = { running: true, step: '封面', error: '' };
-      this.ensurePoll();
-      await this.refresh();
-    },
-    async onRetry(item) {
-      if (!this.hostReady || this.job.running || item.image.status !== '失败') return;
-      const result = await this.call('retryImage', { slot: item.slot, index: item.index });
-      if (this.noteRejection(result)) return;
-      this.job = { running: true, step: item.label, error: '' };
+      this.job = { running: true, step: item.slot === 'cover' ? '封面' : item.label, error: '' };
       this.ensurePoll();
       await this.refresh();
     },
@@ -272,15 +296,31 @@ function notePage() {
       await this.writeClipboard(text);
     },
     async onOpenHistory() {
+      this.clearCopied();
       if (!window.studioHost.go) return;
       await window.studioHost.go('history');
+    },
+    clearCopied() {
+      if (this.copiedTimer) {
+        clearTimeout(this.copiedTimer);
+        this.copiedTimer = null;
+      }
+      this.copied = '';
+    },
+    showCopied(message) {
+      if (this.copiedTimer) clearTimeout(this.copiedTimer);
+      this.copied = message;
+      this.copiedTimer = setTimeout(() => {
+        this.copied = '';
+        this.copiedTimer = null;
+      }, 2000);
     },
     async writeClipboard(text) {
       try {
         await navigator.clipboard.writeText(text);
-        this.copied = '已复制这篇笔记';
+        this.showCopied('已复制');
       } catch (err) {
-        this.copied = '没有复制成功';
+        this.showCopied('没有复制成功');
       }
     },
     async onNew() {
@@ -292,7 +332,7 @@ function notePage() {
       }
       this.previews = {};
       this.errors = { business: '', article: '', galleryCount: '' };
-      this.copied = '';
+      this.clearCopied();
       this.applyServer(fresh);
       this.phase = 'materials';
     },
@@ -305,6 +345,7 @@ function notePage() {
       }
       this.previews = {};
       this.errors = { business: '', article: '', galleryCount: '' };
+      this.clearCopied();
       this.applyServer(result);
       this.phase = result.draft ? 'copy' : 'materials';
     },
