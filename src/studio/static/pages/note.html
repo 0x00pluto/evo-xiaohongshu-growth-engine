@@ -71,12 +71,11 @@
             x-model.number="galleryCount"
             :readonly="job.running"
             :aria-invalid="errors.galleryCount ? 'true' : 'false'"
-            aria-describedby="gallery-hint gallery-error"
+            aria-describedby="gallery-error"
             @change="onCountChange()"
           />
           <button id="gallery-inc" class="btn btn-sm join-item" type="button" aria-label="多一张" @click="galleryCount = Math.min(9, Number(galleryCount) + 1); onCountChange()" :disabled="job.running || Number(galleryCount) >= 9">+</button>
         </div>
-        <p id="gallery-hint" class="text-sm">0 到 9，封面另外有 1 张。</p>
       </div>
       <p id="gallery-error" class="text-sm text-error" role="alert" x-show="errors.galleryCount" x-text="errors.galleryCount"></p>
     </div>
@@ -114,14 +113,23 @@
     <p class="text-sm leading-6" x-show="!draft">笔记还在写，出来后可以整篇复制。</p>
     <template x-if="draft">
     <div class="flex flex-col gap-4">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <p class="text-sm leading-6" x-show="promptsWaiting && !job.running"><span class="badge badge-outline">待重算</span> 画面还对不上这篇。</p>
-        <button id="regenerate-prompts" class="btn btn-primary btn-sm" type="button" x-show="promptsWaiting && !job.running" @click="onGeneratePrompts()" :disabled="!hostReady || job.running">让画面跟上</button>
-      </div>
       <div class="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div class="flex min-w-0 flex-col gap-4">
         <div class="flex flex-col gap-3 rounded-lg bg-base-200 p-3">
           <p class="text-sm font-medium" x-text="'图片 ' + imageIndex + '/' + imageTotal"></p>
+          <fieldset id="reading" class="flex flex-col gap-2" x-show="draft" x-cloak>
+            <legend class="sr-only">图片解读</legend>
+            <div class="grid grid-cols-2 gap-2" role="radiogroup" aria-label="图片解读">
+              <label class="btn btn-sm" :class="reading === 'breakdown' ? 'btn-primary' : 'btn-ghost border border-base-300'">
+                <input class="sr-only" type="radio" name="reading" value="breakdown" :checked="reading === 'breakdown'" :disabled="job.running" @change="onReading('breakdown')" />
+                过程说明
+              </label>
+              <label class="btn btn-sm" :class="reading === 'compare' ? 'btn-primary' : 'btn-ghost border border-base-300'">
+                <input class="sr-only" type="radio" name="reading" value="compare" :checked="reading === 'compare'" :disabled="job.running" @change="onReading('compare')" />
+                对比
+              </label>
+            </div>
+          </fieldset>
           <div class="flex gap-2 overflow-x-auto p-1">
             <template x-for="item in slots" :key="drawKey(item)">
               <div class="relative w-16 shrink-0">
@@ -135,12 +143,19 @@
               </div>
             </template>
           </div>
+          <div class="flex gap-2" x-show="activeVersions.length" x-cloak>
+            <template x-for="(version, index) in activeVersions" :key="version.path">
+              <button class="relative h-12 w-9 shrink-0 overflow-hidden bg-base-100" type="button" :class="versionChosen(activeSlot, index) ? 'ring-2 ring-base-content' : ''" :aria-label="'第 ' + (index + 1) + ' 张'" :aria-pressed="versionChosen(activeSlot, index) ? 'true' : 'false'" @click="onChooseVersion(activeSlot, index + 1)" :disabled="job.running">
+                <img class="h-full w-full object-cover" x-show="versionPreview(version)" :src="versionPreview(version)" alt="" />
+                <span class="absolute bottom-0 right-0 bg-base-100 px-0.5 text-[10px] leading-none" x-text="index + 1"></span>
+              </button>
+            </template>
+          </div>
           <template x-if="activeSlot && promptIsOpen(activeSlot)">
             <div class="flex flex-col gap-2">
               <label class="text-sm font-medium" :for="'slot-prompt-' + activeKey">这张的提示词</label>
               <textarea class="textarea min-h-32 w-full wrap" :id="'slot-prompt-' + activeKey" x-model="activeSlot.prompt" :readonly="job.running" @input="setSlotPrompt(activeSlot)" @blur="persist()"></textarea>
-              <p class="text-sm" x-show="promptsWaiting">画面还对不上这篇</p>
-              <p class="text-sm" x-show="!promptsWaiting && !String(activeSlot.prompt || '').trim()">还没有这一张的提示词</p>
+              <p class="text-sm" x-show="!String(activeSlot.prompt || '').trim()">还没有这一张的提示词</p>
               <div>
                 <button class="btn btn-ghost btn-sm" type="button" x-show="activeSlot.image.status === '成功'" @click="onReveal(activeSlot)" :disabled="!hostReady">显示文件</button>
               </div>

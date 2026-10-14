@@ -27,9 +27,17 @@ test('本机服务的 loadLatest 在空目录返回空态', async () => {
     const noteFile = await fetch(`${started.url}pages/note.html`);
     assert.equal(noteFile.status, 200);
     const noteHtml = await noteFile.text();
-    assert.match(noteHtml, /复制这篇笔记/);
+    assert.match(noteHtml, /复制这篇/);
     assert.match(noteHtml, /这张的提示词/);
+    assert.doesNotMatch(noteHtml, /只发头图/);
+    assert.doesNotMatch(noteHtml, /让画面跟上/);
+    assert.doesNotMatch(noteHtml, /待重算/);
+    assert.match(noteHtml, /id="reading"/);
+    assert.match(noteHtml, /过程说明/);
+    assert.match(noteHtml, /对比/);
+    assert.doesNotMatch(noteHtml, /<select[^>]*setType/);
     assert.match(noteHtml, /drawLabel\(item\)/);
+    assert.match(noteHtml, /onChooseVersion/);
     assert.doesNotMatch(noteHtml, /封面上的这句话/);
     assert.doesNotMatch(noteHtml, /做出封面和配图/);
     assert.doesNotMatch(noteHtml, /id="cover-type"/);

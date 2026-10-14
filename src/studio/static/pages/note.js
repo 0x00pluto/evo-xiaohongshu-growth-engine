@@ -6,8 +6,18 @@ function notePage() {
     articleOpen: false,
     galleryCount: 1,
     draft: null,
-    prompts: { cover: '', gallery: [], stale: false, basis: null },
-    images: { cover: { status: '空', path: '' }, gallery: [] },
+    prompts: {
+      cover: '',
+      coverType: '',
+      setType: '',
+      gallery: [],
+      galleryLines: [],
+      galleryRoles: [],
+      style: '',
+      stale: false,
+      basis: null,
+    },
+    images: { cover: { status: '空', path: '', selected: 0, revisedAt: 0, versions: [] }, gallery: [] },
     job: { running: false, step: '', error: '' },
     errors: { business: '', article: '', galleryCount: '' },
     notice: '',
@@ -27,19 +37,15 @@ function notePage() {
     get articleLength() {
       return Array.from(String(this.article || '').trim()).length;
     },
-    get promptsWaiting() {
-      if (!this.draft) return false;
-      if (this.prompts.stale) return true;
-      if (!this.prompts.basis) return Boolean(String(this.prompts.cover || '').trim());
-      const basis = this.prompts.basis;
-      const topics = (this.draft.topics || []).map((topic) => String(topic).trim());
-      const basisTopics = Array.isArray(basis.topics) ? basis.topics : [];
-      return basis.title !== String(this.draft.title || '').trim()
-        || basis.body !== String(this.draft.body || '').trim()
-        || basis.coverLine !== String(this.draft.coverLine || '').trim()
-        || Number(basis.galleryCount) !== Number(this.galleryCount)
-        || basisTopics.length !== topics.length
-        || basisTopics.some((topic, index) => topic !== topics[index]);
+    get reading() {
+      return this.prompts.coverType === 'compare' ? 'compare' : 'breakdown';
+    },
+    // 表单里的张数是下一次「写成笔记」要用的。笔记上的槽位跟上次写成的结果走。
+    committedGalleryCount() {
+      const basisCount = this.prompts && this.prompts.basis ? Number(this.prompts.basis.galleryCount) : NaN;
+      if (Number.isInteger(basisCount) && basisCount >= 0 && basisCount <= 9) return basisCount;
+      const count = Number(this.galleryCount);
+      return Number.isInteger(count) && count > 0 ? count : 0;
     },
     syncSlots() {
       const cover = this.images.cover || { status: '空', path: '' };
@@ -50,8 +56,7 @@ function notePage() {
         image: cover,
         prompt: String(this.prompts.cover || ''),
       }];
-      const count = Number(this.galleryCount);
-      const total = Number.isInteger(count) && count > 0 ? count : 0;
+      const total = this.committedGalleryCount();
       for (let index = 1; index <= total; index += 1) {
         const image = (this.images.gallery && this.images.gallery[index - 1]) || { status: '空', path: '' };
         const prompt = (this.prompts.gallery && this.prompts.gallery[index - 1]) || '';
@@ -115,8 +120,7 @@ function notePage() {
       return [title, body, topics].filter(Boolean).join('\n\n');
     },
     stepText(step) {
-      if (step === '成稿') return '正在写这篇笔记';
-      if (step === '提示词') return '正在让画面跟上';
+      if (step === '成稿' || step === '提示词') return '正在写这篇笔记';
       if (step === '封面') return '正在做封面';
       if (typeof step === 'string' && step.startsWith('配图')) return `正在做${step}`;
       return step || '';
@@ -150,6 +154,10 @@ function notePage() {
     get activeSlot() {
       return this.slots.find((item) => this.promptKey(item) === this.activeKey) || this.slots[0] || null;
     },
+    get activeVersions() {
+      const image = this.activeSlot && this.activeSlot.image;
+      return image && Array.isArray(image.versions) ? image.versions : [];
+    },
     get imageTotal() {
       return this.slots.length;
     },
@@ -162,14 +170,29 @@ function notePage() {
       const active = this.activeSlot;
       return Boolean(active && item && this.promptKey(active) === this.promptKey(item));
     },
+    previewKey(item) {
+      const image = item && item.image;
+      if (!image || !image.path) return '';
+      return `${image.path}@${image.revisedAt || 0}`;
+    },
     slotPreview(item) {
-      if (!item || !item.image || item.image.status !== '成功' || !item.image.path) return '';
-      return this.previews[item.image.path] || '';
+      if (!item || !item.image || !item.image.path) return '';
+      if (item.image.status !== '成功' && item.image.status !== '生成中') return '';
+      return this.previews[this.previewKey(item)] || '';
+    },
+    versionPreview(version) {
+      if (!version || !version.path) return '';
+      return this.previews[`${version.path}@${version.revisedAt || 0}`] || '';
+    },
+    versionChosen(item, index) {
+      return Boolean(item && item.image && item.image.selected === index + 1);
     },
     drawKey(item) {
-      // 键带上能不能点。列表复用旧节点时，disabled 会停在第一次算出来的结果。
+      // 键带上能不能点，以及这张图的修订号。列表复用旧节点时，disabled 和图片都会停在第一次的结果。
       const status = item && item.image && item.image.status ? item.image.status : '空';
-      return `${this.promptKey(item)}-${status}-${this.slotDrawDisabled(item) ? 'off' : 'on'}`;
+      const revised = item && item.image && item.image.revisedAt ? item.image.revisedAt : 0;
+      const selected = item && item.image && item.image.selected ? item.image.selected : 0;
+      return `${this.promptKey(item)}-${status}-${revised}-${selected}-${this.slotDrawDisabled(item) ? 'off' : 'on'}`;
     },
     get hasGeneratedImage() {
       return this.slots.some((item) => item.image && item.image.status === '成功' && item.image.path);
@@ -237,7 +260,17 @@ function notePage() {
       this.article = typeof next.article === 'string' ? next.article : '';
       this.galleryCount = next.galleryCount == null ? 1 : next.galleryCount;
       this.draft = next.draft || null;
-      this.prompts = next.prompts || { cover: '', gallery: [], stale: false, basis: null };
+      this.prompts = next.prompts || {
+        cover: '',
+        coverType: '',
+        setType: '',
+        gallery: [],
+        galleryLines: [],
+        galleryRoles: [],
+        style: '',
+        stale: false,
+        basis: null,
+      };
       this.images = next.images || { cover: { status: '空', path: '' }, gallery: [] };
       this.job = next.job || { running: false, step: '', error: '' };
       this.directory = next.directory || '';
@@ -252,13 +285,29 @@ function notePage() {
     async loadPreviews() {
       const next = { ...this.previews };
       let changed = false;
+      const live = new Set();
       for (const item of this.slots) {
-        if (item.image.status !== '成功' || !item.image.path || next[item.image.path]) continue;
-        const result = await this.call('previewImage', { slot: item.slot, index: item.index });
-        if (result && result.ok && result.dataUrl) {
-          next[item.image.path] = result.dataUrl;
-          changed = true;
+        const versions = item.image && Array.isArray(item.image.versions) ? item.image.versions : [];
+        for (let index = 0; index < versions.length; index += 1) {
+          const version = versions[index];
+          const key = `${version.path}@${version.revisedAt || 0}`;
+          live.add(key);
+          if (next[key]) continue;
+          const result = await this.call('previewImage', {
+            slot: item.slot,
+            index: item.index,
+            version: index + 1,
+          });
+          if (result && result.ok && result.dataUrl) {
+            next[key] = result.dataUrl;
+            changed = true;
+          }
         }
+      }
+      for (const key of Object.keys(next)) {
+        if (live.has(key)) continue;
+        delete next[key];
+        changed = true;
       }
       if (changed) this.previews = next;
     },
@@ -355,13 +404,10 @@ function notePage() {
       this.ensurePoll();
       await this.refresh();
     },
-    async onGeneratePrompts() {
-      if (!this.hostReady || this.job.running || !this.draft) return;
+    async onReading(next) {
+      if (!this.hostReady || this.job.running || !this.draft || next === this.reading) return;
       this.notice = '';
-      const result = await this.call('generatePrompts', {
-        draft: this.draft,
-        galleryCount: this.galleryCount,
-      });
+      const result = await this.call('reinterpret', { reading: next });
       if (this.noteRejection(result)) return;
       this.job = { running: true, step: '提示词', error: '' };
       this.ensurePoll();
@@ -382,7 +428,6 @@ function notePage() {
       return !this.hostReady
         || this.job.running
         || !this.draft
-        || this.promptsWaiting
         || !String(item.prompt || '').trim();
     },
     drawLabel(item) {
@@ -391,18 +436,31 @@ function notePage() {
     async onDraw(item) {
       if (this.slotDrawDisabled(item)) return;
       this.notice = '';
-      const count = Number(this.galleryCount) || 0;
       const result = await this.call('generateImages', {
         slot: item.slot,
         index: item.index,
         prompts: {
           cover: this.prompts.cover,
-          gallery: (this.prompts.gallery || []).slice(0, count),
+          gallery: Array.isArray(this.prompts.gallery) ? this.prompts.gallery.slice() : [],
         },
       });
       if (this.noteRejection(result)) return;
       this.job = { running: true, step: item.slot === 'cover' ? '封面' : item.label, error: '' };
       this.ensurePoll();
+      await this.refresh();
+    },
+    async onChooseVersion(item, version) {
+      if (!this.hostReady || this.job.running || !item) return;
+      this.notice = '';
+      const result = await this.call('chooseImage', {
+        slot: item.slot,
+        index: item.index,
+        version,
+      });
+      if (result && result.ok === false) {
+        this.notice = result.message || '没有这一张';
+        return;
+      }
       await this.refresh();
     },
     async onReveal(item) {
@@ -482,6 +540,7 @@ function notePage() {
         return;
       }
       this.errors.galleryCount = '';
+      this.phase = 'materials';
       await this.persist();
     },
   };

@@ -21,6 +21,8 @@ const METHODS = new Set([
   'saveEditor',
   'generateDraft',
   'generatePrompts',
+  'reinterpret',
+  'chooseImage',
   'generateImages',
   'retryImage',
   'previewImage',

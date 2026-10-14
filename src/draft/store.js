@@ -9,8 +9,30 @@ function galleryFile(index) {
   return `gallery-${String(index).padStart(2, '0')}.png`;
 }
 
+function imagePrefix(slot, index) {
+  if (slot === 'cover') return 'cover';
+  return galleryFile(index).replace(/\.png$/, '');
+}
+
+function safeImageName(filePath) {
+  if (typeof filePath !== 'string') return '';
+  return /^(?:cover|gallery-\d{2})(?:-\d+)?\.png$/.test(filePath) ? filePath : '';
+}
+
+function nextImageFile(slot, index, versions) {
+  const prefix = imagePrefix(slot, index);
+  let max = 0;
+  for (const item of versions || []) {
+    const filePath = item && item.path;
+    if (filePath === `${prefix}.png`) max = Math.max(max, 1);
+    const match = typeof filePath === 'string' ? filePath.match(new RegExp(`^${prefix}-(\\d+)\\.png$`)) : null;
+    if (match) max = Math.max(max, Number(match[1]));
+  }
+  return `${prefix}-${max + 1}.png`;
+}
+
 function emptySlot() {
-  return { status: '空', path: '' };
+  return { status: '空', path: '', selected: 0, revisedAt: 0, versions: [] };
 }
 
 function emptyState() {
@@ -20,16 +42,56 @@ function emptyState() {
     coverLineSpecified: '',
     galleryCount: 1,
     draft: null,
-    prompts: { cover: '', coverType: '', gallery: [], stale: false, basis: null },
+    prompts: {
+      cover: '',
+      coverType: '',
+      setType: '',
+      gallery: [],
+      galleryLines: [],
+      galleryRoles: [],
+      style: '',
+      stale: false,
+      basis: null,
+    },
     images: { cover: emptySlot(), gallery: [] },
     job: { running: false, step: '', error: '' },
   };
 }
 
+function versionStamp(value) {
+  const revised = Number(value);
+  return Number.isInteger(revised) && revised > 0 ? revised : 0;
+}
+
 function normalizeSlot(slot) {
   const status = slot && STATUSES.has(slot.status) ? slot.status : '空';
-  const filePath = slot && typeof slot.path === 'string' ? slot.path : '';
-  return { status, path: filePath };
+  const versions = [];
+  const seen = new Set();
+  const pushVersion = (filePath, revisedAt) => {
+    const safe = safeImageName(filePath);
+    if (!safe || seen.has(safe)) return;
+    seen.add(safe);
+    versions.push({ path: safe, revisedAt: versionStamp(revisedAt) });
+  };
+  if (slot && Array.isArray(slot.versions)) {
+    for (const item of slot.versions) pushVersion(item && item.path, item && item.revisedAt);
+  }
+  // 旧稿只有一个路径。它算这个位置的第 1 张，文件名不改。
+  pushVersion(slot && slot.path, slot && slot.revisedAt);
+  let selected = Number(slot && slot.selected);
+  if (!Number.isInteger(selected) || selected < 1 || selected > versions.length) {
+    const legacy = safeImageName(slot && slot.path);
+    const found = legacy ? versions.findIndex((item) => item.path === legacy) : -1;
+    selected = found >= 0 ? found + 1 : (versions.length > 0 ? versions.length : 0);
+  }
+  const chosen = selected > 0 ? versions[selected - 1] : null;
+  return {
+    status,
+    path: chosen ? chosen.path : '',
+    selected,
+    revisedAt: chosen ? chosen.revisedAt : 0,
+    versions,
+  };
 }
 
 function normalizeBasis(basis) {
@@ -44,7 +106,19 @@ function normalizeBasis(basis) {
     coverLineSpecified: typeof basis.coverLineSpecified === 'string' ? basis.coverLineSpecified : '',
     galleryCount: count,
     coverRules: typeof basis.coverRules === 'string' ? basis.coverRules : '',
+    setRules: typeof basis.setRules === 'string' ? basis.setRules : '',
   };
+}
+
+function normalizeStringList(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => String(item));
+}
+
+function normalizeGalleryRoles(value) {
+  const roles = normalizeStringList(value);
+  if (roles.some((role) => role !== 'point' && role !== 'summary' && role !== 'contrast')) return [];
+  return roles;
 }
 
 function normalize(raw) {
@@ -67,7 +141,11 @@ function normalize(raw) {
   base.prompts = {
     cover: typeof prompts.cover === 'string' ? prompts.cover : '',
     coverType: prompts.coverType === 'story' || prompts.coverType === 'compare' ? prompts.coverType : '',
-    gallery: Array.isArray(prompts.gallery) ? prompts.gallery.map((item) => String(item)) : [],
+    setType: prompts.setType === 'breakdown' || prompts.setType === 'compare' ? prompts.setType : '',
+    gallery: normalizeStringList(prompts.gallery),
+    galleryLines: normalizeStringList(prompts.galleryLines),
+    galleryRoles: normalizeGalleryRoles(prompts.galleryRoles),
+    style: typeof prompts.style === 'string' ? prompts.style : '',
     stale: Boolean(prompts.stale),
     basis: normalizeBasis(prompts.basis),
   };
@@ -109,28 +187,13 @@ function createStore(latestDir) {
     fs.renameSync(tmp, file);
   }
 
-  function invalidateImages(state) {
-    fs.rmSync(path.join(latestDir, 'cover.png'), { force: true });
-    for (let index = 1; index <= 9; index += 1) {
-      fs.rmSync(path.join(latestDir, galleryFile(index)), { force: true });
-    }
-    const coverHadFile = state.images.cover.status !== '空';
-    state.images.cover = { status: coverHadFile ? '作废' : '空', path: '' };
-    const next = [];
-    for (let index = 0; index < state.galleryCount; index += 1) {
-      const previous = state.images.gallery[index];
-      const hadFile = previous && previous.status !== '空';
-      next.push({ status: hadFile ? '作废' : '空', path: '' });
-    }
-    state.images.gallery = next;
-  }
-
-  return { exists, file, invalidateImages, read, write };
+  return { exists, file, read, write };
 }
 
 module.exports = {
   createStore,
   emptyState,
   galleryFile,
+  nextImageFile,
   normalize,
 };

@@ -5,19 +5,21 @@ const path = require('node:path');
 const { createLlm } = require('../llm/client');
 const { generatePng } = require('../image/generate');
 const {
-  coverTypePromptName,
-  faceVars,
+  READINGS,
+  assignContrastSlots,
+  assignGalleryRoles,
+  assignStoryRoles,
   fillPrompt,
-  parseCoverLineText,
-  parseCoverText,
-  parseCoverTypeText,
+  formatGallerySlots,
+  parseArtText,
   parseDraftText,
-  parseGalleryText,
+  parsePlanText,
   readPromptFile,
+  renderSheet,
+  seriesPromptNames,
 } = require('../prompts/fill');
-const { createStore, emptyState, galleryFile } = require('../draft/store');
+const { createStore, emptyState, nextImageFile } = require('../draft/store');
 const {
-  basisEqual,
   basisFrom,
   validateDraftFace,
   validateGalleryCount,
@@ -34,18 +36,9 @@ const {
 
 const BUSY_MESSAGE = '正在生成，请等这一轮结束';
 
-function slotFile(slot, index) {
-  if (slot === 'cover') return 'cover.png';
-  if (slot === 'gallery' && Number.isInteger(index) && index >= 1 && index <= 9) return galleryFile(index);
-  return '';
-}
-
 function promptsBlockReason(state) {
   if (!state.draft) return '还没有稿面';
-  const current = basisFrom(state.draft, state.galleryCount, state.coverLineSpecified);
-  if (state.prompts.stale || !basisEqual(state.prompts.basis, current)) return '提示词待重算';
   if (!state.prompts.cover.trim()) return '封面提示词是空的';
-  if (state.prompts.gallery.length !== state.galleryCount) return '提示词条数和配图张数不一致';
   if (state.prompts.gallery.some((item) => !String(item).trim())) return '有配图提示词是空的';
   return '';
 }
@@ -68,9 +61,7 @@ function slotPromptText(state, only) {
 
 function slotBlockReason(state, only) {
   if (!state.draft) return '还没有稿面';
-  const current = basisFrom(state.draft, state.galleryCount, state.coverLineSpecified);
-  if (state.prompts.stale || !basisEqual(state.prompts.basis, current)) return '提示词待重算';
-  if (only.slot === 'gallery' && only.index > state.galleryCount) return '还没有这一张的提示词';
+  if (only.slot === 'gallery' && only.index > state.prompts.gallery.length) return '还没有这一张的提示词';
   if (!slotPromptText(state, only)) return '还没有这一张的提示词';
   return '';
 }
@@ -115,14 +106,17 @@ function createRunner(options) {
     return { ok: false, message: BUSY_MESSAGE };
   }
 
+  function stopGenerating(slot) {
+    if (!slot || slot.status !== '生成中') return slot;
+    const hasVersion = Array.isArray(slot.versions) && slot.versions.length > 0;
+    return { ...slot, status: hasVersion ? '成功' : '失败' };
+  }
+
   function markJobFailed(message) {
     const state = store.read();
-    if (state.images.cover.status === '生成中') {
-      state.images.cover = { status: '失败', path: '' };
-    }
-    state.images.gallery = state.images.gallery.map((slot) => (
-      slot.status === '生成中' ? { status: '失败', path: '' } : slot
-    ));
+    state.images.cover = stopGenerating(state.images.cover);
+    state.images.gallery = state.images.gallery.map((slot) => stopGenerating(slot));
+    state.prompts.stale = false;
     state.job = { running: false, step: '', error: message || '没有完成' };
     store.write(state);
   }
@@ -145,53 +139,60 @@ function createRunner(options) {
     };
   }
 
-  function markStaleIfNeeded(state) {
-    if (!state.draft || !state.prompts.basis) return;
-    const current = basisFrom(state.draft, state.galleryCount, state.coverLineSpecified);
-    if (basisEqual(state.prompts.basis, current)) {
-      state.prompts.stale = false;
-      return;
+  async function producePrompts(face, galleryCount, reading) {
+    // 人选解读。过程说明的头图才填大字规则，配图和对比不再套封面大字。
+    const setKey = reading === 'compare' ? 'compare' : 'breakdown';
+    if (!Object.prototype.hasOwnProperty.call(READINGS, setKey)) {
+      throw new Error('解读不在允许列表');
     }
-    state.prompts.stale = true;
-    store.invalidateImages(state);
-  }
-
-  async function producePrompts(face, galleryCount) {
-    // 封面那句话一律由句子模块写出，再写进生图提示词。语气和大字规则只装填，不单独请求模型。
+    const coverType = READINGS[setKey];
     const tone = readPromptFile(promptsDir, 'cover/tone-amateur.md');
-    const largeType = readPromptFile(promptsDir, 'cover/large-type.md');
+    const names = seriesPromptNames(setKey);
     const shared = {
       title: face.title,
       body: face.body,
       topics: face.topics.join('、'),
     };
-    const sentencePrompt = fillPrompt(readPromptFile(promptsDir, 'cover/sentence.md'), {
+    const slots = setKey === 'compare' ? assignContrastSlots(galleryCount) : assignStoryRoles(galleryCount);
+    const planVars = {
       ...shared,
       tone,
-    });
-    const coverLine = parseCoverLineText(await complete(sentencePrompt));
-    const choosePrompt = fillPrompt(readPromptFile(promptsDir, 'cover/choose-type.md'), {
-      ...shared,
-      coverLine,
-    });
-    const coverType = parseCoverTypeText(await complete(choosePrompt));
-    const typePrompt = fillPrompt(readPromptFile(promptsDir, coverTypePromptName(coverType)), {
-      ...shared,
-      coverLine,
-      tone,
-      largeType,
-      type: coverType,
-    });
-    const cover = parseCoverText(await complete(typePrompt), { type: coverType, coverLine });
-    let gallery = [];
-    if (galleryCount > 0) {
-      const galleryPrompt = fillPrompt(
-        readPromptFile(promptsDir, 'gallery.md'),
-        faceVars({ ...face, coverLine }, galleryCount),
-      );
-      gallery = parseGalleryText(await complete(galleryPrompt), galleryCount);
+      imageCount: String(galleryCount + 1),
+      slots: formatGallerySlots(slots),
+    };
+    if (setKey === 'breakdown') {
+      planVars.seriesPoint = readPromptFile(promptsDir, names.point);
+      planVars.seriesSummary = readPromptFile(promptsDir, names.summary);
     }
-    return { cover, coverType, coverLine, gallery };
+    const planned = parsePlanText(
+      await complete(fillPrompt(readPromptFile(promptsDir, names.plan), planVars)),
+      galleryCount,
+      face.body,
+    );
+    const art = parseArtText(await complete(fillPrompt(readPromptFile(promptsDir, 'sets/art.md'), {
+      ...shared,
+      tone,
+      plannedLines: planned.join('\n'),
+      readingHint: setKey === 'compare'
+        ? '每一张画面仍是一个对照，前后接成一个故事。'
+        : '前后接成一个故事。',
+    })), planned);
+    const rendered = planned.map((line, index) => renderSheet(promptsDir, art, art.scenes[index], line));
+    const galleryRoles = galleryCount === 0
+      ? []
+      : (setKey === 'compare'
+        ? Array.from({ length: galleryCount }, () => 'contrast')
+        : assignGalleryRoles(galleryCount));
+    return {
+      cover: rendered[0].prompt,
+      coverType,
+      coverLine: planned[0],
+      setType: galleryCount === 0 ? '' : setKey,
+      gallery: rendered.slice(1).map((item) => item.prompt),
+      galleryLines: planned.slice(1),
+      galleryRoles,
+      style: rendered[0].style,
+    };
   }
 
   function commitPrompts(face, galleryCount, produced) {
@@ -202,11 +203,14 @@ function createRunner(options) {
     state.prompts = {
       cover: produced.cover,
       coverType: produced.coverType,
+      setType: produced.setType,
       gallery: produced.gallery,
+      galleryLines: produced.galleryLines,
+      galleryRoles: produced.galleryRoles,
+      style: produced.style,
       stale: false,
       basis: basisFrom(nextFace, galleryCount, state.coverLineSpecified),
     };
-    store.invalidateImages(state);
     state.job = { running: false, step: '', error: '' };
     store.write(state);
   }
@@ -226,12 +230,12 @@ function createRunner(options) {
       }
       const drafted = store.read();
       drafted.draft = face;
-      drafted.prompts.stale = true;
+      drafted.prompts.stale = false;
       drafted.job = { running: true, step: '提示词', error: '' };
       store.write(drafted);
       let produced;
       try {
-        produced = await producePrompts(face, checked.galleryCount);
+        produced = await producePrompts(face, checked.galleryCount, 'breakdown');
       } catch (err) {
         markJobFailed(err.message || '提示词失败');
         return;
@@ -247,9 +251,10 @@ function createRunner(options) {
       const state = store.read();
       const face = state.draft;
       const galleryCount = state.galleryCount;
+      const reading = state.prompts.coverType === 'compare' ? 'compare' : 'breakdown';
       let produced;
       try {
-        produced = await producePrompts(face, galleryCount);
+        produced = await producePrompts(face, galleryCount, reading);
       } catch (err) {
         markJobFailed(err.message || '提示词失败');
         return;
@@ -258,6 +263,25 @@ function createRunner(options) {
     } catch (err) {
       markJobFailed(err.message || '提示词失败');
     }
+  }
+
+  let imageStamp = 0;
+
+  function nextRevisedAt() {
+    const now = Date.now();
+    imageStamp = Math.max(imageStamp + 1, now);
+    return imageStamp;
+  }
+
+  function readImageSlot(state, slot, index) {
+    if (slot === 'cover') return state.images.cover;
+    return state.images.gallery[index - 1] || {
+      status: '空',
+      path: '',
+      selected: 0,
+      revisedAt: 0,
+      versions: [],
+    };
   }
 
   function setImageSlot(state, slot, index, next) {
@@ -274,13 +298,12 @@ function createRunner(options) {
   async function runImages(only) {
     try {
       const initial = store.read();
-      const jobs = [{ slot: 'cover', index: 0, file: 'cover.png', prompt: initial.prompts.cover, label: '封面' }];
+      const jobs = [{ slot: 'cover', index: 0, prompt: initial.prompts.cover, label: '封面' }];
       initial.prompts.gallery.forEach((prompt, index) => {
         const number = index + 1;
         jobs.push({
           slot: 'gallery',
           index: number,
-          file: galleryFile(number),
           prompt,
           label: `配图 ${number}`,
         });
@@ -292,14 +315,25 @@ function createRunner(options) {
       let lastError = '';
       for (const job of selected) {
         const current = store.read();
-        setImageSlot(current, job.slot, job.index, { status: '生成中', path: '' });
+        const previous = readImageSlot(current, job.slot, job.index);
+        const file = nextImageFile(job.slot, job.index, previous.versions);
+        setImageSlot(current, job.slot, job.index, { ...previous, status: '生成中' });
         current.job = { running: true, step: job.label, error: '' };
         store.write(current);
-        const outputPath = path.join(currentDir, job.file);
+        const outputPath = path.join(currentDir, file);
         try {
           await generateImage({ prompt: job.prompt, outputPath });
           const done = store.read();
-          setImageSlot(done, job.slot, job.index, { status: '成功', path: job.file });
+          const base = readImageSlot(done, job.slot, job.index);
+          const revisedAt = nextRevisedAt();
+          const versions = base.versions.concat([{ path: file, revisedAt }]);
+          setImageSlot(done, job.slot, job.index, {
+            status: '成功',
+            path: file,
+            selected: versions.length,
+            revisedAt,
+            versions,
+          });
           done.job = { running: true, step: job.label, error: '' };
           store.write(done);
         } catch (err) {
@@ -307,7 +341,11 @@ function createRunner(options) {
           lastError = err && err.message ? err.message : '生图失败';
           fs.rmSync(outputPath, { force: true });
           const failedState = store.read();
-          setImageSlot(failedState, job.slot, job.index, { status: '失败', path: '' });
+          const base = readImageSlot(failedState, job.slot, job.index);
+          setImageSlot(failedState, job.slot, job.index, {
+            ...base,
+            status: base.versions.length > 0 ? '成功' : '失败',
+          });
           failedState.job = { running: true, step: job.label, error: '' };
           store.write(failedState);
         }
@@ -334,22 +372,11 @@ function createRunner(options) {
         step: '',
         error: state.job.error || '上次生成中断，请重试',
       };
-      if (state.images.cover.status === '生成中') {
-        state.images.cover = { status: '失败', path: state.images.cover.path };
-      }
-      state.images.gallery = state.images.gallery.map((slot) => (
-        slot.status === '生成中' ? { status: '失败', path: slot.path } : slot
-      ));
+      state.images.cover = stopGenerating(state.images.cover);
+      state.images.gallery = state.images.gallery.map((slot) => stopGenerating(slot));
       store.write(state);
     }
-    const view = { ok: true, ...state, directory: currentDir, id: currentId };
-    if (state.draft && state.prompts && state.prompts.basis) {
-      const current = basisFrom(state.draft, state.galleryCount, state.coverLineSpecified);
-      if (!basisEqual(state.prompts.basis, current)) {
-        view.prompts = { ...state.prompts, stale: true };
-      }
-    }
-    return view;
+    return { ok: true, ...state, directory: currentDir, id: currentId };
   }
 
   function startNew() {
@@ -390,7 +417,6 @@ function createRunner(options) {
     }
     applyDraftText(state, source);
     applyPromptText(state, source);
-    markStaleIfNeeded(state);
     store.write(state);
     return { ok: true };
   }
@@ -408,7 +434,6 @@ function createRunner(options) {
     if (typeof payload.coverLineSpecified === 'string') {
       state.coverLineSpecified = payload.coverLineSpecified.trim();
     }
-    store.invalidateImages(state);
     state.job = { running: true, step: '成稿', error: '' };
     store.write(state);
     runGenerateDraft(checked).finally(() => {
@@ -435,11 +460,48 @@ function createRunner(options) {
     const faceMessage = validateDraftFace(state.draft);
     if (faceMessage) return { ok: false, message: faceMessage };
     state.draft = normalizeFace(state.draft);
-    markStaleIfNeeded(state);
     lock = 'generatePrompts';
     state.job = { running: true, step: '提示词', error: '' };
     store.write(state);
     runGeneratePrompts().finally(() => {
+      lock = null;
+    });
+    return { ok: true, accepted: true };
+  }
+
+  async function runReinterpret(reading) {
+    try {
+      const state = store.read();
+      const face = state.draft;
+      let produced;
+      try {
+        produced = await producePrompts(face, state.galleryCount, reading);
+      } catch (err) {
+        markJobFailed(err.message || '提示词失败');
+        return;
+      }
+      commitPrompts(face, state.galleryCount, produced);
+    } catch (err) {
+      markJobFailed(err.message || '提示词失败');
+    }
+  }
+
+  function reinterpret(payload) {
+    if (!store) return { ok: false, message: '没有这一篇' };
+    if (lock) return busy();
+    const reading = payload && payload.reading;
+    if (reading !== 'breakdown' && reading !== 'compare') {
+      return { ok: false, message: '解读不在允许列表' };
+    }
+    const state = store.read();
+    if (!state.draft) return { ok: false, message: '还没有稿面' };
+    const faceMessage = validateDraftFace(state.draft);
+    if (faceMessage) return { ok: false, message: faceMessage };
+    state.draft = normalizeFace(state.draft);
+    lock = 'reinterpret';
+    state.job = { running: true, step: '提示词', error: '' };
+    store.write(state);
+    runReinterpret(reading).finally(() => {
       lock = null;
     });
     return { ok: true, accepted: true };
@@ -484,7 +546,8 @@ function createRunner(options) {
       return { ok: false, message: '要指明封面或配图序号' };
     }
     const state = store.read();
-    if (promptsBlockReason(state)) return { ok: false, message: '提示词待重算' };
+    const blocked = promptsBlockReason(state);
+    if (blocked) return { ok: false, message: blocked };
     const image = slot === 'cover' ? state.images.cover : state.images.gallery[index - 1];
     if (!image || image.status !== '失败') {
       return { ok: false, message: '只能重试失败的那一张' };
@@ -496,10 +559,53 @@ function createRunner(options) {
     return { ok: true, accepted: true };
   }
 
+  function imageFileFor(source) {
+    if (!store) return '';
+    const only = requestedSlot(source);
+    if (!only) return '';
+    const state = store.read();
+    const image = only.slot === 'cover'
+      ? state.images.cover
+      : state.images.gallery[only.index - 1];
+    if (!image) return '';
+    const version = Number(source.version);
+    if (Number.isInteger(version) && version >= 1) {
+      const item = image.versions[version - 1];
+      return item ? item.path : '';
+    }
+    return image.path || '';
+  }
+
+  function chooseImage(payload) {
+    if (!store) return { ok: false, message: '没有这一篇' };
+    if (lock) return busy();
+    const source = payload && typeof payload === 'object' ? payload : {};
+    const only = requestedSlot(source);
+    if (!only) return { ok: false, message: '要指明封面或配图序号' };
+    const version = Number(source.version);
+    const state = store.read();
+    const image = only.slot === 'cover'
+      ? state.images.cover
+      : state.images.gallery[only.index - 1];
+    if (!image || !Number.isInteger(version) || version < 1 || version > image.versions.length) {
+      return { ok: false, message: '没有这一张' };
+    }
+    const chosen = image.versions[version - 1];
+    setImageSlot(state, only.slot, only.index, {
+      ...image,
+      status: '成功',
+      selected: version,
+      path: chosen.path,
+      revisedAt: chosen.revisedAt,
+    });
+    store.write(state);
+    return { ok: true };
+  }
+
   function previewImage(payload) {
     if (!currentDir) return { ok: false, message: '没有这张图' };
     const source = payload && typeof payload === 'object' ? payload : {};
-    const file = slotFile(source.slot, Number(source.index));
+    const file = imageFileFor(source);
     if (!file) return { ok: false, message: '没有这张图' };
     const abs = path.join(currentDir, file);
     if (!fs.existsSync(abs)) return { ok: false, message: '图片不在' };
@@ -510,7 +616,7 @@ function createRunner(options) {
   function revealImage(payload) {
     if (!currentDir) return { ok: false, message: '没有这张图' };
     const source = payload && typeof payload === 'object' ? payload : {};
-    const file = slotFile(source.slot, Number(source.index));
+    const file = imageFileFor(source);
     if (!file) return { ok: false, message: '没有这张图' };
     const abs = path.join(currentDir, file);
     if (!fs.existsSync(abs)) return { ok: false, message: '图片不在' };
@@ -523,10 +629,12 @@ function createRunner(options) {
   }
 
   return {
+    chooseImage,
     generateDraft,
     generateImages,
     generatePrompts,
     listPosts: catalog,
+    reinterpret,
     loadLatest,
     openPost,
     previewImage,

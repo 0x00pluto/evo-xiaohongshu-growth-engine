@@ -68,6 +68,8 @@ function basisFrom(draft, galleryCount, coverLineSpecified) {
     galleryCount,
     // 大字规则改版后，旧封面提示词对不上这一版，打开时标待重算，不在这里删图。
     coverRules: 'large-type-1',
+    // 系列从图内无字改成节拍加总结后，旧配图提示词对不上这一版。
+    setRules: 'breakdown-1',
   };
 }
 
@@ -76,6 +78,7 @@ function basisEqual(left, right) {
   if (left.title !== right.title || left.body !== right.body || left.coverLine !== right.coverLine) return false;
   if ((left.coverLineSpecified || '') !== (right.coverLineSpecified || '')) return false;
   if ((left.coverRules || '') !== (right.coverRules || '')) return false;
+  if ((left.setRules || '') !== (right.setRules || '')) return false;
   if (left.galleryCount !== right.galleryCount) return false;
   if (!Array.isArray(left.topics) || !Array.isArray(right.topics) || left.topics.length !== right.topics.length) {
     return false;

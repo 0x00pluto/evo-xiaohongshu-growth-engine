@@ -45,6 +45,12 @@ function apply(ctx) {
     generatePrompts(payload) {
       return runner.generatePrompts(payload || {});
     },
+    reinterpret(payload) {
+      return runner.reinterpret(payload || {});
+    },
+    chooseImage(payload) {
+      return runner.chooseImage(payload || {});
+    },
     generateImages(payload) {
       return runner.generateImages(payload || {});
     },

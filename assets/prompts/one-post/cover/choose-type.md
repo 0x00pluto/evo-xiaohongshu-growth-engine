@@ -8,3 +8,7 @@
 封面那句话：{{coverLine}}
 
 只返回一个 JSON 对象，不要 Markdown 围栏，不要额外说明。字段 type 只能是 story 或 compare。
+
+返回示例：
+{"type":"story"}
+示例只说明字段形状。type 按材料在 story 和 compare 里选，不要照抄示例。

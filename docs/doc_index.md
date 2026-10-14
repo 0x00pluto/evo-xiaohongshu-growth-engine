@@ -10,7 +10,7 @@
 - `docs/builtin-workflows/cut-release-tag.md`: 日常发版唯一入口；汇总变更 → upgrades → 对齐 version → tag → 推送 → gh 或网页建 Release；major 须人指定
 - `docs/workflows/one-post-studio.md`: 一篇图文操作台；本机命令改页面会自动刷新，与 Dex Buddy 共用页面，插件包范围见 dex-buddy-plugin.pack
 - `docs/workflows/_TEMPLATE.md`: 业务 workflow 六段骨架；新建业务工作流时复制并改名，写完后删掉本行或改成真实条目
-- `docs/DESIGN.md`: 页侧视觉事实源（HTML、Alpine、daisyUI 5；配色为 Cal 色板）；改外观前先读
+- `docs/DESIGN.md`: 页侧视觉事实源（HTML、Alpine、daisyUI 5；配色为 Cal 色板；排版含壳、间距、两屏和手机框）；改外观前先读
 - `specs/prds/prd-wiki-index.md`: PRD 索引，不计入序号；产品经理追加一行，工程验收官可回写状态
 - `.cursor/commands/team/product-manager.md`: 产品经理，`/team:product-manager`，写 PRD
 - `.cursor/commands/team/prd-accept.md`: 工程验收官，`/team:prd-accept`，回写 PRD 文末状态
