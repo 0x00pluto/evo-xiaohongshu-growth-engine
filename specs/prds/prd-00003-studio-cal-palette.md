@@ -2,15 +2,19 @@
 name: prd-00003-studio-cal-palette
 sequence: 3
 description: 操作台三页只换 Cal.com 色板，技术栈、信息架构和交互保持不动。
-status: backlog
+status: accepted
 created: 2026-10-14T01:35:40Z
+last_accepted_at: 2026-10-14T02:37:09Z
+accepted_commit: 14ae4e1
+accepted_branch: main
+accepted_scope: R0,R1
 ---
 
 # PRD: 操作台 Cal 配色
 
 | 属性 | 值 |
 |------|----|
-| 状态 | backlog |
+| 状态 | 工程：accepted。见文末「工程验收状态」 |
 | 范围 | 操作台壳层、写笔记、历史的配色。Release 0 |
 | 顺序号 | 00003 |
 | 关联文档 | `docs/DESIGN.md`、`docs/workflows/one-post-studio.md`、`docs/mvp-map.md`、`AGENTS.md` |
@@ -200,3 +204,52 @@ stateDiagram-v2
 | 日期 | 说明 |
 |------|------|
 | 2026-10-14 | 初稿。操作台只换 Cal 色板，技术栈和步骤不动。 |
+
+## 1. 工程验收状态
+
+> 由 `/team:prd-accept` 维护；勿手工编造「通过」。最后更新：2026-10-14T02:37:09Z，main@14ae4e1，范围：R0,R1。
+
+### 总览
+
+- 工程状态：`accepted`
+- 验收判定：Release 0 六条均通过。正文声明没有 Release 1，标为范围外
+- 最近验收：2026-10-14T02:37:09Z
+- 代码提交：`main@14ae4e1`
+- 壳层用无层叠样式覆盖 `data-theme="light"` 的 14 个语义变量。主按钮近黑白字，页底白，边框与浅灰面、错误红均按色板
+- 写笔记仍是三步。没有笔记时后两步不可进。未就绪侧栏项不可点。历史可打开、可返回新稿，复制按钮仍在
+- `note.html` 与 `history.html` 没有手写色值。`note.js`、`history.js`、`shell.js` 未因配色改行为
+
+### Release 交付
+
+| Release | 状态 | 说明 |
+|---------|------|------|
+| R0 | 通过 | 故事 1–6 通过 |
+| R1 | 范围外 | 正文声明没有 Release 1 |
+
+### 功能验收清单（Agent 优先读此表）
+
+| ID | 能力摘要 | Release | 状态 | 证据 |
+|----|----------|---------|------|------|
+| US-01 | 主按钮近黑底、白字 | R0 | 通过 | `src/studio/static/index.html` `--color-primary` `#111111`、`--color-primary-content` `#ffffff`。`pages/note.html` `#generate-draft`、`#regenerate-prompts`、`#regenerate-prompts-images` 与 `pages/history.html` `#write-new` 均为 `btn-primary`。本机 `127.0.0.1:8768` 计算样式为底 `rgb(17, 17, 17)`、字 `rgb(255, 255, 255)` |
+| US-02 | 页底白、边框浅灰、浅灰面 | R0 | 通过 | 同文件 `--color-base-100` `#ffffff`、`--color-base-300` `#e5e7eb`、`--color-base-200` `#f5f5f5`。壳层 `bg-base-100` 与 `border-base-300`；`note.html` 配图占位 `bg-base-200`。计算样式：页底 `rgb(255, 255, 255)`，侧栏与历史列表边框 `rgb(229, 231, 235)`，占位 `rgb(245, 245, 245)` |
+| US-03 | 空业务一句报错为红，且不发成稿请求 | R0 | 通过 | `pages/note.html` `#business-error` 为 `text-error`；`--color-error` `#ef4444`。空字段点「写成笔记」后文字为 `rgb(239, 68, 68)`，该次点击没有 `onePost` 请求 |
+| US-04 | 三步与未就绪侧栏行为不变 | R0 | 通过 | `pages/note.html` 步骤为「要发什么」「这篇笔记」「配图」。`shell.js` 中选题等项 `ready: false`，按钮 `disabled`。没有笔记时后两步禁用；点「选题」仍停在写笔记 |
+| US-05 | 历史可进入、可打开、可回到新稿，复制按钮仍在 | R0 | 通过 | `pages/note.html` `#open-history`；`pages/history.html` 复制按钮与 `#write-new`。本机打开历史列表、打开一篇旧稿，再点「写新的一篇」回到空白写笔记（请求为 `startNew`，不是成稿） |
+| US-06 | 事实源与壳层变量一致，子页不手写颜色 | R0 | 通过 | `docs/DESIGN.md` 写明 14 个语义变量。色值只在 `src/studio/static/index.html` 的主题覆盖里。`pages/note.html` 与 `pages/history.html` 无手写色值 |
+| US-07 | 没有 Release 1 | R1 | 范围外 | 正文：「没有 Release 1」。字体、圆角、营销页结构、正文灰 `#374151` 在非目标中 |
+
+### 未完成与遗留
+
+- 无
+
+### 质量检查
+
+| 检查项 | 状态 |
+|--------|------|
+| 测试 | N/A。本仓无测试命令。配色按页面计算样式核对，不编造 `pnpm test` |
+| Lint | N/A。本仓无 lint 命令 |
+| 文档与 OpenAPI | 本项目无 OpenAPI，跳过。配色事实源为 `docs/DESIGN.md` |
+
+---
+
+统计：通过 6 / 部分 0 / 未实现 0 / 范围外 1
