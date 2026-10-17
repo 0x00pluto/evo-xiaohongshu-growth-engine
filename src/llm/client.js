@@ -1,12 +1,26 @@
+// @ts-check
 'use strict';
 
 const DEFAULT_BASE_URL = 'https://api.deepseek.com';
 const DEFAULT_MODEL = 'deepseek-chat';
 
+/**
+ * @typedef {Record<string, string | undefined>} LlmEnv
+ * @typedef {(input: string | URL | Request, init?: RequestInit) => Promise<Response>} FetchFn
+ */
+
+/**
+ * @param {LlmEnv | null | undefined} env
+ * @param {FetchFn} [fetchImpl]
+ */
 function createLlm(env, fetchImpl) {
   const source = env || {};
   const fetchFn = fetchImpl || globalThis.fetch;
 
+  /**
+   * @param {string} prompt
+   * @returns {Promise<string>}
+   */
   async function complete(prompt) {
     const apiKey = String(source.DEEPSEEK_API_KEY || '').trim();
     if (!apiKey) throw new Error('缺少 DEEPSEEK_API_KEY');

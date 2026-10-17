@@ -84,5 +84,7 @@ node scripts/run-studio.js --open
 ## 测试
 
 ```bash
-node --test tests/**/*.test.js
+pnpm check
 ```
+
+等价于先 `pnpm run check:types`（`tsc --noEmit`），再 `pnpm test`（`node --test tests/**/*.test.js`）。

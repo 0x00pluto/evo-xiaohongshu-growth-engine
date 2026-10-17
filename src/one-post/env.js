@@ -1,7 +1,13 @@
+// @ts-check
 'use strict';
 
 const fs = require('node:fs');
 
+/**
+ * @param {Record<string, string>} env
+ * @param {string} [file]
+ * @returns {Record<string, string>}
+ */
 function fillMissingFromDotEnv(env, file) {
   const next = { ...env };
   if (!file || !fs.existsSync(file)) return next;

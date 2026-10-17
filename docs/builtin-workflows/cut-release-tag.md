@@ -72,6 +72,7 @@
 → 定版号 $TAG（major/跳号 → 等人口头确认）
 → 写 upgrades/$TAG.md + 更新 upgrades/README.md 索引
 → 对齐 evo_agent_pack.json 的 version（= $TAG 去 v）
+→ pnpm check 必须通过
 → 本地 commit（默认仅 upgrades + pack.json）+ git tag $TAG
 → 输出（或经授权执行）push + gh release create
 → 验收：远程 tag、Release 正文、clone 核对
@@ -84,6 +85,7 @@
 - 功能改动已提交到默认分支（或即将随本流程一并提交的仅限 upgrades / pack 相关文件）。
 - 工作区干净，或仅剩即将写入的 `upgrades/` 与 `evo_agent_pack.json`。
 - `git remote get-url origin` 等于 `evo_agent_pack.json` 的 `origin`（GitHub）。不一致 → 停。
+- 打 tag 前跑 `pnpm check`（类型检查 + 测试）。失败 → 停，先修再发版。
 
 ### 1. 查上一 tag 与变更
 

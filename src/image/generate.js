@@ -1,3 +1,4 @@
+// @ts-check
 'use strict';
 
 const fs = require('node:fs');
@@ -14,12 +15,32 @@ const IMAGE_INPUT = {
   number_of_images: 1,
 };
 
+/**
+ * @typedef {Record<string, string | undefined>} ImageEnv
+ * @typedef {(input: string | URL | Request, init?: RequestInit) => Promise<Response>} FetchFn
+ * @typedef {(ms: number) => Promise<void>} SleepFn
+ * @typedef {{
+ *   status?: string;
+ *   error?: unknown;
+ *   output?: unknown;
+ *   urls?: { get?: string };
+ * }} Prediction
+ */
+
+/**
+ * @param {number} ms
+ * @returns {Promise<void>}
+ */
 function sleep(ms) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
 }
 
+/**
+ * @param {unknown} output
+ * @returns {string}
+ */
 function outputUrl(output) {
   if (typeof output === 'string' && output.startsWith('http')) return output;
   if (Array.isArray(output)) {
@@ -30,26 +51,38 @@ function outputUrl(output) {
     return '';
   }
   if (output && typeof output === 'object') {
-    if (typeof output.url === 'string') return output.url;
-    if (typeof output.href === 'string') return output.href;
+    const record = /** @type {Record<string, unknown>} */ (output);
+    if (typeof record.url === 'string') return record.url;
+    if (typeof record.href === 'string') return record.href;
   }
   return '';
 }
 
+/**
+ * @param {Response} response
+ * @returns {Promise<Prediction>}
+ */
 async function readPrediction(response) {
   if (!response.ok) {
     let detail = '';
     try {
       const body = await response.json();
-      detail = typeof body.detail === 'string' ? body.detail : '';
-    } catch (err) {
+      detail = body && typeof body.detail === 'string' ? body.detail : '';
+    } catch {
       detail = '';
     }
     throw new Error(detail ? `生图失败：${detail}` : `生图失败（${response.status}）`);
   }
-  return response.json();
+  return /** @type {Promise<Prediction>} */ (response.json());
 }
 
+/**
+ * @param {Prediction} prediction
+ * @param {string} token
+ * @param {FetchFn} fetchFn
+ * @param {SleepFn} [sleepImpl]
+ * @returns {Promise<string>}
+ */
 async function waitForPrediction(prediction, token, fetchFn, sleepImpl) {
   let current = prediction;
   const pause = sleepImpl || sleep;
@@ -73,6 +106,16 @@ async function waitForPrediction(prediction, token, fetchFn, sleepImpl) {
   return url;
 }
 
+/**
+ * @param {{
+ *   prompt: unknown;
+ *   outputPath: string;
+ *   env?: ImageEnv | null;
+ *   fetch?: FetchFn;
+ *   sleep?: SleepFn;
+ * }} args
+ * @returns {Promise<string>}
+ */
 async function generatePng({ prompt, outputPath, env, fetch: fetchImpl, sleep: sleepImpl }) {
   const token = String((env && env.REPLICATE_API_TOKEN) || '').trim();
   if (!token) throw new Error('缺少 REPLICATE_API_TOKEN');

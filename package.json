@@ -1,4 +1,13 @@
 {
   "name": "xhs-growth-engine",
-  "private": true
+  "private": true,
+  "scripts": {
+    "check:types": "tsc --noEmit",
+    "test": "node --test tests/**/*.test.js",
+    "check": "pnpm run check:types && pnpm test"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "typescript": "^7.0.2"
+  }
 }

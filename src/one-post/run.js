@@ -1,9 +1,24 @@
+// @ts-check
 'use strict';
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { createLlm } = require('../llm/client');
-const { generatePng } = require('../image/generate');
+
+/** @type {typeof import('../llm/client')} */
+const llmModule = require('../llm/client');
+/** @type {typeof import('../image/generate')} */
+const imageModule = require('../image/generate');
+/** @type {typeof import('../prompts/fill')} */
+const fillModule = require('../prompts/fill');
+/** @type {typeof import('../draft/store')} */
+const storeModule = require('../draft/store');
+/** @type {typeof import('../draft/validate')} */
+const validateModule = require('../draft/validate');
+/** @type {typeof import('./posts')} */
+const postsModule = require('./posts');
+
+const { createLlm } = llmModule;
+const { generatePng } = imageModule;
 const {
   READINGS,
   assignContrastSlots,
@@ -17,25 +32,60 @@ const {
   readPromptFile,
   renderSheet,
   seriesPromptNames,
-} = require('../prompts/fill');
-const { createStore, emptyState, nextImageFile } = require('../draft/store');
+} = fillModule;
+const { createStore, emptyState, nextImageFile } = storeModule;
 const {
   basisFrom,
   validateDraftFace,
   validateGalleryCount,
   validateInputs,
   normalizeFace,
-} = require('../draft/validate');
+} = validateModule;
 const {
   allocatePost,
   hasPost,
   importLegacy,
   listPosts,
   touchPost,
-} = require('./posts');
+} = postsModule;
 
 const BUSY_MESSAGE = '正在生成，请等这一轮结束';
 
+/**
+ * @typedef {import('../draft/store').DraftState} DraftState
+ * @typedef {import('../draft/store').ImageSlot} ImageSlot
+ * @typedef {import('../draft/validate').DraftFace} DraftFace
+ * @typedef {{ slot: 'cover'; index: 0 } | { slot: 'gallery'; index: number }} ImageOnly
+ * @typedef {{
+ *   postsDir?: string;
+ *   latestDir?: string;
+ *   promptsDir: string;
+ *   env?: Record<string, string | undefined>;
+ *   fetch?: import('../llm/client').FetchFn;
+ *   now?: () => Date;
+ *   complete?: (prompt: string) => Promise<string>;
+ *   generateImage?: (args: { prompt: string; outputPath: string }) => Promise<string>;
+ *   revealFile?: (absPath: string) => void;
+ * }} RunnerOptions
+ */
+
+/**
+ * @param {unknown} err
+ * @param {string} fallback
+ * @returns {string}
+ */
+function errorMessage(err, fallback) {
+  if (err && typeof err === 'object' && 'message' in err) {
+    const message = /** @type {{ message?: unknown }} */ (err).message;
+    if (typeof message === 'string' && message) return message;
+  }
+  return fallback;
+}
+
+/**
+ * @param {DraftState} state
+ * @returns {string}
+ */
 function promptsBlockReason(state) {
   if (!state.draft) return '还没有稿面';
   if (!state.prompts.cover.trim()) return '封面提示词是空的';
@@ -43,6 +93,10 @@ function promptsBlockReason(state) {
   return '';
 }
 
+/**
+ * @param {Record<string, unknown> | null | undefined} source
+ * @returns {ImageOnly | null}
+ */
 function requestedSlot(source) {
   const slot = source && source.slot;
   const index = Number(source && source.index);
@@ -53,12 +107,22 @@ function requestedSlot(source) {
   return null;
 }
 
+/**
+ * @param {DraftState} state
+ * @param {ImageOnly} only
+ * @returns {string}
+ */
 function slotPromptText(state, only) {
   if (only.slot === 'cover') return String(state.prompts.cover || '').trim();
   const item = state.prompts.gallery[only.index - 1];
   return typeof item === 'string' ? item.trim() : '';
 }
 
+/**
+ * @param {DraftState} state
+ * @param {ImageOnly} only
+ * @returns {string}
+ */
 function slotBlockReason(state, only) {
   if (!state.draft) return '还没有稿面';
   if (only.slot === 'gallery' && only.index > state.prompts.gallery.length) return '还没有这一张的提示词';
@@ -66,8 +130,13 @@ function slotBlockReason(state, only) {
   return '';
 }
 
+/**
+ * @param {RunnerOptions} options
+ */
 function createRunner(options) {
-  const postsDir = options.postsDir || options.latestDir;
+  const postsDirOption = options.postsDir || options.latestDir;
+  if (!postsDirOption) throw new Error('缺少 postsDir');
+  const postsDir = postsDirOption;
   const promptsDir = options.promptsDir;
   const env = options.env || {};
   const fetchImpl = options.fetch;
@@ -75,18 +144,23 @@ function createRunner(options) {
   importLegacy(postsDir);
   let currentId = '';
   let currentDir = '';
+  /** @type {import('../draft/store').DraftStore | null} */
   let store = null;
   const llm = createLlm(env, fetchImpl);
-  const complete = options.complete || ((prompt) => llm.complete(prompt));
-  const generateImage = options.generateImage || ((args) => generatePng({
+  const complete = options.complete || ((/** @type {string} */ prompt) => llm.complete(prompt));
+  const generateImage = options.generateImage || ((/** @type {{ prompt: string; outputPath: string }} */ args) => generatePng({
     prompt: args.prompt,
     outputPath: args.outputPath,
     env,
     fetch: fetchImpl,
   }));
   const revealFile = options.revealFile || (() => {});
+  /** @type {string | null} */
   let lock = null;
 
+  /**
+   * @param {string} id
+   */
   function usePost(id) {
     currentId = id;
     currentDir = path.join(postsDir, id);
@@ -106,13 +180,21 @@ function createRunner(options) {
     return { ok: false, message: BUSY_MESSAGE };
   }
 
+  /**
+   * @param {ImageSlot} slot
+   * @returns {ImageSlot}
+   */
   function stopGenerating(slot) {
     if (!slot || slot.status !== '生成中') return slot;
     const hasVersion = Array.isArray(slot.versions) && slot.versions.length > 0;
     return { ...slot, status: hasVersion ? '成功' : '失败' };
   }
 
+  /**
+   * @param {string} message
+   */
   function markJobFailed(message) {
+    if (!store) return;
     const state = store.read();
     state.images.cover = stopGenerating(state.images.cover);
     state.images.gallery = state.images.gallery.map((slot) => stopGenerating(slot));
@@ -121,24 +203,41 @@ function createRunner(options) {
     store.write(state);
   }
 
+  /**
+   * @param {DraftState} state
+   * @param {Record<string, unknown>} payload
+   */
   function applyPromptText(state, payload) {
-    if (!payload || !payload.prompts) return;
-    if (typeof payload.prompts.cover === 'string') state.prompts.cover = payload.prompts.cover;
-    if (Array.isArray(payload.prompts.gallery)) {
-      state.prompts.gallery = payload.prompts.gallery.map((item) => String(item));
+    const prompts = payload.prompts;
+    if (!prompts || typeof prompts !== 'object' || Array.isArray(prompts)) return;
+    const next = /** @type {Record<string, unknown>} */ (prompts);
+    if (typeof next.cover === 'string') state.prompts.cover = next.cover;
+    if (Array.isArray(next.gallery)) {
+      state.prompts.gallery = next.gallery.map((item) => String(item));
     }
   }
 
+  /**
+   * @param {DraftState} state
+   * @param {Record<string, unknown>} payload
+   */
   function applyDraftText(state, payload) {
-    if (!payload || !payload.draft || typeof payload.draft !== 'object') return;
+    const draft = payload.draft;
+    if (!draft || typeof draft !== 'object' || Array.isArray(draft)) return;
+    const next = /** @type {Record<string, unknown>} */ (draft);
     state.draft = {
-      title: typeof payload.draft.title === 'string' ? payload.draft.title : '',
-      body: typeof payload.draft.body === 'string' ? payload.draft.body : '',
-      topics: Array.isArray(payload.draft.topics) ? payload.draft.topics.map((topic) => String(topic)) : [],
-      coverLine: typeof payload.draft.coverLine === 'string' ? payload.draft.coverLine : '',
+      title: typeof next.title === 'string' ? next.title : '',
+      body: typeof next.body === 'string' ? next.body : '',
+      topics: Array.isArray(next.topics) ? next.topics.map((topic) => String(topic)) : [],
+      coverLine: typeof next.coverLine === 'string' ? next.coverLine : '',
     };
   }
 
+  /**
+   * @param {DraftFace} face
+   * @param {number} galleryCount
+   * @param {string} reading
+   */
   async function producePrompts(face, galleryCount, reading) {
     // 人选解读。过程说明的头图才填大字规则，配图和对比不再套封面大字。
     const setKey = reading === 'compare' ? 'compare' : 'breakdown';
@@ -154,6 +253,7 @@ function createRunner(options) {
       topics: face.topics.join('、'),
     };
     const slots = setKey === 'compare' ? assignContrastSlots(galleryCount) : assignStoryRoles(galleryCount);
+    /** @type {Record<string, string>} */
     const planVars = {
       ...shared,
       tone,
@@ -161,6 +261,7 @@ function createRunner(options) {
       slots: formatGallerySlots(slots),
     };
     if (setKey === 'breakdown') {
+      if (!names.point || !names.summary) throw new Error('系列类型不在允许列表');
       planVars.seriesPoint = readPromptFile(promptsDir, names.point);
       planVars.seriesSummary = readPromptFile(promptsDir, names.summary);
     }
@@ -195,7 +296,22 @@ function createRunner(options) {
     };
   }
 
+  /**
+   * @param {DraftFace} face
+   * @param {number} galleryCount
+   * @param {{
+   *   cover: string;
+   *   coverType: string;
+   *   coverLine: string;
+   *   setType: string;
+   *   gallery: string[];
+   *   galleryLines: string[];
+   *   galleryRoles: string[];
+   *   style: string;
+   * }} produced
+   */
   function commitPrompts(face, galleryCount, produced) {
+    if (!store) return;
     const state = store.read();
     const nextFace = { ...face, coverLine: produced.coverLine };
     state.draft = nextFace;
@@ -215,8 +331,12 @@ function createRunner(options) {
     store.write(state);
   }
 
+  /**
+   * @param {{ business: string; article: string; galleryCount: number }} checked
+   */
   async function runGenerateDraft(checked) {
     try {
+      if (!store) throw new Error('没有这一篇');
       const draftPrompt = fillPrompt(readPromptFile(promptsDir, 'draft.md'), {
         business: checked.business,
         article: checked.article,
@@ -225,7 +345,7 @@ function createRunner(options) {
       try {
         face = parseDraftText(await complete(draftPrompt));
       } catch (err) {
-        markJobFailed(err.message || '成稿失败');
+        markJobFailed(errorMessage(err, '成稿失败'));
         return;
       }
       const drafted = store.read();
@@ -237,31 +357,33 @@ function createRunner(options) {
       try {
         produced = await producePrompts(face, checked.galleryCount, 'breakdown');
       } catch (err) {
-        markJobFailed(err.message || '提示词失败');
+        markJobFailed(errorMessage(err, '提示词失败'));
         return;
       }
       commitPrompts(face, checked.galleryCount, produced);
     } catch (err) {
-      markJobFailed(err.message || '生成稿失败');
+      markJobFailed(errorMessage(err, '生成稿失败'));
     }
   }
 
   async function runGeneratePrompts() {
     try {
+      if (!store) throw new Error('没有这一篇');
       const state = store.read();
       const face = state.draft;
+      if (!face) throw new Error('还没有稿面');
       const galleryCount = state.galleryCount;
       const reading = state.prompts.coverType === 'compare' ? 'compare' : 'breakdown';
       let produced;
       try {
         produced = await producePrompts(face, galleryCount, reading);
       } catch (err) {
-        markJobFailed(err.message || '提示词失败');
+        markJobFailed(errorMessage(err, '提示词失败'));
         return;
       }
       commitPrompts(face, galleryCount, produced);
     } catch (err) {
-      markJobFailed(err.message || '提示词失败');
+      markJobFailed(errorMessage(err, '提示词失败'));
     }
   }
 
@@ -273,6 +395,12 @@ function createRunner(options) {
     return imageStamp;
   }
 
+  /**
+   * @param {DraftState} state
+   * @param {'cover' | 'gallery'} slot
+   * @param {number} index
+   * @returns {ImageSlot}
+   */
   function readImageSlot(state, slot, index) {
     if (slot === 'cover') return state.images.cover;
     return state.images.gallery[index - 1] || {
@@ -284,20 +412,37 @@ function createRunner(options) {
     };
   }
 
+  /**
+   * @param {DraftState} state
+   * @param {'cover' | 'gallery'} slot
+   * @param {number} index
+   * @param {ImageSlot} next
+   */
   function setImageSlot(state, slot, index, next) {
     if (slot === 'cover') {
       state.images.cover = next;
       return;
     }
     const gallery = state.images.gallery.slice();
-    while (gallery.length < index) gallery.push({ status: '空', path: '' });
+    while (gallery.length < index) gallery.push({
+      status: '空',
+      path: '',
+      selected: 0,
+      revisedAt: 0,
+      versions: [],
+    });
     gallery[index - 1] = next;
     state.images.gallery = gallery;
   }
 
+  /**
+   * @param {ImageOnly | null} [only]
+   */
   async function runImages(only) {
     try {
+      if (!store) throw new Error('没有这一篇');
       const initial = store.read();
+      /** @type {{ slot: 'cover' | 'gallery'; index: number; prompt: string; label: string }[]} */
       const jobs = [{ slot: 'cover', index: 0, prompt: initial.prompts.cover, label: '封面' }];
       initial.prompts.gallery.forEach((prompt, index) => {
         const number = index + 1;
@@ -338,7 +483,7 @@ function createRunner(options) {
           store.write(done);
         } catch (err) {
           failed += 1;
-          lastError = err && err.message ? err.message : '生图失败';
+          lastError = errorMessage(err, '生图失败');
           fs.rmSync(outputPath, { force: true });
           const failedState = store.read();
           const base = readImageSlot(failedState, job.slot, job.index);
@@ -358,7 +503,7 @@ function createRunner(options) {
       };
       store.write(finished);
     } catch (err) {
-      markJobFailed(err.message || '生图失败');
+      markJobFailed(errorMessage(err, '生图失败'));
     }
   }
 
@@ -387,6 +532,9 @@ function createRunner(options) {
     return blank();
   }
 
+  /**
+   * @param {Record<string, unknown>} payload
+   */
   function openPost(payload) {
     if (lock) return busy();
     const source = payload && typeof payload === 'object' ? payload : {};
@@ -400,6 +548,9 @@ function createRunner(options) {
     return { ok: true, posts: listPosts(postsDir) };
   }
 
+  /**
+   * @param {Record<string, unknown>} payload
+   */
   function saveEditor(payload) {
     if (!store) return { ok: true, skipped: true };
     if (lock) return busy();
@@ -421,11 +572,15 @@ function createRunner(options) {
     return { ok: true };
   }
 
+  /**
+   * @param {Record<string, unknown>} payload
+   */
   function generateDraft(payload) {
     const checked = validateInputs(payload);
     if (!checked.ok) return checked;
     if (lock) return busy();
     if (!store) usePost(allocatePost(postsDir, now()));
+    if (!store) return { ok: false, message: '没有这一篇' };
     lock = 'generateDraft';
     const state = store.read();
     state.business = checked.business;
@@ -442,6 +597,9 @@ function createRunner(options) {
     return { ok: true, accepted: true, id: currentId };
   }
 
+  /**
+   * @param {Record<string, unknown>} payload
+   */
   function generatePrompts(payload) {
     if (!store) return { ok: false, message: '没有这一篇' };
     if (lock) return busy();
@@ -469,23 +627,31 @@ function createRunner(options) {
     return { ok: true, accepted: true };
   }
 
+  /**
+   * @param {string} reading
+   */
   async function runReinterpret(reading) {
     try {
+      if (!store) throw new Error('没有这一篇');
       const state = store.read();
       const face = state.draft;
+      if (!face) throw new Error('还没有稿面');
       let produced;
       try {
         produced = await producePrompts(face, state.galleryCount, reading);
       } catch (err) {
-        markJobFailed(err.message || '提示词失败');
+        markJobFailed(errorMessage(err, '提示词失败'));
         return;
       }
       commitPrompts(face, state.galleryCount, produced);
     } catch (err) {
-      markJobFailed(err.message || '提示词失败');
+      markJobFailed(errorMessage(err, '提示词失败'));
     }
   }
 
+  /**
+   * @param {Record<string, unknown>} payload
+   */
   function reinterpret(payload) {
     if (!store) return { ok: false, message: '没有这一篇' };
     if (lock) return busy();
@@ -507,6 +673,9 @@ function createRunner(options) {
     return { ok: true, accepted: true };
   }
 
+  /**
+   * @param {Record<string, unknown>} payload
+   */
   function generateImages(payload) {
     if (!store) return { ok: false, message: '没有这一篇' };
     if (lock) return busy();
@@ -533,6 +702,9 @@ function createRunner(options) {
     return { ok: true, accepted: true };
   }
 
+  /**
+   * @param {Record<string, unknown>} payload
+   */
   function retryImage(payload) {
     if (!store) return { ok: false, message: '没有这一篇' };
     if (lock) return busy();
@@ -553,12 +725,18 @@ function createRunner(options) {
       return { ok: false, message: '只能重试失败的那一张' };
     }
     lock = 'retryImage';
-    runImages({ slot, index: slot === 'cover' ? 0 : index }).finally(() => {
+    /** @type {ImageOnly} */
+    const only = slot === 'cover' ? { slot: 'cover', index: 0 } : { slot: 'gallery', index };
+    runImages(only).finally(() => {
       lock = null;
     });
     return { ok: true, accepted: true };
   }
 
+  /**
+   * @param {Record<string, unknown>} source
+   * @returns {string}
+   */
   function imageFileFor(source) {
     if (!store) return '';
     const only = requestedSlot(source);
@@ -576,6 +754,9 @@ function createRunner(options) {
     return image.path || '';
   }
 
+  /**
+   * @param {Record<string, unknown>} payload
+   */
   function chooseImage(payload) {
     if (!store) return { ok: false, message: '没有这一篇' };
     if (lock) return busy();
@@ -602,6 +783,9 @@ function createRunner(options) {
     return { ok: true };
   }
 
+  /**
+   * @param {Record<string, unknown>} payload
+   */
   function previewImage(payload) {
     if (!currentDir) return { ok: false, message: '没有这张图' };
     const source = payload && typeof payload === 'object' ? payload : {};
@@ -613,6 +797,9 @@ function createRunner(options) {
     return { ok: true, dataUrl: `data:image/png;base64,${bytes.toString('base64')}` };
   }
 
+  /**
+   * @param {Record<string, unknown>} payload
+   */
   function revealImage(payload) {
     if (!currentDir) return { ok: false, message: '没有这张图' };
     const source = payload && typeof payload === 'object' ? payload : {};
@@ -622,7 +809,7 @@ function createRunner(options) {
     if (!fs.existsSync(abs)) return { ok: false, message: '图片不在' };
     try {
       revealFile(abs);
-    } catch (err) {
+    } catch {
       return { ok: true, path: abs };
     }
     return { ok: true, path: abs };

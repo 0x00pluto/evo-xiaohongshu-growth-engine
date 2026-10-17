@@ -1,8 +1,12 @@
+// @ts-check
 'use strict';
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { validateDraftFace, normalizeFace } = require('../draft/validate');
+
+/** @type {typeof import('../draft/validate')} */
+const validateModule = require('../draft/validate');
+const { validateDraftFace, normalizeFace } = validateModule;
 
 const COVER_TYPES = new Set(['story', 'compare']);
 const SET_TYPES = new Set(['breakdown', 'compare']);
@@ -33,6 +37,27 @@ const PROMPT_FILES = new Set([
   'sets/looks/card.md',
 ]);
 
+/**
+ * @typedef {Record<string, string | number | boolean>} PromptVars
+ * @typedef {{ look: string; background: string; colors: string; scenes: string[] }} ArtResult
+ * @typedef {{
+ *   label: string;
+ *   font: string;
+ *   size: string;
+ *   typesetting: string;
+ *   placement: string;
+ *   composition: string;
+ *   style: string;
+ *   light: string;
+ * }} LookConfig
+ * @typedef {{ typeFile: string; plan: string; shared: string; point?: string; summary?: string }} SeriesPromptNames
+ */
+
+/**
+ * @param {string} promptsDir
+ * @param {string} name
+ * @returns {string}
+ */
 function readPromptFile(promptsDir, name) {
   if (typeof name !== 'string' || !PROMPT_FILES.has(name)) {
     throw new Error('未知提示词文件');
@@ -44,6 +69,10 @@ function readPromptFile(promptsDir, name) {
   return fs.readFileSync(file, 'utf8');
 }
 
+/**
+ * @param {string} type
+ * @returns {string}
+ */
 function coverTypePromptName(type) {
   if (!COVER_TYPES.has(type)) {
     throw new Error('封面类型不在允许列表');
@@ -51,10 +80,15 @@ function coverTypePromptName(type) {
   return `cover/types/${type}.md`;
 }
 
+/**
+ * @param {string} type
+ * @returns {SeriesPromptNames}
+ */
 function seriesPromptNames(type) {
   if (!SET_TYPES.has(type)) {
     throw new Error('系列类型不在允许列表');
   }
+  /** @type {SeriesPromptNames} */
   const names = {
     typeFile: `sets/types/${type}.md`,
     plan: `sets/${type}/plan.md`,
@@ -67,6 +101,10 @@ function seriesPromptNames(type) {
   return names;
 }
 
+/**
+ * @param {number} count
+ * @returns {string[]}
+ */
 function assignGalleryRoles(count) {
   if (!Number.isInteger(count) || count < 0) return [];
   if (count === 0) return [];
@@ -74,15 +112,27 @@ function assignGalleryRoles(count) {
   return Array.from({ length: count }, (_, index) => (index === count - 1 ? 'summary' : 'point'));
 }
 
+/**
+ * @param {number} galleryCount
+ * @returns {string[]}
+ */
 function assignStoryRoles(galleryCount) {
   return ['opening', ...assignGalleryRoles(galleryCount)];
 }
 
+/**
+ * @param {number} galleryCount
+ * @returns {string[]}
+ */
 function assignContrastSlots(galleryCount) {
   const count = Number.isInteger(galleryCount) && galleryCount >= 0 ? galleryCount + 1 : 1;
   return Array.from({ length: count }, () => 'contrast');
 }
 
+/**
+ * @param {unknown} body
+ * @returns {string}
+ */
 function lastBodyLine(body) {
   const lines = String(body || '')
     .split(/\r?\n/)
@@ -91,11 +141,21 @@ function lastBodyLine(body) {
   return lines.length > 0 ? lines[lines.length - 1] : '';
 }
 
+/**
+ * @param {string[]} roles
+ * @returns {string}
+ */
 function formatGallerySlots(roles) {
   return roles.map((role, index) => `${index + 1} ${role}`).join('\n');
 }
 
+/**
+ * @param {string} template
+ * @param {PromptVars} vars
+ * @returns {string}
+ */
 function fillPrompt(template, vars) {
+  /** @type {string[]} */
   const missing = [];
   const text = String(template).replace(/\{\{(\w+)\}\}/g, (match, key) => {
     if (!Object.prototype.hasOwnProperty.call(vars, key)) {
@@ -110,22 +170,31 @@ function fillPrompt(template, vars) {
   return text;
 }
 
+/**
+ * @param {unknown} text
+ * @returns {Record<string, unknown>}
+ */
 function parseJsonObject(text) {
   let raw = String(text || '').replace(/^\uFEFF/, '').trim();
   const fenced = raw.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/);
   if (fenced) raw = fenced[1].trim();
+  /** @type {unknown} */
   let data;
   try {
     data = JSON.parse(raw);
-  } catch (err) {
+  } catch {
     throw new Error('模型没有返回 JSON 对象');
   }
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
     throw new Error('模型没有返回 JSON 对象');
   }
-  return data;
+  return /** @type {Record<string, unknown>} */ (data);
 }
 
+/**
+ * @param {unknown} text
+ * @returns {import('../draft/validate').DraftFace}
+ */
 function parseDraftText(text) {
   const data = parseJsonObject(text);
   // 封面那句话改由封面流程写入。成稿若仍返回 coverLine，这里丢掉，避免两套句子并存。
@@ -140,6 +209,10 @@ function parseDraftText(text) {
   return normalizeFace(face);
 }
 
+/**
+ * @param {unknown} text
+ * @returns {string}
+ */
 function parseCoverLineText(text) {
   const data = parseJsonObject(text);
   const coverLine = typeof data.coverLine === 'string' ? data.coverLine.trim() : '';
@@ -147,6 +220,10 @@ function parseCoverLineText(text) {
   return coverLine;
 }
 
+/**
+ * @param {unknown} text
+ * @returns {string}
+ */
 function parseCoverTypeText(text) {
   const data = parseJsonObject(text);
   const type = typeof data.type === 'string' ? data.type.trim() : '';
@@ -172,11 +249,20 @@ const SHEET_SLOTS = [
   '12. 系列统一规则',
 ];
 
+/**
+ * @param {unknown} text
+ * @returns {{ name: string; hex: string }[]}
+ */
 function namedHexes(text) {
   return [...String(text || '').matchAll(/([\u4e00-\u9fff]{2,12})\s*(#[0-9A-Fa-f]{6})(?![0-9A-Fa-f])/g)]
     .map((match) => ({ name: match[1], hex: match[2].toUpperCase() }));
 }
 
+/**
+ * @param {unknown} background
+ * @param {unknown} colors
+ * @returns {string}
+ */
 function paletteProblem(background, colors) {
   const joined = `${background || ''}\n${colors || ''}`.toUpperCase();
   if (EXAMPLE_STYLE_COLORS.some((color) => joined.includes(color))) return '配色不要照抄示例';
@@ -188,6 +274,11 @@ function paletteProblem(background, colors) {
   return '';
 }
 
+/**
+ * @param {unknown} text
+ * @param {unknown} lines
+ * @returns {ArtResult}
+ */
 function parseArtText(text, lines) {
   const data = parseJsonObject(text);
   const look = typeof data.look === 'string' ? data.look.trim().toLowerCase() : '';
@@ -211,7 +302,12 @@ function parseArtText(text, lines) {
   return { look, background, colors, scenes };
 }
 
+/**
+ * @param {unknown} text
+ * @returns {LookConfig}
+ */
 function parseLookText(text) {
+  /** @type {Record<string, string>} */
   const found = {};
   for (const line of String(text || '').split(/\r?\n/)) {
     const match = line.match(/^([a-z]+)\s*:\s*(.+)$/);
@@ -220,15 +316,32 @@ function parseLookText(text) {
   for (const key of LOOK_KEYS) {
     if (!found[key]) throw new Error(`风格配置缺了 ${key}`);
   }
-  return found;
+  return {
+    label: found.label,
+    font: found.font,
+    size: found.size,
+    typesetting: found.typesetting,
+    placement: found.placement,
+    composition: found.composition,
+    style: found.style,
+    light: found.light,
+  };
 }
 
+/**
+ * @param {string} promptsDir
+ * @param {ArtResult | null | undefined} art
+ * @param {unknown} scene
+ * @param {unknown} line
+ * @returns {{ prompt: string; style: string }}
+ */
 function renderSheet(promptsDir, art, scene, line) {
   const picture = typeof scene === 'string' ? scene.trim() : '';
   const copy = typeof line === 'string' ? line.trim() : '';
   if (!picture) throw new Error('这一张的画面是空的');
   if (!copy) throw new Error('这一张的文案是空的');
-  const lookId = art && typeof art.look === 'string' ? art.look : '';
+  if (!art) throw new Error('风格不在允许列表');
+  const lookId = typeof art.look === 'string' ? art.look : '';
   if (!LOOKS.has(lookId)) throw new Error('风格不在允许列表');
   const problem = paletteProblem(art.background, art.colors);
   if (problem) throw new Error(problem);
@@ -256,6 +369,10 @@ function renderSheet(promptsDir, art, scene, line) {
   };
 }
 
+/**
+ * @param {unknown} text
+ * @returns {string}
+ */
 function parseSetTypeText(text) {
   const data = parseJsonObject(text);
   const type = typeof data.type === 'string' ? data.type.trim() : '';
@@ -263,6 +380,12 @@ function parseSetTypeText(text) {
   return type;
 }
 
+/**
+ * @param {unknown} text
+ * @param {number} galleryCount
+ * @param {unknown} body
+ * @returns {string[]}
+ */
 function parsePlanText(text, galleryCount, body) {
   const data = parseJsonObject(text);
   const count = galleryCount + 1;

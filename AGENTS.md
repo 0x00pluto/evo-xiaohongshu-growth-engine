@@ -28,6 +28,7 @@
 12. 团队命令在 [`.cursor/commands/team/`](./.cursor/commands/team/)，母版在 Vibecoding 团队成员库，命令全文不抄进本文件。
 13. 改外观前先读 [`docs/DESIGN.md`](./docs/DESIGN.md)。
 14. 踩坑记录与检索用技能 `huyuan-ai-dev-faq-assistant`，FAQ 目录为 `docs/faqs`。技能正文不拷进本仓库。
+15. **后端 JS 检查**：改 `index.js`、其 `require` 到的 `src/` 业务文件，或 `scripts/run-studio.js` 时，文件须有 `// @ts-check` 与 JSDoc（外部参数先当 `unknown`，禁止 `any`）；改完跑 `pnpm run check:types`。页面 `src/studio/static/` 不在此列。
 
 ## 基线规则
 

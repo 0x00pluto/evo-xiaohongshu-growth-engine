@@ -1,3 +1,4 @@
+// @ts-check
 'use strict';
 
 const ARTICLE_LIMIT = 8000;
@@ -6,10 +7,39 @@ const EMPTY_BUSINESS = '先用一句话说你要发什么。';
 const ARTICLE_TOO_LONG = '贴进来的原文太长了，先删到 8000 字以内。';
 const BAD_GALLERY_COUNT = '配图张数要在 0 到 9 之间。';
 
+/**
+ * @typedef {{ title: string; body: string; topics: string[]; coverLine: string }} DraftFace
+ * @typedef {{
+ *   title: string;
+ *   body: string;
+ *   topics: string[];
+ *   coverLine: string;
+ *   coverLineSpecified: string;
+ *   galleryCount: number;
+ *   coverRules: string;
+ *   setRules: string;
+ * }} PromptBasis
+ * @typedef {{ ok: true; galleryCount: number } | { ok: false; field: string; message: string }} GalleryCountResult
+ * @typedef {{
+ *   ok: true;
+ *   business: string;
+ *   article: string;
+ *   galleryCount: number;
+ * } | { ok: false; field: string; message: string }} InputsResult
+ */
+
+/**
+ * @param {string} text
+ * @returns {number}
+ */
 function charLength(text) {
   return Array.from(text).length;
 }
 
+/**
+ * @param {unknown} value
+ * @returns {GalleryCountResult}
+ */
 function validateGalleryCount(value) {
   if (value == null || value === '') {
     return { ok: false, field: 'galleryCount', message: BAD_GALLERY_COUNT };
@@ -21,8 +51,12 @@ function validateGalleryCount(value) {
   return { ok: true, galleryCount: numeric };
 }
 
+/**
+ * @param {unknown} payload
+ * @returns {InputsResult}
+ */
 function validateInputs(payload) {
-  const source = payload && typeof payload === 'object' ? payload : {};
+  const source = payload && typeof payload === 'object' ? /** @type {Record<string, unknown>} */ (payload) : {};
   const business = typeof source.business === 'string' ? source.business.trim() : '';
   const article = typeof source.article === 'string' ? source.article.trim() : '';
   if (!business) {
@@ -36,18 +70,28 @@ function validateInputs(payload) {
   return { ok: true, business, article, galleryCount: count.galleryCount };
 }
 
+/**
+ * @param {unknown} draft
+ * @returns {string}
+ */
 function validateDraftFace(draft) {
-  if (!draft || typeof draft.title !== 'string' || !draft.title.trim()) return '标题是空的';
-  if (typeof draft.body !== 'string' || !draft.body.trim()) return '正文是空的';
-  if (!Array.isArray(draft.topics) || draft.topics.length < 3 || draft.topics.length > 5) {
+  if (!draft || typeof draft !== 'object') return '标题是空的';
+  const face = /** @type {Record<string, unknown>} */ (draft);
+  if (typeof face.title !== 'string' || !face.title.trim()) return '标题是空的';
+  if (typeof face.body !== 'string' || !face.body.trim()) return '正文是空的';
+  if (!Array.isArray(face.topics) || face.topics.length < 3 || face.topics.length > 5) {
     return '话题要有 3 到 5 个';
   }
-  if (draft.topics.some((topic) => typeof topic !== 'string' || !topic.trim())) {
+  if (face.topics.some((topic) => typeof topic !== 'string' || !topic.trim())) {
     return '话题要有 3 到 5 个';
   }
   return '';
 }
 
+/**
+ * @param {{ title: unknown; body: unknown; topics: unknown[]; coverLine?: unknown }} draft
+ * @returns {DraftFace}
+ */
 function normalizeFace(draft) {
   return {
     title: String(draft.title).trim(),
@@ -57,6 +101,12 @@ function normalizeFace(draft) {
   };
 }
 
+/**
+ * @param {{ title: unknown; body: unknown; topics: unknown[]; coverLine?: unknown }} draft
+ * @param {number} galleryCount
+ * @param {unknown} [coverLineSpecified]
+ * @returns {PromptBasis}
+ */
 function basisFrom(draft, galleryCount, coverLineSpecified) {
   const face = normalizeFace(draft);
   return {
@@ -73,6 +123,11 @@ function basisFrom(draft, galleryCount, coverLineSpecified) {
   };
 }
 
+/**
+ * @param {PromptBasis | null | undefined} left
+ * @param {PromptBasis | null | undefined} right
+ * @returns {boolean}
+ */
 function basisEqual(left, right) {
   if (!left || !right) return false;
   if (left.title !== right.title || left.body !== right.body || left.coverLine !== right.coverLine) return false;
@@ -86,19 +141,28 @@ function basisEqual(left, right) {
   return left.topics.every((topic, index) => topic === right.topics[index]);
 }
 
+/**
+ * @param {unknown} [topics]
+ * @returns {string}
+ */
 function formatTopics(topics) {
-  return (topics || [])
+  return (Array.isArray(topics) ? topics : [])
     .map((topic) => String(topic).trim())
     .filter(Boolean)
     .map((topic) => (topic.startsWith('#') ? topic : `#${topic}`))
     .join(' ');
 }
 
+/**
+ * @param {unknown} draft
+ * @returns {string}
+ */
 function formatPost(draft) {
   if (!draft || typeof draft !== 'object') return '';
-  const title = String(draft.title || '').trim();
-  const body = String(draft.body || '').trim();
-  const topics = formatTopics(draft.topics);
+  const face = /** @type {Record<string, unknown>} */ (draft);
+  const title = String(face.title || '').trim();
+  const body = String(face.body || '').trim();
+  const topics = formatTopics(face.topics);
   return [title, body, topics].filter(Boolean).join('\n\n');
 }
 
