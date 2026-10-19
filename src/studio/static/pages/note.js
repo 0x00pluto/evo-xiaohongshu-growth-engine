@@ -8,8 +8,8 @@ function notePage() {
     draft: null,
     prompts: {
       cover: '',
-      coverType: '',
-      setType: '',
+      storyType: '',
+      look: '',
       gallery: [],
       galleryLines: [],
       galleryRoles: [],
@@ -32,13 +32,17 @@ function notePage() {
     promptOpen: {},
     bodyDraft: '',
     activeKey: 'cover-0',
+    albumStyleOpen: false,
+    albums: [],
+    selectedLook: '',
+    albumSamples: {},
+    albumDetailOpen: false,
+    albumDetail: null,
+    albumDetailSample: '',
 
     hostReady: window.studioHost.ready,
     get articleLength() {
       return Array.from(String(this.article || '').trim()).length;
-    },
-    get reading() {
-      return this.prompts.coverType === 'compare' ? 'compare' : 'breakdown';
     },
     // 表单里的张数是下一次「写成笔记」要用的。笔记上的槽位跟上次写成的结果走。
     committedGalleryCount() {
@@ -258,12 +262,15 @@ function notePage() {
       const next = data || {};
       this.business = typeof next.business === 'string' ? next.business : '';
       this.article = typeof next.article === 'string' ? next.article : '';
+      this.articleType = next.articleType === '种草' || next.articleType === '引流' || next.articleType === '素人'
+        ? next.articleType
+        : '素人';
       this.galleryCount = next.galleryCount == null ? 1 : next.galleryCount;
       this.draft = next.draft || null;
       this.prompts = next.prompts || {
         cover: '',
-        coverType: '',
-        setType: '',
+        storyType: '',
+        look: '',
         gallery: [],
         galleryLines: [],
         galleryRoles: [],
@@ -275,8 +282,107 @@ function notePage() {
       this.job = next.job || { running: false, step: '', error: '' };
       this.directory = next.directory || '';
       this.postId = next.id || '';
+      this.selectedLook = typeof this.prompts.look === 'string' ? this.prompts.look : '';
       this.syncSlots();
       this.syncBodyDraft();
+    },
+    albumStyleLabel() {
+      const style = this.prompts && String(this.prompts.style || '').trim();
+      if (style) return style;
+      const look = this.prompts && String(this.prompts.look || '').trim();
+      if (look) {
+        const hit = (this.albums || []).find((item) => item.id === look);
+        if (hit && hit.label) return hit.label;
+        return look;
+      }
+      return '尚未选定';
+    },
+    albumSamplePreview(album) {
+      if (!album || !album.id) return '';
+      return this.albumSamples[album.id] || '';
+    },
+    async loadAlbums() {
+      if (!this.hostReady) return;
+      const data = await this.call('listAlbums');
+      if (!data || data.ok === false || !Array.isArray(data.albums)) {
+        this.albums = [];
+        return;
+      }
+      this.albums = data.albums;
+      if (!this.selectedLook && this.prompts.look) this.selectedLook = this.prompts.look;
+      await this.loadAlbumSamples();
+    },
+    async loadAlbumSamples() {
+      const next = { ...this.albumSamples };
+      let changed = false;
+      for (const album of this.albums) {
+        if (!album.hasSample || next[album.id]) continue;
+        const result = await this.call('previewAlbumSample', { id: album.id });
+        if (result && result.ok && result.dataUrl) {
+          next[album.id] = result.dataUrl;
+          changed = true;
+        }
+      }
+      if (changed) this.albumSamples = next;
+    },
+    async toggleAlbumStyle() {
+      if (this.job.running) return;
+      this.albumStyleOpen = !this.albumStyleOpen;
+      if (this.albumStyleOpen) {
+        if (!this.albums.length) await this.loadAlbums();
+        else await this.loadAlbumSamples();
+        if (!this.selectedLook && this.prompts.look) this.selectedLook = this.prompts.look;
+      }
+    },
+    async openAlbumDetail(album) {
+      if (this.job.running || !album || !album.id) return;
+      this.notice = '';
+      this.selectedLook = album.id;
+      const detail = await this.call('getAlbumDetail', { id: album.id });
+      if (!detail || detail.ok === false) {
+        this.notice = (detail && detail.message) || '没有读到这一册';
+        return;
+      }
+      this.albumDetail = detail;
+      this.albumDetailSample = this.albumSamplePreview(album) || '';
+      if (!this.albumDetailSample && detail.hasSample) {
+        const sample = await this.call('previewAlbumSample', { id: album.id });
+        if (sample && sample.ok && sample.dataUrl) {
+          this.albumDetailSample = sample.dataUrl;
+          this.albumSamples = { ...this.albumSamples, [album.id]: sample.dataUrl };
+        }
+      }
+      this.albumDetailOpen = true;
+    },
+    closeAlbumDetail() {
+      this.albumDetailOpen = false;
+      this.albumDetail = null;
+      this.albumDetailSample = '';
+    },
+    canRegenAlbumPrompts() {
+      return Boolean(
+        this.hostReady
+        && !this.job.running
+        && this.draft
+        && this.albumDetail
+        && String(this.albumDetail.id || this.selectedLook || '').trim(),
+      );
+    },
+    async onRegenAlbumPrompts() {
+      if (!this.canRegenAlbumPrompts()) return;
+      const look = (this.albumDetail && this.albumDetail.id) || this.selectedLook;
+      this.notice = '';
+      this.selectedLook = look;
+      const result = await this.call('generatePrompts', {
+        look,
+        draft: this.draft,
+        galleryCount: this.galleryCount,
+      });
+      if (this.noteRejection(result)) return;
+      this.closeAlbumDetail();
+      this.job = { running: true, step: '提示词', error: '' };
+      this.ensurePoll();
+      await this.refresh();
     },
     resetBrief() {
       this.articleType = '素人';
@@ -336,6 +442,7 @@ function notePage() {
     },
     async init() {
       if (!this.hostReady) return;
+      await this.loadAlbums();
       const intent = window.studioHost.intent;
       window.studioHost.intent = null;
       if (intent && intent.postId) {
@@ -395,21 +502,13 @@ function notePage() {
       const result = await this.call('generateDraft', {
         business: this.business,
         article: this.article,
+        articleType: this.articleType,
         galleryCount: this.galleryCount,
       });
       if (this.noteRejection(result)) return;
       this.postId = result.id || this.postId;
       this.phase = 'copy';
       this.job = { running: true, step: '成稿', error: '' };
-      this.ensurePoll();
-      await this.refresh();
-    },
-    async onReading(next) {
-      if (!this.hostReady || this.job.running || !this.draft || next === this.reading) return;
-      this.notice = '';
-      const result = await this.call('reinterpret', { reading: next });
-      if (this.noteRejection(result)) return;
-      this.job = { running: true, step: '提示词', error: '' };
       this.ensurePoll();
       await this.refresh();
     },

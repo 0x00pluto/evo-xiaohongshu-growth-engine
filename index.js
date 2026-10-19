@@ -76,6 +76,15 @@ module.exports = {
       listPosts() {
         return runner.listPosts();
       },
+      listAlbums() {
+        return runner.listAlbums();
+      },
+      /**
+       * @param {unknown} payload
+       */
+      getAlbumDetail(payload) {
+        return runner.getAlbumDetail(asObject(payload));
+      },
       loadLatest() {
         return runner.loadLatest();
       },
@@ -106,12 +115,6 @@ module.exports = {
       /**
        * @param {unknown} payload
        */
-      reinterpret(payload) {
-        return runner.reinterpret(asObject(payload));
-      },
-      /**
-       * @param {unknown} payload
-       */
       chooseImage(payload) {
         return runner.chooseImage(asObject(payload));
       },
@@ -132,6 +135,12 @@ module.exports = {
        */
       previewImage(payload) {
         return runner.previewImage(asObject(payload));
+      },
+      /**
+       * @param {unknown} payload
+       */
+      previewAlbumSample(payload) {
+        return runner.previewAlbumSample(asObject(payload));
       },
       /**
        * @param {unknown} payload

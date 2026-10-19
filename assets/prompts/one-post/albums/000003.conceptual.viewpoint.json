@@ -1,0 +1,10 @@
+{
+  "id": "000003.conceptual.viewpoint",
+  "kind": "conceptual",
+  "slug": "viewpoint",
+  "hint": "潮流概念插画，几何隐喻，文字优先",
+  "label": "潮流概念插画风",
+  "copySchema": "上下观点。每一项对象字段：\n- theme：本次主题内容（短句，非空）\n- mainTitle：主标题，须上图且醒目（非空）\n- subTitle：副标题（非空）\n返回形状：{\"frames\":[{\"theme\":\"...\",\"mainTitle\":\"...\",\"subTitle\":\"...\"}]}",
+  "legacyIds": ["conceptual"],
+  "enabled": true
+}

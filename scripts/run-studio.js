@@ -23,15 +23,17 @@ const METHODS = new Set([
   'loadLatest',
   'openPost',
   'listPosts',
+  'listAlbums',
+  'getAlbumDetail',
   'startNew',
   'saveEditor',
   'generateDraft',
   'generatePrompts',
-  'reinterpret',
   'chooseImage',
   'generateImages',
   'retryImage',
   'previewImage',
+  'previewAlbumSample',
   'revealImage',
 ]);
 const LOCAL_HOSTS = new Set(['127.0.0.1', 'localhost', '::1']);

@@ -32,9 +32,11 @@ test('本机服务的 loadLatest 在空目录返回空态', async () => {
     assert.doesNotMatch(noteHtml, /只发头图/);
     assert.doesNotMatch(noteHtml, /让画面跟上/);
     assert.doesNotMatch(noteHtml, /待重算/);
-    assert.match(noteHtml, /id="reading"/);
-    assert.match(noteHtml, /过程说明/);
-    assert.match(noteHtml, /对比/);
+    assert.doesNotMatch(noteHtml, /id="reading"/);
+    assert.match(noteHtml, /文章类型/);
+    assert.match(noteHtml, /种草/);
+    assert.match(noteHtml, /引流/);
+    assert.match(noteHtml, /素人/);
     assert.doesNotMatch(noteHtml, /<select[^>]*setType/);
     assert.match(noteHtml, /drawLabel\(item\)/);
     assert.match(noteHtml, /onChooseVersion/);

@@ -20,18 +20,30 @@ const postsModule = require('./posts');
 const { createLlm } = llmModule;
 const { generatePng } = imageModule;
 const {
-  READINGS,
+  albumHint,
+  albumPromptName,
+  albumSampleFile,
+  albumSamplePath,
   assignContrastSlots,
   assignGalleryRoles,
   assignStoryRoles,
+  buildDraftPrompt,
+  copySchema,
   fillPrompt,
   formatGallerySlots,
-  parseArtText,
+  formatPlannedLines,
+  frameDisplayLine,
+  isAlbum,
+  isArticleType,
+  loadAlbumCatalog,
   parseDraftText,
   parsePlanText,
+  parseScenesText,
+  pickAlbum,
+  pickStoryType,
   readPromptFile,
-  renderSheet,
-  seriesPromptNames,
+  renderAlbumPrompt,
+  storyPromptName,
 } = fillModule;
 const { createStore, emptyState, nextImageFile } = storeModule;
 const {
@@ -66,6 +78,7 @@ const BUSY_MESSAGE = '正在生成，请等这一轮结束';
  *   complete?: (prompt: string) => Promise<string>;
  *   generateImage?: (args: { prompt: string; outputPath: string }) => Promise<string>;
  *   revealFile?: (absPath: string) => void;
+ *   random?: () => number;
  * }} RunnerOptions
  */
 
@@ -80,6 +93,25 @@ function errorMessage(err, fallback) {
     if (typeof message === 'string' && message) return message;
   }
   return fallback;
+}
+
+/**
+ * @param {unknown} err
+ * @returns {boolean}
+ */
+function isSceneLengthError(err) {
+  return /画面应为 \d+ 张，模型返回了 \d+ 张/.test(errorMessage(err, ''));
+}
+
+/**
+ * @param {unknown} err
+ * @param {number} fallback
+ * @returns {number}
+ */
+function sceneLengthFromError(err, fallback) {
+  const match = errorMessage(err, '').match(/模型返回了 (\d+) 张/);
+  if (!match) return fallback;
+  return Number(match[1]);
 }
 
 /**
@@ -141,7 +173,7 @@ function createRunner(options) {
   const env = options.env || {};
   const fetchImpl = options.fetch;
   const now = options.now || (() => new Date());
-  importLegacy(postsDir);
+  importLegacy(postsDir, promptsDir);
   let currentId = '';
   let currentDir = '';
   /** @type {import('../draft/store').DraftStore | null} */
@@ -155,6 +187,7 @@ function createRunner(options) {
     fetch: fetchImpl,
   }));
   const revealFile = options.revealFile || (() => {});
+  const random = options.random || Math.random;
   /** @type {string | null} */
   let lock = null;
 
@@ -164,7 +197,7 @@ function createRunner(options) {
   function usePost(id) {
     currentId = id;
     currentDir = path.join(postsDir, id);
-    store = createStore(currentDir);
+    store = createStore(currentDir, { promptsDir });
     const writeFile = store.write;
     store.write = (state) => {
       writeFile(state);
@@ -234,63 +267,87 @@ function createRunner(options) {
   }
 
   /**
+   * 画面条数必须等于已定文案行数；长度不符时附纠正句再调一次。
+   * @param {string[]} displayLines
+   * @param {Record<string, string>} sceneVars
+   * @param {string} look
+   * @returns {Promise<{ album: string; scenes: string[] }>}
+   */
+  async function completeScenes(displayLines, sceneVars, look) {
+    const need = displayLines.length;
+    const basePrompt = fillPrompt(readPromptFile(promptsDir, 'scenes.md'), sceneVars);
+    /** @type {unknown} */
+    let lastErr;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const prompt = attempt === 0
+        ? basePrompt
+        : `${basePrompt}\n\n上一轮返回了 ${sceneLengthFromError(lastErr, need)} 条，必须正好 ${need} 条，只返回 JSON。`;
+      try {
+        return parseScenesText(await complete(prompt), displayLines, look, promptsDir);
+      } catch (err) {
+        lastErr = err;
+        if (attempt === 0 && isSceneLengthError(err)) continue;
+        throw err;
+      }
+    }
+    throw lastErr instanceof Error ? lastErr : new Error('画面失败');
+  }
+
+  /**
    * @param {DraftFace} face
    * @param {number} galleryCount
-   * @param {string} reading
+   * @param {string} [albumLook] 合法图册 id；缺省则随机抽
    */
-  async function producePrompts(face, galleryCount, reading) {
-    // 人选解读。过程说明的头图才填大字规则，配图和对比不再套封面大字。
-    const setKey = reading === 'compare' ? 'compare' : 'breakdown';
-    if (!Object.prototype.hasOwnProperty.call(READINGS, setKey)) {
-      throw new Error('解读不在允许列表');
-    }
-    const coverType = READINGS[setKey];
-    const tone = readPromptFile(promptsDir, 'cover/tone-amateur.md');
-    const names = seriesPromptNames(setKey);
+  async function producePrompts(face, galleryCount, albumLook) {
+    const storyType = pickStoryType(random);
+    const look = typeof albumLook === 'string' && isAlbum(albumLook, promptsDir)
+      ? albumLook
+      : pickAlbum(promptsDir, random);
+    const tone = readPromptFile(promptsDir, 'tone.md');
     const shared = {
       title: face.title,
       body: face.body,
       topics: face.topics.join('、'),
     };
-    const slots = setKey === 'compare' ? assignContrastSlots(galleryCount) : assignStoryRoles(galleryCount);
-    /** @type {Record<string, string>} */
-    const planVars = {
-      ...shared,
-      tone,
-      imageCount: String(galleryCount + 1),
-      slots: formatGallerySlots(slots),
-    };
-    if (setKey === 'breakdown') {
-      if (!names.point || !names.summary) throw new Error('系列类型不在允许列表');
-      planVars.seriesPoint = readPromptFile(promptsDir, names.point);
-      planVars.seriesSummary = readPromptFile(promptsDir, names.summary);
-    }
+    const slots = storyType === 'contrast' ? assignContrastSlots(galleryCount) : assignStoryRoles(galleryCount);
     const planned = parsePlanText(
-      await complete(fillPrompt(readPromptFile(promptsDir, names.plan), planVars)),
+      await complete(fillPrompt(readPromptFile(promptsDir, storyPromptName(storyType)), {
+        ...shared,
+        tone,
+        albumHint: albumHint(promptsDir, look),
+        copySchema: copySchema(look, promptsDir),
+        imageCount: String(galleryCount + 1),
+        slots: formatGallerySlots(slots),
+      })),
       galleryCount,
       face.body,
+      look,
+      promptsDir,
     );
-    const art = parseArtText(await complete(fillPrompt(readPromptFile(promptsDir, 'sets/art.md'), {
+    const displayLines = planned.map((frame) => frameDisplayLine(look, frame, promptsDir));
+    const art = await completeScenes(displayLines, {
       ...shared,
       tone,
-      plannedLines: planned.join('\n'),
-      readingHint: setKey === 'compare'
+      albumHint: albumHint(promptsDir, look),
+      plannedLines: formatPlannedLines(planned, look, promptsDir),
+      storyHint: storyType === 'contrast'
         ? '每一张画面仍是一个对照，前后接成一个故事。'
         : '前后接成一个故事。',
-    })), planned);
-    const rendered = planned.map((line, index) => renderSheet(promptsDir, art, art.scenes[index], line));
+      sceneCount: String(displayLines.length),
+    }, look);
+    const rendered = planned.map((frame, index) => renderAlbumPrompt(promptsDir, look, art.scenes[index], frame));
     const galleryRoles = galleryCount === 0
       ? []
-      : (setKey === 'compare'
+      : (storyType === 'contrast'
         ? Array.from({ length: galleryCount }, () => 'contrast')
         : assignGalleryRoles(galleryCount));
     return {
       cover: rendered[0].prompt,
-      coverType,
-      coverLine: planned[0],
-      setType: galleryCount === 0 ? '' : setKey,
+      storyType,
+      look,
+      coverLine: displayLines[0],
       gallery: rendered.slice(1).map((item) => item.prompt),
-      galleryLines: planned.slice(1),
+      galleryLines: displayLines.slice(1),
       galleryRoles,
       style: rendered[0].style,
     };
@@ -301,9 +358,9 @@ function createRunner(options) {
    * @param {number} galleryCount
    * @param {{
    *   cover: string;
-   *   coverType: string;
+   *   storyType: string;
+   *   look: string;
    *   coverLine: string;
-   *   setType: string;
    *   gallery: string[];
    *   galleryLines: string[];
    *   galleryRoles: string[];
@@ -318,8 +375,8 @@ function createRunner(options) {
     state.galleryCount = galleryCount;
     state.prompts = {
       cover: produced.cover,
-      coverType: produced.coverType,
-      setType: produced.setType,
+      storyType: produced.storyType,
+      look: produced.look,
       gallery: produced.gallery,
       galleryLines: produced.galleryLines,
       galleryRoles: produced.galleryRoles,
@@ -332,12 +389,12 @@ function createRunner(options) {
   }
 
   /**
-   * @param {{ business: string; article: string; galleryCount: number }} checked
+   * @param {{ business: string; article: string; galleryCount: number; articleType: string }} checked
    */
   async function runGenerateDraft(checked) {
     try {
       if (!store) throw new Error('没有这一篇');
-      const draftPrompt = fillPrompt(readPromptFile(promptsDir, 'draft.md'), {
+      const draftPrompt = buildDraftPrompt(promptsDir, checked.articleType, {
         business: checked.business,
         article: checked.article,
       });
@@ -350,12 +407,13 @@ function createRunner(options) {
       }
       const drafted = store.read();
       drafted.draft = face;
+      drafted.articleType = checked.articleType;
       drafted.prompts.stale = false;
       drafted.job = { running: true, step: '提示词', error: '' };
       store.write(drafted);
       let produced;
       try {
-        produced = await producePrompts(face, checked.galleryCount, 'breakdown');
+        produced = await producePrompts(face, checked.galleryCount);
       } catch (err) {
         markJobFailed(errorMessage(err, '提示词失败'));
         return;
@@ -366,17 +424,19 @@ function createRunner(options) {
     }
   }
 
-  async function runGeneratePrompts() {
+  /**
+   * @param {string} [albumLook]
+   */
+  async function runGeneratePrompts(albumLook) {
     try {
       if (!store) throw new Error('没有这一篇');
       const state = store.read();
       const face = state.draft;
       if (!face) throw new Error('还没有稿面');
       const galleryCount = state.galleryCount;
-      const reading = state.prompts.coverType === 'compare' ? 'compare' : 'breakdown';
       let produced;
       try {
-        produced = await producePrompts(face, galleryCount, reading);
+        produced = await producePrompts(face, galleryCount, albumLook);
       } catch (err) {
         markJobFailed(errorMessage(err, '提示词失败'));
         return;
@@ -545,7 +605,7 @@ function createRunner(options) {
   }
 
   function catalog() {
-    return { ok: true, posts: listPosts(postsDir) };
+    return { ok: true, posts: listPosts(postsDir, promptsDir) };
   }
 
   /**
@@ -578,6 +638,10 @@ function createRunner(options) {
   function generateDraft(payload) {
     const checked = validateInputs(payload);
     if (!checked.ok) return checked;
+    const articleType = payload && payload.articleType;
+    if (!isArticleType(articleType)) {
+      return { ok: false, message: '文章类型不在允许列表', field: 'articleType' };
+    }
     if (lock) return busy();
     if (!store) usePost(allocatePost(postsDir, now()));
     if (!store) return { ok: false, message: '没有这一篇' };
@@ -585,13 +649,14 @@ function createRunner(options) {
     const state = store.read();
     state.business = checked.business;
     state.article = checked.article;
+    state.articleType = articleType;
     state.galleryCount = checked.galleryCount;
     if (typeof payload.coverLineSpecified === 'string') {
       state.coverLineSpecified = payload.coverLineSpecified.trim();
     }
     state.job = { running: true, step: '成稿', error: '' };
     store.write(state);
-    runGenerateDraft(checked).finally(() => {
+    runGenerateDraft({ ...checked, articleType }).finally(() => {
       lock = null;
     });
     return { ok: true, accepted: true, id: currentId };
@@ -614,6 +679,10 @@ function createRunner(options) {
     if (typeof source.coverLineSpecified === 'string') {
       state.coverLineSpecified = source.coverLineSpecified.trim();
     }
+    const albumLook = typeof source.look === 'string' ? source.look.trim() : '';
+    if (albumLook && !isAlbum(albumLook, promptsDir)) {
+      return { ok: false, message: '图册不在允许列表', field: 'look' };
+    }
     if (!state.draft) return { ok: false, message: '还没有稿面' };
     const faceMessage = validateDraftFace(state.draft);
     if (faceMessage) return { ok: false, message: faceMessage };
@@ -621,56 +690,66 @@ function createRunner(options) {
     lock = 'generatePrompts';
     state.job = { running: true, step: '提示词', error: '' };
     store.write(state);
-    runGeneratePrompts().finally(() => {
+    runGeneratePrompts(albumLook || undefined).finally(() => {
       lock = null;
     });
     return { ok: true, accepted: true };
   }
 
-  /**
-   * @param {string} reading
-   */
-  async function runReinterpret(reading) {
-    try {
-      if (!store) throw new Error('没有这一篇');
-      const state = store.read();
-      const face = state.draft;
-      if (!face) throw new Error('还没有稿面');
-      let produced;
-      try {
-        produced = await producePrompts(face, state.galleryCount, reading);
-      } catch (err) {
-        markJobFailed(errorMessage(err, '提示词失败'));
-        return;
-      }
-      commitPrompts(face, state.galleryCount, produced);
-    } catch (err) {
-      markJobFailed(errorMessage(err, '提示词失败'));
-    }
+  function listAlbums() {
+    const catalog = loadAlbumCatalog(promptsDir);
+    return {
+      ok: true,
+      albums: catalog.list().map((meta) => {
+        const samplePath = albumSamplePath(meta.id, promptsDir);
+        return {
+          id: meta.id,
+          label: meta.label,
+          hint: meta.hint,
+          samplePath,
+          hasSample: fs.existsSync(albumSampleFile(promptsDir, meta.id)),
+        };
+      }),
+    };
   }
 
   /**
    * @param {Record<string, unknown>} payload
    */
-  function reinterpret(payload) {
-    if (!store) return { ok: false, message: '没有这一篇' };
-    if (lock) return busy();
-    const reading = payload && payload.reading;
-    if (reading !== 'breakdown' && reading !== 'compare') {
-      return { ok: false, message: '解读不在允许列表' };
+  function previewAlbumSample(payload) {
+    const source = payload && typeof payload === 'object' ? payload : {};
+    const id = typeof source.id === 'string' ? source.id.trim() : '';
+    if (!isAlbum(id, promptsDir)) return { ok: false, message: '图册不在允许列表' };
+    const abs = albumSampleFile(promptsDir, id);
+    if (!fs.existsSync(abs)) return { ok: false, message: '没有样图' };
+    const bytes = fs.readFileSync(abs);
+    const ext = path.extname(abs).toLowerCase();
+    const mime = ext === '.png' ? 'image/png' : 'image/jpeg';
+    return { ok: true, dataUrl: `data:${mime};base64,${bytes.toString('base64')}` };
+  }
+
+  /**
+   * @param {Record<string, unknown>} payload
+   */
+  function getAlbumDetail(payload) {
+    const source = payload && typeof payload === 'object' ? payload : {};
+    const id = typeof source.id === 'string' ? source.id.trim() : '';
+    if (!isAlbum(id, promptsDir)) return { ok: false, message: '图册不在允许列表' };
+    const meta = loadAlbumCatalog(promptsDir).get(id);
+    let promptTemplate = '';
+    try {
+      promptTemplate = readPromptFile(promptsDir, albumPromptName(id, promptsDir));
+    } catch {
+      return { ok: false, message: '找不到图册题词' };
     }
-    const state = store.read();
-    if (!state.draft) return { ok: false, message: '还没有稿面' };
-    const faceMessage = validateDraftFace(state.draft);
-    if (faceMessage) return { ok: false, message: faceMessage };
-    state.draft = normalizeFace(state.draft);
-    lock = 'reinterpret';
-    state.job = { running: true, step: '提示词', error: '' };
-    store.write(state);
-    runReinterpret(reading).finally(() => {
-      lock = null;
-    });
-    return { ok: true, accepted: true };
+    return {
+      ok: true,
+      id: meta.id,
+      label: meta.label,
+      hint: meta.hint,
+      hasSample: fs.existsSync(albumSampleFile(promptsDir, id)),
+      promptTemplate,
+    };
   }
 
   /**
@@ -820,10 +899,12 @@ function createRunner(options) {
     generateDraft,
     generateImages,
     generatePrompts,
+    getAlbumDetail,
+    listAlbums,
     listPosts: catalog,
-    reinterpret,
     loadLatest,
     openPost,
+    previewAlbumSample,
     previewImage,
     revealImage,
     retryImage,

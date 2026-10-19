@@ -4,6 +4,10 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
+/** @type {typeof import('../prompts/fill')} */
+const fillModule = require('../prompts/fill');
+const { migrateAlbumId } = fillModule;
+
 const STATUSES = new Set(['空', '生成中', '成功', '失败', '作废']);
 
 /**
@@ -17,8 +21,8 @@ const STATUSES = new Set(['空', '生成中', '成功', '失败', '作废']);
  * }} ImageSlot
  * @typedef {{
  *   cover: string;
- *   coverType: string;
- *   setType: string;
+ *   storyType: string;
+ *   look: string;
  *   gallery: string[];
  *   galleryLines: string[];
  *   galleryRoles: string[];
@@ -29,6 +33,7 @@ const STATUSES = new Set(['空', '生成中', '成功', '失败', '作废']);
  * @typedef {{
  *   business: string;
  *   article: string;
+ *   articleType: string;
  *   coverLineSpecified: string;
  *   galleryCount: number;
  *   draft: import('./validate').DraftFace | null;
@@ -103,13 +108,14 @@ function emptyState() {
   return {
     business: '',
     article: '',
+    articleType: '素人',
     coverLineSpecified: '',
     galleryCount: 1,
     draft: null,
     prompts: {
       cover: '',
-      coverType: '',
-      setType: '',
+      storyType: '',
+      look: '',
       gallery: [],
       galleryLines: [],
       galleryRoles: [],
@@ -120,6 +126,41 @@ function emptyState() {
     images: { cover: emptySlot(), gallery: [] },
     job: { running: false, step: '', error: '' },
   };
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function normalizeArticleType(value) {
+  if (value === '种草' || value === '引流' || value === '素人') return value;
+  return '素人';
+}
+
+/**
+ * @param {Record<string, unknown>} prompts
+ * @param {string} [promptsDir]
+ * @returns {{ storyType: string; look: string }}
+ */
+function normalizePromptSlots(prompts, promptsDir) {
+  const look = migrateAlbumId(prompts.look, promptsDir);
+  if (prompts.storyType === 'process' || prompts.storyType === 'contrast') {
+    return { storyType: prompts.storyType, look };
+  }
+  // 旧稿中文 id，或更早的 coverType / setType；look 仍按短名映射。
+  if (prompts.storyType === '过程说明') {
+    return { storyType: 'process', look };
+  }
+  if (prompts.storyType === '对比') {
+    return { storyType: 'contrast', look };
+  }
+  if (prompts.coverType === 'compare' || prompts.setType === 'compare') {
+    return { storyType: 'contrast', look };
+  }
+  if (prompts.coverType === 'story' || prompts.setType === 'breakdown') {
+    return { storyType: 'process', look };
+  }
+  return { storyType: '', look };
 }
 
 /**
@@ -219,13 +260,15 @@ function normalizeGalleryRoles(value) {
 
 /**
  * @param {unknown} raw
+ * @param {string} [promptsDir]
  * @returns {DraftState}
  */
-function normalize(raw) {
+function normalize(raw, promptsDir) {
   const base = emptyState();
   const source = raw && typeof raw === 'object' ? /** @type {Record<string, unknown>} */ (raw) : {};
   base.business = typeof source.business === 'string' ? source.business : '';
   base.article = typeof source.article === 'string' ? source.article : '';
+  base.articleType = normalizeArticleType(source.articleType);
   base.coverLineSpecified = typeof source.coverLineSpecified === 'string' ? source.coverLineSpecified : '';
   const count = Number(source.galleryCount);
   base.galleryCount = Number.isInteger(count) && count >= 0 && count <= 9 ? count : 1;
@@ -241,10 +284,11 @@ function normalize(raw) {
   const prompts = source.prompts && typeof source.prompts === 'object'
     ? /** @type {Record<string, unknown>} */ (source.prompts)
     : {};
+  const slots = normalizePromptSlots(prompts, promptsDir);
   base.prompts = {
     cover: typeof prompts.cover === 'string' ? prompts.cover : '',
-    coverType: prompts.coverType === 'story' || prompts.coverType === 'compare' ? prompts.coverType : '',
-    setType: prompts.setType === 'breakdown' || prompts.setType === 'compare' ? prompts.setType : '',
+    storyType: slots.storyType,
+    look: slots.look,
     gallery: normalizeStringList(prompts.gallery),
     galleryLines: normalizeStringList(prompts.galleryLines),
     galleryRoles: normalizeGalleryRoles(prompts.galleryRoles),
@@ -272,9 +316,11 @@ function normalize(raw) {
 
 /**
  * @param {string} latestDir
+ * @param {{ promptsDir?: string }} [options]
  * @returns {DraftStore}
  */
-function createStore(latestDir) {
+function createStore(latestDir, options) {
+  const promptsDir = options && typeof options.promptsDir === 'string' ? options.promptsDir : '';
   const file = path.join(latestDir, 'draft.json');
 
   function exists() {
@@ -287,7 +333,7 @@ function createStore(latestDir) {
   function read() {
     if (!exists()) return emptyState();
     try {
-      return normalize(JSON.parse(fs.readFileSync(file, 'utf8')));
+      return normalize(JSON.parse(fs.readFileSync(file, 'utf8')), promptsDir);
     } catch {
       return emptyState();
     }
@@ -300,7 +346,7 @@ function createStore(latestDir) {
     // 先写临时文件再替换，轮询才不会读到半截 JSON。
     fs.mkdirSync(latestDir, { recursive: true });
     const tmp = `${file}.${process.pid}.tmp`;
-    fs.writeFileSync(tmp, `${JSON.stringify(normalize(state), null, 2)}\n`);
+    fs.writeFileSync(tmp, `${JSON.stringify(normalize(state, promptsDir), null, 2)}\n`);
     fs.renameSync(tmp, file);
   }
 

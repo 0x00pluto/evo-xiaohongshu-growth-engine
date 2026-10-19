@@ -1,0 +1,10 @@
+{
+  "id": "000004.card.knowledge",
+  "kind": "card",
+  "slug": "knowledge",
+  "hint": "强对比知识卡片，干货短句，模块图形",
+  "label": "强对比知识卡片风",
+  "copySchema": "卡片上下。每一项对象字段：\n- mainTitle：主标题，须上图且醒目（非空）\n- point：底部要点（非空）\n返回形状：{\"frames\":[{\"mainTitle\":\"...\",\"point\":\"...\"}]}",
+  "legacyIds": ["card"],
+  "enabled": true
+}
