@@ -8,10 +8,16 @@
     );
   }
 
+  // Alpine 等代理不能进 IPC；dex 前打成普通对象（HTTP 分支已有 stringify）。
+  function plain(value) {
+    if (value === undefined) return undefined;
+    return JSON.parse(JSON.stringify(value));
+  }
+
   async function call(method, payload) {
     try {
       if (window.dex && typeof window.dex.call === 'function') {
-        const args = payload === undefined ? [] : [payload];
+        const args = payload === undefined ? [] : [plain(payload)];
         return await window.dex.call('onePost', method, args);
       }
       const response = await fetch(`/api/one-post/${method}`, {
