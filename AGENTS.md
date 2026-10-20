@@ -29,6 +29,9 @@
 13. 改外观前先读 [`docs/DESIGN.md`](./docs/DESIGN.md)。
 14. 踩坑记录与检索用技能 `huyuan-ai-dev-faq-assistant`，FAQ 目录为 `docs/faqs`。技能正文不拷进本仓库。
 15. **后端 JS 检查**：改 `index.js`、其 `require` 到的 `src/` 业务文件，或 `scripts/run-studio.js` 时，文件须有 `// @ts-check` 与 JSDoc（外部参数先当 `unknown`，禁止 `any`）；改完跑 `pnpm run check:types`。页面 `src/studio/static/` 不在此列。
+16. 查代码时 **首选 Codebase Memory MCP**，再降级全文检索：
+   - 本仓：`project="Users-peng.zhi-Documents-Codex-0007-e5b08fe7baa2e4b9a6e5a29ee995bfe5bc95e6938e"`，用 `search_graph` / `search_code` / `trace_path` / `get_code_snippet`
+   - **降级**：MCP 未接入、项目不在列表、查询失败，或目标落在 `.cursor/`、`cache/`、`output/`、`temp/` 时，再用 `Grep` / `Read`
 
 ## 基线规则
 
