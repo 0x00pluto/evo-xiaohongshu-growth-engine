@@ -5,8 +5,12 @@
 const catalogModule = require('./album/catalog');
 /** @type {typeof import('./album/frame')} */
 const frameModule = require('./album/frame');
+/** @type {typeof import('./album/learn')} */
+const learnModule = require('./album/learn');
 /** @type {typeof import('./album/render')} */
 const renderModule = require('./album/render');
+/** @type {typeof import('./album/store')} */
+const albumStoreModule = require('./album/store');
 /** @type {typeof import('./article')} */
 const articleModule = require('./article');
 /** @type {typeof import('./parse')} */
@@ -33,28 +37,37 @@ module.exports = {
   assignContrastSlots: storyModule.assignContrastSlots,
   assignGalleryRoles: storyModule.assignGalleryRoles,
   assignStoryRoles: storyModule.assignStoryRoles,
+  buildAlbumDraft: learnModule.buildAlbumDraft,
   buildDraftPrompt: articleModule.buildDraftPrompt,
   clearAlbumCatalogCache: catalogModule.clearAlbumCatalogCache,
+  commitAlbumDraft: albumStoreModule.commitAlbumDraft,
   copySchema: catalogModule.copySchema,
+  deleteAlbumFiles: albumStoreModule.deleteAlbumFiles,
+  draftPublicView: learnModule.draftPublicView,
   fillPrompt: templateModule.fillPrompt,
   formatGallerySlots: storyModule.formatGallerySlots,
   formatPlannedLines: frameModule.formatPlannedLines,
   frameDisplayLine: frameModule.frameDisplayLine,
   isAlbum: catalogModule.isAlbum,
   isArticleType: articleModule.isArticleType,
+  isBuiltinAlbum: catalogModule.isBuiltinAlbum,
   isLook: catalogModule.isLook,
   isStoryType: storyModule.isStoryType,
   listAlbums: catalogModule.listAlbums,
   loadAlbumCatalog: catalogModule.loadAlbumCatalog,
   migrateAlbumId: catalogModule.migrateAlbumId,
+  normalizeFrame: frameModule.normalizeFrame,
+  normalizeReferenceImage: learnModule.normalizeReferenceImage,
   parseDraftText: parseModule.parseDraftText,
   parseJsonObject: parseModule.parseJsonObject,
+  parseLearnResult: learnModule.parseLearnResult,
   parsePlanText: parseModule.parsePlanText,
   parseScenesText: parseModule.parseScenesText,
   pickAlbum: catalogModule.pickAlbum,
   pickLook: catalogModule.pickLook,
   pickOne: catalogModule.pickOne,
   pickStoryType: storyModule.pickStoryType,
+  readLearnSystemPrompt: learnModule.readLearnSystemPrompt,
   readPromptFile: templateModule.readPromptFile,
   renderAlbumPrompt: renderModule.renderAlbumPrompt,
   storyPromptName: storyModule.storyPromptName,

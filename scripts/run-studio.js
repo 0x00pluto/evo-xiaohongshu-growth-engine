@@ -25,6 +25,10 @@ const METHODS = new Set([
   'listPosts',
   'listAlbums',
   'getAlbumDetail',
+  'learnAlbum',
+  'commitAlbum',
+  'discardAlbum',
+  'deleteAlbum',
   'startNew',
   'saveEditor',
   'generateDraft',
@@ -343,7 +347,8 @@ function createHandler(runner, staticDir, reloadHub) {
         if (typeof method === 'function') {
           const text = await readBody(req);
           const payload = text.trim() ? JSON.parse(text) : {};
-          sendJson(res, 200, method.call(runner, payload));
+          const result = method.call(runner, payload);
+          sendJson(res, 200, result && typeof result.then === 'function' ? await result : result);
           return;
         }
       }

@@ -2,7 +2,7 @@
 
 **日常发版唯一入口**：已有工牌与 remote 后，每次升版只雇本篇。仅首次建仓 / 改合同字段时才去 [publish-evo-agent-pack.md](./publish-evo-agent-pack.md)。
 
-可复跑：从上一 Git tag 到当前 HEAD 汇总变更 → 写 `upgrades/` 发版页 → 对齐 `evo_agent_pack.json` 的 `version` → 本地提交并打 tag → 推送 → 用发版页全文创建 GitHub Release。
+可复跑：从上一 Git tag 到当前 HEAD 汇总变更 → 写 `upgrades/` 发版页 → 对齐 `evo_agent_pack.json` 与（若有）`plugin.manifest.json` 的 `version` → 本地提交并打 tag → 推送 → 用发版页全文创建 GitHub Release。
 
 与 [publish-evo-agent-pack.md](./publish-evo-agent-pack.md) 分工：工牌流只负责合同 JSON（仅首次 / 偶发核对）；**禁止**无 `upgrades/` 页直接打 tag——一律走本篇。
 
@@ -14,7 +14,7 @@
 1. 打开当前工作区（一次只雇本仓）
 2. 阅读本篇全文
 3. 按「日常步骤」执行；缺信息或需升 major → 停，按失败排查问询
-4. 验收：远程有 tag；GitHub Release 正文 = upgrades 全文；clone 该 tag 可见 evo_agent_pack.json
+4. 验收：远程有 tag；GitHub Release 正文 = upgrades 全文；clone 该 tag 可见 evo_agent_pack.json（及若有则 plugin.manifest.json）且 version 同号
 ```
 
 ### 无 gh / 未登录时（网页短路径）
@@ -42,7 +42,7 @@
 
 | 角色 | 职责 |
 |---|---|
-| Agent | 查上一 tag..HEAD；按 SemVer 定版号（major 除外）；写 `upgrades/$TAG.md`；更新 `upgrades/README.md`；对齐 pack `version`；本地 `git commit` + `git tag`；默认只给出推送与 `gh` 命令 |
+| Agent | 查上一 tag..HEAD；按 SemVer 定版号（major 除外）；写 `upgrades/$TAG.md`；更新 `upgrades/README.md`；对齐 pack 与（若有）plugin.manifest 的 `version`；本地 `git commit` + `git tag`；默认只给出推送与 `gh` 命令 |
 | 人 | major（及跳号 / 覆盖版号）时**显式指定**；自行推送，或本轮明确授权 Agent 代推 |
 
 ## 版号规则（SemVer · 铁律）
@@ -62,7 +62,7 @@
 - 若可能涉及 **breaking / major**：Agent **停住**，说明理由并请人给出目标 major；未确认前不得打 major tag。
 - 人可随时覆盖：显式说出目标 tag 时，以指定为准。
 - 跳号须人显式指定；默认不跳号。
-- `$TAG` 去掉 `v` 后必须等于将写入的 `evo_agent_pack.json` → `version`。
+- `$TAG` 去掉 `v` 后必须等于将写入的 `evo_agent_pack.json` → `version`；若存在 `plugin.manifest.json`，其 `version` **必须同号**（Dex Buddy 插件中心读这份）。
 - **默认不改** `dependencies` / `name` / `dirname` / `origin`；合同字段变更走 publish-evo-agent-pack，除非人明确说本次一并改。
 
 ## 日常步骤
@@ -71,9 +71,9 @@
 查上一 tag 与 PREV..HEAD 变更
 → 定版号 $TAG（major/跳号 → 等人口头确认）
 → 写 upgrades/$TAG.md + 更新 upgrades/README.md 索引
-→ 对齐 evo_agent_pack.json 的 version（= $TAG 去 v）
+→ 对齐 evo_agent_pack.json 与（若有）plugin.manifest.json 的 version（= $TAG 去 v）
 → pnpm check 必须通过
-→ 本地 commit（默认仅 upgrades + pack.json）+ git tag $TAG
+→ 本地 commit（默认 upgrades + pack.json + 若有 plugin.manifest.json）+ git tag $TAG
 → 输出（或经授权执行）push + gh release create
 → 验收：远程 tag、Release 正文、clone 核对
 ```
@@ -82,8 +82,8 @@
 
 ### 0. 前置
 
-- 功能改动已提交到默认分支（或即将随本流程一并提交的仅限 upgrades / pack 相关文件）。
-- 工作区干净，或仅剩即将写入的 `upgrades/` 与 `evo_agent_pack.json`。
+- 功能改动已提交到默认分支（或即将随本流程一并提交的仅限 upgrades / pack / plugin.manifest 相关文件）。
+- 工作区干净，或仅剩即将写入的 `upgrades/`、`evo_agent_pack.json` 与（若有）`plugin.manifest.json`。
 - `git remote get-url origin` 等于 `evo_agent_pack.json` 的 `origin`（GitHub）。不一致 → 停。
 - 打 tag 前跑 `pnpm check`（类型检查 + 测试）。失败 → 停，先修再发版。
 
@@ -128,18 +128,23 @@ git diff "${PREV}..HEAD" --stat
 
 - clone / 切换到本 tag：`git clone --branch vX.Y.Z <origin>`
 - 核对根目录 `evo_agent_pack.json` 的 `version` 为 `X.Y.Z`（不含 v）
+- 若有 `plugin.manifest.json`：其 `version` 须同为 `X.Y.Z`
 ```
 
 缺 `upgrades/$TAG.md` 时 **禁止** `gh release create`。
 
-### 4. 对齐工牌 version
+### 4. 对齐 version（工牌 + 插件）
 
-编辑根目录 `evo_agent_pack.json`：把 `version` 设为 `$TAG` 去掉前缀 `v` 后的字符串。其余字段（`name` / `dirname` / `origin` / `dependencies`）本步不改，除非人另有要求。
+1. 编辑根目录 `evo_agent_pack.json`：把 `version` 设为 `$TAG` 去掉前缀 `v` 后的字符串。其余字段（`name` / `dirname` / `origin` / `dependencies`）本步不改，除非人另有要求。
+2. **若存在**根目录 `plugin.manifest.json`：把其 `version` 设为**同一字符串**（不含 `v`）。Dex Buddy 插件中心只认这份；**禁止**只改工牌不改清单。
+3. 本仓 `pnpm check` 含「两处 version 同号」断言；漏改会失败。
 
 ### 5. 本地提交并打 tag
 
 ```bash
 git add "upgrades/${TAG}.md" upgrades/README.md evo_agent_pack.json
+# 有插件清单时必加：
+test -f plugin.manifest.json && git add plugin.manifest.json
 git commit -m "$(cat <<EOF
 docs(upgrades): 增加 ${TAG} 发版说明
 
@@ -148,7 +153,7 @@ EOF
 git tag "$TAG"
 ```
 
-仅当还有未提交的功能代码且人要求一并入库时，才额外 `git add` 那些路径；默认本步只提交 upgrades + pack.json。
+仅当还有未提交的功能代码且人要求一并入库时，才额外 `git add` 那些路径；默认本步只提交 upgrades + pack.json +（若有）plugin.manifest.json。
 
 ### 6. 推送与创建 Release
 
@@ -166,12 +171,13 @@ gh release create "$TAG" --title "$TAG" --notes-file "upgrades/${TAG}.md"
 
 - 远程存在 tag `$TAG`
 - GitHub Releases 页正文与 `upgrades/$TAG.md` 一致
-- 空目录：`git clone --branch "$TAG" <origin-url> /tmp/evo-pack-check`，存在 `evo_agent_pack.json` 且 `version` 正确
+- 空目录：`git clone --branch "$TAG" <origin-url> /tmp/evo-pack-check`，存在 `evo_agent_pack.json` 且 `version` 正确；若有 `plugin.manifest.json`，其 `version` 与工牌同号
 
 ## 产物
 
 - `upgrades/$TAG.md` + `upgrades/README.md` 索引行（入库）
 - 更新后的 `evo_agent_pack.json`（`version` 与 tag 对齐）
+- 若有：更新后的 `plugin.manifest.json`（`version` 与工牌同号）
 - 本地与远程 lightweight tag `$TAG`
 - GitHub Release（标题 = `$TAG`，正文 = upgrades 全文）
 
@@ -187,6 +193,7 @@ gh release create "$TAG" --title "$TAG" --notes-file "upgrades/${TAG}.md"
 | staged 含 `.env` | 立刻中止 | 带着密钥 push |
 | `gh` 未登录 / 无权限 | 见文首「网页短路径」；或请人 `gh auth login` 后再 `gh release create` | 编造 Release；因无 gh 而跳过 Release |
 | 用户未授权代推 | 只输出命令并停 | 静默 push |
+| pack 与 plugin.manifest version 不一致 | 按 §4 同步后再 `pnpm check` | 只改一边就打 tag |
 
 ## 测试
 
@@ -198,5 +205,13 @@ test -f "upgrades/${TAG}.md"
 git rev-parse "$TAG"
 gh release view "$TAG"
 git clone --branch "$TAG" "$(git remote get-url origin)" /tmp/evo-pack-check
-python3 -c "import json; p=json.load(open('/tmp/evo-pack-check/evo_agent_pack.json')); assert p['version']=='${TAG#v}'"
+python3 -c "
+import json, os
+root='/tmp/evo-pack-check'
+ver=json.load(open(f'{root}/evo_agent_pack.json'))['version']
+assert ver=='${TAG#v}', ver
+manifest=f'{root}/plugin.manifest.json'
+if os.path.isfile(manifest):
+    assert json.load(open(manifest))['version']==ver
+"
 ```

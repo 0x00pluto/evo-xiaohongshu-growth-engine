@@ -8,6 +8,19 @@ const path = require('node:path');
 const ALBUM_KINDS = ['magazine', 'scrapbook', 'conceptual', 'card', 'infographic'];
 /** @type {ReadonlySet<string>} */
 const ALBUM_KIND_SET = new Set(ALBUM_KINDS);
+/** 用户自加图册从这个序号起；更小的序号整段系统预留（含出厂五本） */
+const USER_ALBUM_SEQ_START = 100000;
+/** @type {ReadonlyArray<string>} */
+const SAMPLE_EXTS = ['.jpg', '.jpeg', '.png', '.webp'];
+
+/**
+ * kind / slug：小写英文开头，其后为小写英文、数字或连字符。
+ * @param {string} value
+ * @returns {boolean}
+ */
+function isAlbumToken(value) {
+  return typeof value === 'string' && /^[a-z][a-z0-9-]*$/.test(value);
+}
 
 /**
  * @typedef {{ min: number; max: number }} RangeConstraint
@@ -83,15 +96,25 @@ function normalizeMeta(raw, fileId) {
   if (id !== fileId) {
     throw new Error(`图册 id 与文件名不一致：${fileId}`);
   }
-  const kind = requireNonEmptyString(source.kind);
-  if (!ALBUM_KIND_SET.has(kind)) {
-    throw new Error(`图册 kind 不在允许列表：${id}`);
+  const kind = requireNonEmptyString(source.kind).toLowerCase();
+  if (!isAlbumToken(kind)) {
+    throw new Error(`图册 kind 不合法：${id}`);
   }
-  const idKind = id.split('.')[1] || '';
+  const idParts = id.split('.');
+  if (idParts.length !== 3 || !/^\d{6}$/.test(idParts[0] || '')) {
+    throw new Error(`图册 id 形状不合法：${id}`);
+  }
+  const idKind = idParts[1] || '';
   if (idKind !== kind) {
     throw new Error(`图册 id 中的 kind 与字段不一致：${id}`);
   }
-  const slug = requireNonEmptyString(source.slug);
+  const slug = requireNonEmptyString(source.slug).toLowerCase();
+  if (!isAlbumToken(slug)) {
+    throw new Error(`图册 slug 不合法：${id}`);
+  }
+  if ((idParts[2] || '') !== slug) {
+    throw new Error(`图册 id 中的 slug 与字段不一致：${id}`);
+  }
   const hint = requireNonEmptyString(source.hint);
   const label = requireNonEmptyString(source.label);
   const copySchema = requireNonEmptyString(source.copySchema);
@@ -291,12 +314,22 @@ function migrateAlbumId(look, promptsDir) {
   if (
     parts.length === 3
     && /^\d{6}$/.test(parts[0] || '')
-    && ALBUM_KIND_SET.has(parts[1] || '')
-    && parts[2]
+    && isAlbumToken(parts[1] || '')
+    && isAlbumToken(parts[2] || '')
   ) {
     return look;
   }
   return '';
+}
+
+/**
+ * 序号小于 100000 为系统预留，不可删。
+ * @param {string} id
+ * @returns {boolean}
+ */
+function isBuiltinAlbum(id) {
+  const seq = Number(String(id || '').split('.')[0] || '');
+  return Number.isInteger(seq) && seq >= 1 && seq < USER_ALBUM_SEQ_START;
 }
 
 /**
@@ -336,6 +369,36 @@ function albumPromptName(album, promptsDir) {
 }
 
 /**
+ * 样图按扩展名探测；优先 jpg，其次 jpeg / png / webp。
+ * @param {string} promptsDir
+ * @param {string} album
+ * @returns {string} 相对 promptsDir 的路径；尚无文件时默认 samples/<id>.jpg
+ */
+function resolveAlbumSampleRel(promptsDir, album) {
+  const samplesDir = path.join(promptsDir, 'samples');
+  /** @type {string[]} */
+  const candidates = [
+    `samples/${album}.jpg`,
+    `samples/${album}.jpeg`,
+    `samples/${album}.png`,
+    `samples/${album}.webp`,
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(path.join(promptsDir, candidate))) return candidate;
+  }
+  if (fs.existsSync(samplesDir)) {
+    for (const name of fs.readdirSync(samplesDir)) {
+      const ext = path.extname(name).toLowerCase();
+      const base = path.basename(name, path.extname(name));
+      if (base === album && (ext === '.jpg' || ext === '.jpeg' || ext === '.png' || ext === '.webp')) {
+        return `samples/${name}`;
+      }
+    }
+  }
+  return `samples/${album}.jpg`;
+}
+
+/**
  * @param {unknown} album
  * @param {string} promptsDir
  * @returns {string}
@@ -344,7 +407,7 @@ function albumSamplePath(album, promptsDir) {
   if (!isAlbum(album, promptsDir)) {
     throw new Error('图册不在允许列表');
   }
-  return `samples/${album}.jpg`;
+  return resolveAlbumSampleRel(promptsDir, /** @type {string} */ (album));
 }
 
 /**
@@ -393,6 +456,8 @@ const isLook = isAlbum;
 module.exports = {
   ALBUM_KINDS,
   ALBUM_KIND_SET,
+  SAMPLE_EXTS,
+  USER_ALBUM_SEQ_START,
   albumHint,
   albumKind,
   albumLabel,
@@ -402,6 +467,8 @@ module.exports = {
   clearAlbumCatalogCache,
   copySchema,
   isAlbum,
+  isAlbumToken,
+  isBuiltinAlbum,
   isLook,
   listAlbums,
   loadAlbumCatalog,
@@ -409,4 +476,5 @@ module.exports = {
   pickAlbum,
   pickLook,
   pickOne,
+  resolveAlbumSampleRel,
 };

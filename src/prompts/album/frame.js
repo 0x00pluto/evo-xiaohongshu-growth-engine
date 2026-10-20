@@ -136,11 +136,15 @@ function frameDisplayLine(album, frame, promptsDir) {
   if (kind === 'magazine' || kind === 'scrapbook') {
     return typeof frame.line === 'string' ? frame.line.trim() : '';
   }
-  if (typeof frame.mainTitle !== 'string') return '';
-  // 信息图主标题可含换行；摘要与去重用首行，避免把整段多行当一行
-  const title = frame.mainTitle.replace(/\\n/g, '\n').trim();
-  const first = title.split(/\n/)[0] || '';
-  return first.trim() || title;
+  if (kind === 'conceptual' || kind === 'card' || kind === 'infographic') {
+    if (typeof frame.mainTitle !== 'string') return '';
+    // 信息图主标题可含换行；摘要与去重用首行，避免把整段多行当一行
+    const title = frame.mainTitle.replace(/\\n/g, '\n').trim();
+    const first = title.split(/\n/)[0] || '';
+    return first.trim() || title;
+  }
+  // 新 kind：用 line 作上图展示句
+  return typeof frame.line === 'string' ? frame.line.trim() : '';
 }
 
 /**
@@ -217,7 +221,50 @@ function normalizeFrame(raw, album, promptsDir) {
     }
     return frame;
   }
-  throw new Error('图册 kind 不在允许列表');
+  // 新 kind：按 copySchema 声明的扁平字段校验；必须有非空 line
+  return normalizeGenericFrame(source, /** @type {string} */ (album), promptsDir);
+}
+
+/**
+ * 从 copySchema 正文里抽出 `- field：` / `- field:` 行声明的字段名。
+ * @param {string} schema
+ * @returns {string[]}
+ */
+function schemaFieldNames(schema) {
+  /** @type {string[]} */
+  const names = [];
+  const re = /(?:^|\n)\s*-\s*([a-zA-Z][a-zA-Z0-9_]*)\s*[：:]/g;
+  let match = re.exec(schema);
+  while (match) {
+    const name = match[1];
+    if (!names.includes(name)) names.push(name);
+    match = re.exec(schema);
+  }
+  return names;
+}
+
+/**
+ * @param {Record<string, unknown>} source
+ * @param {string} album
+ * @param {string} promptsDir
+ * @returns {CopyFrame}
+ */
+function normalizeGenericFrame(source, album, promptsDir) {
+  const meta = loadAlbumCatalog(promptsDir).get(album);
+  const fields = schemaFieldNames(meta.copySchema);
+  if (!fields.includes('line')) {
+    throw new Error('新 kind 的 copySchema 须声明 line 字段');
+  }
+  /** @type {CopyFrame & Record<string, string>} */
+  const frame = {};
+  for (const name of fields) {
+    // 数组类字段（modules/steps）留给出厂 infographic；通用槽只收字符串
+    if (name === 'modules' || name === 'steps') continue;
+    const value = source[name];
+    frame[name] = typeof value === 'string' ? value.trim() : '';
+  }
+  if (!frame.line) throw new Error('策划那一句是空的');
+  return frame;
 }
 
 module.exports = {
@@ -226,4 +273,5 @@ module.exports = {
   formatStepsBlock,
   frameDisplayLine,
   normalizeFrame,
+  schemaFieldNames,
 };

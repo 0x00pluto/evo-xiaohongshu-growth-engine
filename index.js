@@ -85,6 +85,30 @@ module.exports = {
       getAlbumDetail(payload) {
         return runner.getAlbumDetail(asObject(payload));
       },
+      /**
+       * @param {unknown} payload
+       */
+      learnAlbum(payload) {
+        return runner.learnAlbum(asObject(payload));
+      },
+      /**
+       * @param {unknown} payload
+       */
+      commitAlbum(payload) {
+        return runner.commitAlbum(asObject(payload));
+      },
+      /**
+       * @param {unknown} payload
+       */
+      discardAlbum(payload) {
+        return runner.discardAlbum(asObject(payload));
+      },
+      /**
+       * @param {unknown} payload
+       */
+      deleteAlbum(payload) {
+        return runner.deleteAlbum(asObject(payload));
+      },
       loadLatest() {
         return runner.loadLatest();
       },

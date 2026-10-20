@@ -18,7 +18,7 @@ test('桥把 onePost 的方法登记到宿主', () => {
     },
   });
   assert.equal(service.name, 'onePost');
-  for (const method of ['loadLatest', 'listPosts', 'listAlbums', 'getAlbumDetail', 'openPost', 'startNew', 'saveEditor', 'generateDraft', 'generatePrompts', 'chooseImage', 'generateImages', 'retryImage', 'previewImage', 'previewAlbumSample', 'revealImage']) {
+  for (const method of ['loadLatest', 'listPosts', 'listAlbums', 'getAlbumDetail', 'learnAlbum', 'commitAlbum', 'discardAlbum', 'deleteAlbum', 'openPost', 'startNew', 'saveEditor', 'generateDraft', 'generatePrompts', 'chooseImage', 'generateImages', 'retryImage', 'previewImage', 'previewAlbumSample', 'revealImage']) {
     assert.equal(typeof service.methods[method], 'function');
   }
   const latest = service.methods.loadLatest();

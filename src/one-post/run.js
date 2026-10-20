@@ -27,20 +27,27 @@ const {
   assignContrastSlots,
   assignGalleryRoles,
   assignStoryRoles,
+  buildAlbumDraft,
   buildDraftPrompt,
+  commitAlbumDraft,
   copySchema,
+  deleteAlbumFiles,
+  draftPublicView,
   fillPrompt,
   formatGallerySlots,
   formatPlannedLines,
   frameDisplayLine,
   isAlbum,
   isArticleType,
+  isBuiltinAlbum,
   loadAlbumCatalog,
+  normalizeReferenceImage,
   parseDraftText,
   parsePlanText,
   parseScenesText,
   pickAlbum,
   pickStoryType,
+  readLearnSystemPrompt,
   readPromptFile,
   renderAlbumPrompt,
   storyPromptName,
@@ -76,6 +83,7 @@ const BUSY_MESSAGE = '正在生成，请等这一轮结束';
  *   fetch?: import('../llm/client').FetchFn;
  *   now?: () => Date;
  *   complete?: (prompt: string) => Promise<string>;
+ *   completeVision?: (input: { text: string; dataUrl: string }) => Promise<string>;
  *   generateImage?: (args: { prompt: string; outputPath: string }) => Promise<string>;
  *   revealFile?: (absPath: string) => void;
  *   random?: () => number;
@@ -180,6 +188,8 @@ function createRunner(options) {
   let store = null;
   const llm = createLlm(env, fetchImpl);
   const complete = options.complete || ((/** @type {string} */ prompt) => llm.complete(prompt));
+  const completeVision = options.completeVision
+    || ((/** @type {{ text: string; dataUrl: string }} */ input) => llm.completeVision(input));
   const generateImage = options.generateImage || ((/** @type {{ prompt: string; outputPath: string }} */ args) => generatePng({
     prompt: args.prompt,
     outputPath: args.outputPath,
@@ -190,6 +200,9 @@ function createRunner(options) {
   const random = options.random || Math.random;
   /** @type {string | null} */
   let lock = null;
+  /** @type {import('../prompts/album/learn').AlbumDraft | null} */
+  let albumDraft = null;
+  let albumDraftSeq = 0;
 
   /**
    * @param {string} id
@@ -706,11 +719,107 @@ function createRunner(options) {
           id: meta.id,
           label: meta.label,
           hint: meta.hint,
+          kind: meta.kind,
           samplePath,
           hasSample: fs.existsSync(albumSampleFile(promptsDir, meta.id)),
+          deletable: !isBuiltinAlbum(meta.id),
         };
       }),
     };
+  }
+
+  /**
+   * 当前笔记是否正在用某图册做提示词或生图。
+   * @param {string} albumId
+   * @returns {boolean}
+   */
+  function albumBusy(albumId) {
+    if (!lock || !store) return false;
+    if (lock !== 'generatePrompts' && lock !== 'generateImages' && lock !== 'retryImage') {
+      return false;
+    }
+    const state = store.read();
+    const look = state.prompts && typeof state.prompts.look === 'string'
+      ? state.prompts.look.trim()
+      : '';
+    return Boolean(look && look === albumId);
+  }
+
+  /**
+   * @param {Record<string, unknown>} payload
+   */
+  async function learnAlbum(payload) {
+    if (lock === 'learnAlbum') return busy();
+    const source = payload && typeof payload === 'object' ? payload : {};
+    /** @type {ReturnType<typeof normalizeReferenceImage>} */
+    let image;
+    try {
+      image = normalizeReferenceImage(source);
+    } catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : '参考图不合格' };
+    }
+    lock = 'learnAlbum';
+    try {
+      const system = readLearnSystemPrompt(promptsDir);
+      const raw = await completeVision({ text: system, dataUrl: image.dataUrl });
+      albumDraftSeq += 1;
+      const draftId = `draft-${albumDraftSeq}`;
+      const draft = buildAlbumDraft(promptsDir, raw, image, draftId);
+      albumDraft = draft;
+      return { ok: true, draft: draftPublicView(draft) };
+    } catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : '学习失败' };
+    } finally {
+      lock = null;
+    }
+  }
+
+  /**
+   * @param {Record<string, unknown>} payload
+   */
+  function commitAlbum(payload) {
+    if (!albumDraft) return { ok: false, message: '没有可写入的草稿' };
+    if (lock) return busy();
+    const source = payload && typeof payload === 'object' ? payload : {};
+    const draftId = typeof source.draftId === 'string' ? source.draftId.trim() : '';
+    if (draftId && draftId !== albumDraft.draftId) {
+      return { ok: false, message: '草稿已过期，请重新学习' };
+    }
+    try {
+      const result = commitAlbumDraft(promptsDir, albumDraft);
+      albumDraft = null;
+      return { ok: true, id: result.id };
+    } catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : '写入失败' };
+    }
+  }
+
+  /**
+   * @param {Record<string, unknown>} [_payload]
+   */
+  function discardAlbum(_payload) {
+    albumDraft = null;
+    return { ok: true };
+  }
+
+  /**
+   * @param {Record<string, unknown>} payload
+   */
+  function deleteAlbum(payload) {
+    if (lock) return busy();
+    const source = payload && typeof payload === 'object' ? payload : {};
+    const id = typeof source.id === 'string' ? source.id.trim() : '';
+    if (!id) return { ok: false, message: '要指明图册' };
+    if (isBuiltinAlbum(id)) return { ok: false, message: '出厂图册不能删除' };
+    if (albumBusy(id)) {
+      return { ok: false, message: '这本图册正在用于生成，请等这一轮结束' };
+    }
+    try {
+      deleteAlbumFiles(promptsDir, id);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : '删除失败' };
+    }
   }
 
   /**
@@ -724,7 +833,9 @@ function createRunner(options) {
     if (!fs.existsSync(abs)) return { ok: false, message: '没有样图' };
     const bytes = fs.readFileSync(abs);
     const ext = path.extname(abs).toLowerCase();
-    const mime = ext === '.png' ? 'image/png' : 'image/jpeg';
+    const mime = ext === '.png'
+      ? 'image/png'
+      : (ext === '.webp' ? 'image/webp' : 'image/jpeg');
     return { ok: true, dataUrl: `data:${mime};base64,${bytes.toString('base64')}` };
   }
 
@@ -896,10 +1007,14 @@ function createRunner(options) {
 
   return {
     chooseImage,
+    commitAlbum,
+    deleteAlbum,
+    discardAlbum,
     generateDraft,
     generateImages,
     generatePrompts,
     getAlbumDetail,
+    learnAlbum,
     listAlbums,
     listPosts: catalog,
     loadLatest,

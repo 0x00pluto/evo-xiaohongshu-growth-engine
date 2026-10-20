@@ -8,7 +8,7 @@ const frameModule = require('./frame');
 /** @type {typeof import('../template')} */
 const templateModule = require('../template');
 
-const { albumKind, albumLabel, albumPromptName, isAlbum } = catalogModule;
+const { ALBUM_KIND_SET, albumKind, albumLabel, albumPromptName, isAlbum } = catalogModule;
 const { formatModulesBlock, formatStepsBlock, frameDisplayLine } = frameModule;
 const { fillPrompt, readPromptFile } = templateModule;
 
@@ -69,6 +69,13 @@ function renderAlbumPrompt(promptsDir, album, scene, frame) {
     vars.stepsBlock = formatStepsBlock(copy.stepsBar || '', copy.steps || []);
     vars.summary = copy.summary || '';
     vars.credit = copy.credit || '';
+  } else {
+    // 新 kind：题词 {{占位符}} 与策划字段同名装填
+    const bag = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (copy));
+    for (const [key, value] of Object.entries(bag)) {
+      if (typeof value === 'string') vars[key] = value;
+    }
+    if (!vars.line) vars.line = copy.line || display;
   }
 
   const prompt = fillPrompt(readPromptFile(promptsDir, albumPromptName(album, promptsDir)), vars).trim();
@@ -96,6 +103,8 @@ function renderAlbumPrompt(promptsDir, album, scene, frame) {
     ) {
       throw new Error('绘图提示词缺了文案区');
     }
+  } else if (!ALBUM_KIND_SET.has(kind)) {
+    // 通用槽：展示句已写入 prompt（上方统一检查）
   }
   const seriesAt = prompt.indexOf('11. 系列统一规则');
   const sceneAt = prompt.indexOf('12. 主题绘画内容');

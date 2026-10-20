@@ -191,17 +191,21 @@ test('成稿和图册提示词能装填，长提示词不在 src 里', () => {
 test('代码随机抽故事类型和图册，不靠模型选题', () => {
   assert.deepEqual([...ARTICLE_TYPES], ['种草', '引流', '素人']);
   assert.deepEqual(STORY_TYPES, ['process', 'contrast']);
-  assert.deepEqual(listAlbums(promptsDir), [
+  const factory = [
     '000001.magazine.dazibao',
     '000002.scrapbook.handnote',
     '000003.conceptual.viewpoint',
     '000004.card.knowledge',
     '000005.infographic.modules',
-  ]);
+  ];
+  const listed = listAlbums(promptsDir);
+  for (const id of factory) {
+    assert.ok(listed.includes(id), `缺出厂图册 ${id}`);
+  }
   assert.equal(pickStoryType(() => 0), 'process');
+  // 排序后出厂五本在前；用户册（100000+）不影响首位
   assert.equal(pickAlbum(promptsDir, () => 0), '000001.magazine.dazibao');
-  assert.equal(pickAlbum(promptsDir, () => 0.75), '000004.card.knowledge');
-  assert.equal(pickAlbum(promptsDir, () => 0.9), '000005.infographic.modules');
+  assert.equal(pickAlbum(promptsDir, () => 0.2), '000002.scrapbook.handnote');
 });
 
 test('条数不对的画面算失败', () => {

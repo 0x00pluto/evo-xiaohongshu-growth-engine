@@ -62,6 +62,7 @@
       pageError: '',
       menu: [
         { id: 'note', label: '生成笔记', ready: true },
+        { id: 'library', label: '资料库', ready: true },
         { id: 'topics', label: '选题', ready: false },
         { id: 'role', label: '角色', ready: false },
         { id: 'risk', label: '危险词', ready: false },
@@ -89,6 +90,10 @@
         if (!slot) return;
         try {
           await loadScript(`pages/${id}.js`);
+          // 资料库壳下面还有资源 Tab 模块，须在 initTree 前挂好。
+          if (id === 'library') {
+            await loadScript('pages/library/albums.js');
+          }
           const response = await fetch(`pages/${id}.html`);
           if (!response.ok) throw new Error('没有打开这一页');
           const html = await response.text();
