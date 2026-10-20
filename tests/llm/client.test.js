@@ -33,6 +33,7 @@ test('文案请求走 Chat Completions 并要求 JSON 对象', async () => {
   assert.equal(captured.options.headers.Authorization, 'Bearer test-key');
   const body = JSON.parse(captured.options.body);
   assert.equal(body.model, 'deepseek-chat');
+  assert.equal(body.temperature, 0.7);
   assert.deepEqual(body.messages, [{ role: 'user', content: '写一篇' }]);
   assert.deepEqual(body.response_format, { type: 'json_object' });
 });
@@ -56,5 +57,6 @@ test('识图与写稿模型分开，默认 deepseek-flash', async () => {
   });
   assert.equal(text, '{"kind":"poster"}');
   assert.equal(captured.model, 'deepseek-flash');
+  assert.equal(captured.temperature, 0.2);
   assert.equal(captured.messages[0].content[1].image_url.detail, 'original');
 });

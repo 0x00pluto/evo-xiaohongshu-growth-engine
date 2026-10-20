@@ -21,7 +21,6 @@ const { createLlm } = llmModule;
 const { generatePng } = imageModule;
 const {
   albumHint,
-  albumPromptName,
   albumSampleFile,
   albumSamplePath,
   assignContrastSlots,
@@ -37,16 +36,19 @@ const {
   formatGallerySlots,
   formatPlannedLines,
   frameDisplayLine,
+  composeImagePrompt,
   isAlbum,
   isArticleType,
   isBuiltinAlbum,
   loadAlbumCatalog,
+  migrateUserAlbumsFromAssets,
   normalizeReferenceImage,
   parseDraftText,
   parsePlanText,
   parseScenesText,
   pickAlbum,
   pickStoryType,
+  readAlbumPromptText,
   readLearnSystemPrompt,
   readPromptFile,
   renderAlbumPrompt,
@@ -79,12 +81,18 @@ const BUSY_MESSAGE = '正在生成，请等这一轮结束';
  *   postsDir?: string;
  *   latestDir?: string;
  *   promptsDir: string;
+ *   userAlbumsDir?: string;
+ *   userImageRefsDir?: string;
  *   env?: Record<string, string | undefined>;
  *   fetch?: import('../llm/client').FetchFn;
  *   now?: () => Date;
  *   complete?: (prompt: string) => Promise<string>;
  *   completeVision?: (input: { text: string; dataUrl: string }) => Promise<string>;
- *   generateImage?: (args: { prompt: string; outputPath: string }) => Promise<string>;
+ *   generateImage?: (args: {
+ *     prompt: string;
+ *     outputPath: string;
+ *     references?: import('../image/generate').ImageReference[];
+ *   }) => Promise<string>;
  *   revealFile?: (absPath: string) => void;
  *   random?: () => number;
  * }} RunnerOptions
@@ -109,6 +117,22 @@ function errorMessage(err, fallback) {
  */
 function isSceneLengthError(err) {
   return /画面应为 \d+ 张，模型返回了 \d+ 张/.test(errorMessage(err, ''));
+}
+
+/**
+ * @param {unknown} err
+ * @returns {boolean}
+ */
+function isSceneDuplicateError(err) {
+  return errorMessage(err, '') === '这一张的画面重复了';
+}
+
+/**
+ * @param {unknown} err
+ * @returns {boolean}
+ */
+function isSceneRetryableError(err) {
+  return isSceneLengthError(err) || isSceneDuplicateError(err);
 }
 
 /**
@@ -178,10 +202,19 @@ function createRunner(options) {
   if (!postsDirOption) throw new Error('缺少 postsDir');
   const postsDir = postsDirOption;
   const promptsDir = options.promptsDir;
+  const userAlbumsDir = typeof options.userAlbumsDir === 'string' && options.userAlbumsDir.trim()
+    ? path.resolve(options.userAlbumsDir.trim())
+    : '';
+  const userImageRefsDir = typeof options.userImageRefsDir === 'string' && options.userImageRefsDir.trim()
+    ? path.resolve(options.userImageRefsDir.trim())
+    : '';
   const env = options.env || {};
   const fetchImpl = options.fetch;
   const now = options.now || (() => new Date());
-  importLegacy(postsDir, promptsDir);
+  if (userAlbumsDir) {
+    migrateUserAlbumsFromAssets(promptsDir, userAlbumsDir);
+  }
+  importLegacy(postsDir, promptsDir, userAlbumsDir);
   let currentId = '';
   let currentDir = '';
   /** @type {import('../draft/store').DraftStore | null} */
@@ -190,9 +223,14 @@ function createRunner(options) {
   const complete = options.complete || ((/** @type {string} */ prompt) => llm.complete(prompt));
   const completeVision = options.completeVision
     || ((/** @type {{ text: string; dataUrl: string }} */ input) => llm.completeVision(input));
-  const generateImage = options.generateImage || ((/** @type {{ prompt: string; outputPath: string }} */ args) => generatePng({
+  const generateImage = options.generateImage || ((/** @type {{
+    prompt: string;
+    outputPath: string;
+    references?: import('../image/generate').ImageReference[];
+  }} */ args) => generatePng({
     prompt: args.prompt,
     outputPath: args.outputPath,
+    references: args.references,
     env,
     fetch: fetchImpl,
   }));
@@ -210,7 +248,7 @@ function createRunner(options) {
   function usePost(id) {
     currentId = id;
     currentDir = path.join(postsDir, id);
-    store = createStore(currentDir, { promptsDir });
+    store = createStore(currentDir, { promptsDir, userAlbumsDir });
     const writeFile = store.write;
     store.write = (state) => {
       writeFile(state);
@@ -280,7 +318,7 @@ function createRunner(options) {
   }
 
   /**
-   * 画面条数必须等于已定文案行数；长度不符时附纠正句再调一次。
+   * 画面条数必须等于已定文案行数；条数不对或画面重复时附纠正句再调一次。
    * @param {string[]} displayLines
    * @param {Record<string, string>} sceneVars
    * @param {string} look
@@ -294,12 +332,12 @@ function createRunner(options) {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const prompt = attempt === 0
         ? basePrompt
-        : `${basePrompt}\n\n上一轮返回了 ${sceneLengthFromError(lastErr, need)} 条，必须正好 ${need} 条，只返回 JSON。`;
+        : `${basePrompt}\n\n上一轮返回了 ${sceneLengthFromError(lastErr, need)} 条，必须正好 ${need} 条，且每一条画面都不能相同，只返回 JSON。`;
       try {
-        return parseScenesText(await complete(prompt), displayLines, look, promptsDir);
+        return parseScenesText(await complete(prompt), displayLines, look, promptsDir, userAlbumsDir);
       } catch (err) {
         lastErr = err;
-        if (attempt === 0 && isSceneLengthError(err)) continue;
+        if (attempt === 0 && isSceneRetryableError(err)) continue;
         throw err;
       }
     }
@@ -313,9 +351,9 @@ function createRunner(options) {
    */
   async function producePrompts(face, galleryCount, albumLook) {
     const storyType = pickStoryType(random);
-    const look = typeof albumLook === 'string' && isAlbum(albumLook, promptsDir)
+    const look = typeof albumLook === 'string' && isAlbum(albumLook, promptsDir, userAlbumsDir)
       ? albumLook
-      : pickAlbum(promptsDir, random);
+      : pickAlbum(promptsDir, random, userAlbumsDir);
     const tone = readPromptFile(promptsDir, 'tone.md');
     const shared = {
       title: face.title,
@@ -327,8 +365,8 @@ function createRunner(options) {
       await complete(fillPrompt(readPromptFile(promptsDir, storyPromptName(storyType)), {
         ...shared,
         tone,
-        albumHint: albumHint(promptsDir, look),
-        copySchema: copySchema(look, promptsDir),
+        albumHint: albumHint(promptsDir, look, userAlbumsDir),
+        copySchema: copySchema(look, promptsDir, userAlbumsDir),
         imageCount: String(galleryCount + 1),
         slots: formatGallerySlots(slots),
       })),
@@ -336,19 +374,26 @@ function createRunner(options) {
       face.body,
       look,
       promptsDir,
+      userAlbumsDir,
     );
-    const displayLines = planned.map((frame) => frameDisplayLine(look, frame, promptsDir));
+    const displayLines = planned.map((frame) => frameDisplayLine(look, frame, promptsDir, userAlbumsDir));
     const art = await completeScenes(displayLines, {
       ...shared,
       tone,
-      albumHint: albumHint(promptsDir, look),
-      plannedLines: formatPlannedLines(planned, look, promptsDir),
+      albumHint: albumHint(promptsDir, look, userAlbumsDir),
+      plannedLines: formatPlannedLines(planned, look, promptsDir, userAlbumsDir),
       storyHint: storyType === 'contrast'
         ? '每一张画面仍是一个对照，前后接成一个故事。'
         : '前后接成一个故事。',
       sceneCount: String(displayLines.length),
     }, look);
-    const rendered = planned.map((frame, index) => renderAlbumPrompt(promptsDir, look, art.scenes[index], frame));
+    const rendered = planned.map((frame, index) => renderAlbumPrompt(
+      promptsDir,
+      look,
+      art.scenes[index],
+      frame,
+      userAlbumsDir,
+    ));
     const galleryRoles = galleryCount === 0
       ? []
       : (storyType === 'contrast'
@@ -515,6 +560,9 @@ function createRunner(options) {
     try {
       if (!store) throw new Error('没有这一篇');
       const initial = store.read();
+      const look = initial.prompts && typeof initial.prompts.look === 'string'
+        ? initial.prompts.look.trim()
+        : '';
       /** @type {{ slot: 'cover' | 'gallery'; index: number; prompt: string; label: string }[]} */
       const jobs = [{ slot: 'cover', index: 0, prompt: initial.prompts.cover, label: '封面' }];
       initial.prompts.gallery.forEach((prompt, index) => {
@@ -540,7 +588,17 @@ function createRunner(options) {
         store.write(current);
         const outputPath = path.join(currentDir, file);
         try {
-          await generateImage({ prompt: job.prompt, outputPath });
+          const composed = composeImagePrompt(job.prompt, {
+            promptsDir,
+            look,
+            userAlbumsDir,
+            userImageRefsDir,
+          });
+          await generateImage({
+            prompt: composed.prompt,
+            outputPath,
+            ...(composed.references.length > 0 ? { references: composed.references } : {}),
+          });
           const done = store.read();
           const base = readImageSlot(done, job.slot, job.index);
           const revisedAt = nextRevisedAt();
@@ -618,7 +676,7 @@ function createRunner(options) {
   }
 
   function catalog() {
-    return { ok: true, posts: listPosts(postsDir, promptsDir) };
+    return { ok: true, posts: listPosts(postsDir, promptsDir, userAlbumsDir) };
   }
 
   /**
@@ -693,7 +751,7 @@ function createRunner(options) {
       state.coverLineSpecified = source.coverLineSpecified.trim();
     }
     const albumLook = typeof source.look === 'string' ? source.look.trim() : '';
-    if (albumLook && !isAlbum(albumLook, promptsDir)) {
+    if (albumLook && !isAlbum(albumLook, promptsDir, userAlbumsDir)) {
       return { ok: false, message: '图册不在允许列表', field: 'look' };
     }
     if (!state.draft) return { ok: false, message: '还没有稿面' };
@@ -710,19 +768,19 @@ function createRunner(options) {
   }
 
   function listAlbums() {
-    const catalog = loadAlbumCatalog(promptsDir);
+    const catalog = loadAlbumCatalog(promptsDir, userAlbumsDir);
     return {
       ok: true,
       albums: catalog.list().map((meta) => {
-        const samplePath = albumSamplePath(meta.id, promptsDir);
+        const samplePath = albumSamplePath(meta.id, promptsDir, userAlbumsDir);
         return {
           id: meta.id,
           label: meta.label,
           hint: meta.hint,
           kind: meta.kind,
           samplePath,
-          hasSample: fs.existsSync(albumSampleFile(promptsDir, meta.id)),
-          deletable: !isBuiltinAlbum(meta.id),
+          hasSample: fs.existsSync(albumSampleFile(promptsDir, meta.id, userAlbumsDir)),
+          deletable: meta.source === 'user',
         };
       }),
     };
@@ -764,7 +822,7 @@ function createRunner(options) {
       const raw = await completeVision({ text: system, dataUrl: image.dataUrl });
       albumDraftSeq += 1;
       const draftId = `draft-${albumDraftSeq}`;
-      const draft = buildAlbumDraft(promptsDir, raw, image, draftId);
+      const draft = buildAlbumDraft(promptsDir, raw, image, draftId, userAlbumsDir);
       albumDraft = draft;
       return { ok: true, draft: draftPublicView(draft) };
     } catch (err) {
@@ -780,13 +838,14 @@ function createRunner(options) {
   function commitAlbum(payload) {
     if (!albumDraft) return { ok: false, message: '没有可写入的草稿' };
     if (lock) return busy();
+    if (!userAlbumsDir) return { ok: false, message: '缺少用户图册目录' };
     const source = payload && typeof payload === 'object' ? payload : {};
     const draftId = typeof source.draftId === 'string' ? source.draftId.trim() : '';
     if (draftId && draftId !== albumDraft.draftId) {
       return { ok: false, message: '草稿已过期，请重新学习' };
     }
     try {
-      const result = commitAlbumDraft(promptsDir, albumDraft);
+      const result = commitAlbumDraft(userAlbumsDir, albumDraft, promptsDir);
       albumDraft = null;
       return { ok: true, id: result.id };
     } catch (err) {
@@ -815,7 +874,7 @@ function createRunner(options) {
       return { ok: false, message: '这本图册正在用于生成，请等这一轮结束' };
     }
     try {
-      deleteAlbumFiles(promptsDir, id);
+      deleteAlbumFiles(promptsDir, userAlbumsDir, id);
       return { ok: true };
     } catch (err) {
       return { ok: false, message: err instanceof Error ? err.message : '删除失败' };
@@ -828,8 +887,8 @@ function createRunner(options) {
   function previewAlbumSample(payload) {
     const source = payload && typeof payload === 'object' ? payload : {};
     const id = typeof source.id === 'string' ? source.id.trim() : '';
-    if (!isAlbum(id, promptsDir)) return { ok: false, message: '图册不在允许列表' };
-    const abs = albumSampleFile(promptsDir, id);
+    if (!isAlbum(id, promptsDir, userAlbumsDir)) return { ok: false, message: '图册不在允许列表' };
+    const abs = albumSampleFile(promptsDir, id, userAlbumsDir);
     if (!fs.existsSync(abs)) return { ok: false, message: '没有样图' };
     const bytes = fs.readFileSync(abs);
     const ext = path.extname(abs).toLowerCase();
@@ -845,11 +904,11 @@ function createRunner(options) {
   function getAlbumDetail(payload) {
     const source = payload && typeof payload === 'object' ? payload : {};
     const id = typeof source.id === 'string' ? source.id.trim() : '';
-    if (!isAlbum(id, promptsDir)) return { ok: false, message: '图册不在允许列表' };
-    const meta = loadAlbumCatalog(promptsDir).get(id);
+    if (!isAlbum(id, promptsDir, userAlbumsDir)) return { ok: false, message: '图册不在允许列表' };
+    const meta = loadAlbumCatalog(promptsDir, userAlbumsDir).get(id);
     let promptTemplate = '';
     try {
-      promptTemplate = readPromptFile(promptsDir, albumPromptName(id, promptsDir));
+      promptTemplate = readAlbumPromptText(promptsDir, id, userAlbumsDir);
     } catch {
       return { ok: false, message: '找不到图册题词' };
     }
@@ -858,7 +917,7 @@ function createRunner(options) {
       id: meta.id,
       label: meta.label,
       hint: meta.hint,
-      hasSample: fs.existsSync(albumSampleFile(promptsDir, id)),
+      hasSample: fs.existsSync(albumSampleFile(promptsDir, id, userAlbumsDir)),
       promptTemplate,
     };
   }

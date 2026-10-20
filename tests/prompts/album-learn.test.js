@@ -79,6 +79,10 @@ function seedFactoryAlbums(dir) {
     path.join(ROOT_PROMPTS, 'learn-album', 'system.md'),
     path.join(dir, 'learn-album', 'system.md'),
   );
+  fs.copyFileSync(
+    path.join(ROOT_PROMPTS, 'image-refs.md'),
+    path.join(dir, 'image-refs.md'),
+  );
   const kinds = ['magazine', 'scrapbook', 'conceptual', 'card', 'infographic'];
   const lineSchema = '每一项对象字段：\n- line：须准确上图的一句中文（非空）\n返回形状：{"frames":[{"line":"..."}]}';
   for (let i = 1; i <= 5; i += 1) {
@@ -152,6 +156,15 @@ test('学习提示词独立文件可现读', () => {
   const text = readLearnSystemPrompt(ROOT_PROMPTS);
   assert.match(text, /图册/);
   assert.match(text, /promptMd/);
+  assert.match(text, /竖版 3:4/);
+  assert.match(text, /magazine.*scrapbook.*conceptual.*card.*infographic/s);
+  assert.match(text, /可以新开 kind/);
+  assert.match(text, /学图方法/);
+  assert.match(text, /按笔画判断类别|可观察的字形特征/);
+  assert.match(text, /槽 6～8|还原核心/);
+  assert.match(text, /输出前核对/);
+  assert.match(text, /无主题插画，只保留参考图已有的背景/);
+  assert.doesNotMatch(text, /实测像素|识别画幅/);
 });
 
 test('参考图按文件头校验，不合格不进模型', () => {
@@ -182,6 +195,7 @@ test('识图请求走 deepseek-flash 且图在 user 消息里', async () => {
     dataUrl: `data:image/jpeg;base64,${JPEG_BYTES.toString('base64')}`,
   });
   assert.equal(captured.body.model, 'deepseek-flash');
+  assert.equal(captured.body.temperature, 0.2);
   assert.equal(captured.body.messages[0].role, 'user');
   assert.equal(captured.body.messages[0].content[0].type, 'text');
   assert.equal(captured.body.messages[0].content[1].type, 'image_url');
@@ -190,51 +204,65 @@ test('识图请求走 deepseek-flash 且图在 user 消息里', async () => {
 
 test('四件套校验失败不落盘；写入后可删；出厂不可删', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'album-learn-'));
+  const userDir = path.join(dir, 'runtime', 'albums');
   seedFactoryAlbums(dir);
-  const before = listAlbums(dir).slice().sort();
+  const before = listAlbums(dir, userDir).slice().sort();
 
   assert.throws(() => parseLearnResult({ kind: 'poster', slug: 'x' }), /不完整/);
 
   const image = normalizeReferenceImage({
     dataUrl: `data:image/jpeg;base64,${JPEG_BYTES.toString('base64')}`,
   });
-  const draft = buildAlbumDraft(dir, learnPayload(), image, 'draft-1');
+  const draft = buildAlbumDraft(dir, learnPayload(), image, 'draft-1', userDir);
   assert.equal(draft.kind, 'poster');
   assert.match(draft.id, /^100000\.poster\.bold-type$/);
-  assert.deepEqual(listAlbums(dir).slice().sort(), before);
+  assert.deepEqual(listAlbums(dir, userDir).slice().sort(), before);
 
-  commitAlbumDraft(dir, draft);
-  clearAlbumCatalogCache(dir);
-  assert.ok(listAlbums(dir).includes(draft.id));
+  commitAlbumDraft(userDir, draft, dir);
+  clearAlbumCatalogCache(dir, userDir);
+  assert.ok(listAlbums(dir, userDir).includes(draft.id));
+  assert.ok(fs.existsSync(path.join(userDir, `${draft.id}.json`)));
+  assert.equal(fs.existsSync(path.join(dir, 'albums', `${draft.id}.json`)), false);
   assert.equal(isBuiltinAlbum(draft.id), false);
   assert.equal(isBuiltinAlbum('000001.magazine.seed'), true);
 
-  assert.throws(() => deleteAlbumFiles(dir, '000001.magazine.seed'), /出厂/);
-  deleteAlbumFiles(dir, draft.id);
-  clearAlbumCatalogCache(dir);
-  assert.equal(listAlbums(dir).includes(draft.id), false);
+  assert.throws(() => deleteAlbumFiles(dir, userDir, '000001.magazine.seed'), /出厂/);
+  deleteAlbumFiles(dir, userDir, draft.id);
+  clearAlbumCatalogCache(dir, userDir);
+  assert.equal(listAlbums(dir, userDir).includes(draft.id), false);
 });
 
 test('新 kind 通用槽能 normalizeFrame 与 renderAlbumPrompt', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'album-generic-'));
+  const userDir = path.join(dir, 'runtime', 'albums');
   seedFactoryAlbums(dir);
   const image = normalizeReferenceImage({
     dataUrl: `data:image/jpeg;base64,${JPEG_BYTES.toString('base64')}`,
   });
-  const draft = buildAlbumDraft(dir, learnPayload(), image, 'draft-g');
-  commitAlbumDraft(dir, draft);
-  clearAlbumCatalogCache(dir);
-  const frame = normalizeFrame({ line: '这一句上图' }, draft.id, dir);
+  const draft = buildAlbumDraft(dir, learnPayload(), image, 'draft-g', userDir);
+  commitAlbumDraft(userDir, draft, dir);
+  clearAlbumCatalogCache(dir, userDir);
+  const frame = normalizeFrame({ line: '这一句上图' }, draft.id, dir, userDir);
   assert.equal(frame.line, '这一句上图');
-  const rendered = renderAlbumPrompt(dir, draft.id, '画面里有一块几何色块', frame);
+  const rendered = renderAlbumPrompt(dir, draft.id, '画面里有一块几何色块', frame, userDir);
   assert.match(rendered.prompt, /12\. 主题绘画内容/);
   assert.match(rendered.prompt, /这一句上图/);
   assert.match(rendered.prompt, /画面里有一块几何色块/);
+  assert.doesNotMatch(rendered.prompt, /【参考图】|第一张是|@template|禁止人物/);
   assert.equal(rendered.style, '粗字海报风');
+  const { composeImagePrompt } = require('../../src/prompts/fill');
+  const composed = composeImagePrompt(rendered.prompt, {
+    promptsDir: dir,
+    look: draft.id,
+    userAlbumsDir: userDir,
+  });
+  assert.match(composed.prompt, /第一张是版式模板参考图/);
+  assert.doesNotMatch(composed.prompt, /禁止人物、物体、场景和概念插画/);
 });
 
 test('新 kind 含 modulesBlock 能装填；未知 fooBlock 不拦', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'album-modules-'));
+  const userDir = path.join(dir, 'runtime', 'albums');
   seedFactoryAlbums(dir);
   const image = normalizeReferenceImage({
     dataUrl: `data:image/jpeg;base64,${JPEG_BYTES.toString('base64')}`,
@@ -267,9 +295,9 @@ test('新 kind 含 modulesBlock 能装填；未知 fooBlock 不拦', () => {
     ].join('\n'),
     promptMd: promptWithBlocks,
     copySample: '仅示例。',
-  }), image, 'draft-m');
-  commitAlbumDraft(dir, draft);
-  clearAlbumCatalogCache(dir);
+  }), image, 'draft-m', userDir);
+  commitAlbumDraft(userDir, draft, dir);
+  clearAlbumCatalogCache(dir, userDir);
 
   const frame = normalizeFrame({
     line: '智算峰会',
@@ -278,12 +306,12 @@ test('新 kind 含 modulesBlock 能装填；未知 fooBlock 不拦', () => {
       { icon: '箭头', head: '算力', body: '弹性扩容' },
       { icon: '盾', head: '安全', body: '合规托管' },
     ],
-  }, draft.id, dir);
+  }, draft.id, dir, userDir);
   assert.equal(frame.line, '智算峰会');
   assert.ok(Array.isArray(/** @type {{ modules?: unknown }} */ (frame).modules));
   assert.equal(/** @type {{ modules: unknown[] }} */ (frame).modules.length, 2);
 
-  const rendered = renderAlbumPrompt(dir, draft.id, '右侧城市剪影', frame);
+  const rendered = renderAlbumPrompt(dir, draft.id, '右侧城市剪影', frame, userDir);
   assert.match(rendered.prompt, /智算峰会/);
   assert.match(rendered.prompt, /INVITE/);
   assert.match(rendered.prompt, /算力/);
@@ -296,6 +324,7 @@ test('runner 学习写入删除：失败零落盘；出厂拒绝', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'album-runner-'));
   const postsDir = path.join(dir, 'posts');
   const promptsDir = path.join(dir, 'prompts');
+  const userAlbumsDir = path.join(dir, 'runtime', 'albums');
   seedFactoryAlbums(promptsDir);
   fs.mkdirSync(postsDir, { recursive: true });
 
@@ -303,6 +332,7 @@ test('runner 学习写入删除：失败零落盘；出厂拒绝', async () => {
   const runner = createRunner({
     postsDir,
     promptsDir,
+    userAlbumsDir,
     env: { DEEPSEEK_API_KEY: 'k' },
     completeVision: async () => {
       visionCalls += 1;
@@ -322,10 +352,12 @@ test('runner 学习写入删除：失败零落盘；出厂拒绝', async () => {
   assert.equal(learned.ok, true);
   assert.ok(learned.draft);
   assert.equal(fs.existsSync(path.join(promptsDir, 'albums', `${learned.draft.id}.json`)), false);
+  assert.equal(fs.existsSync(path.join(userAlbumsDir, `${learned.draft.id}.json`)), false);
 
   const committed = runner.commitAlbum({ draftId: learned.draft.draftId });
   assert.equal(committed.ok, true);
-  assert.ok(fs.existsSync(path.join(promptsDir, 'albums', `${committed.id}.json`)));
+  assert.ok(fs.existsSync(path.join(userAlbumsDir, `${committed.id}.json`)));
+  assert.equal(fs.existsSync(path.join(promptsDir, 'albums', `${committed.id}.json`)), false);
 
   const listed = runner.listAlbums();
   assert.ok(listed.albums.some((item) => item.id === committed.id && item.deletable === true));
@@ -336,5 +368,5 @@ test('runner 学习写入删除：失败零落盘；出厂拒绝', async () => {
 
   const deleted = runner.deleteAlbum({ id: committed.id });
   assert.equal(deleted.ok, true);
-  assert.equal(fs.existsSync(path.join(promptsDir, 'albums', `${committed.id}.json`)), false);
+  assert.equal(fs.existsSync(path.join(userAlbumsDir, `${committed.id}.json`)), false);
 });

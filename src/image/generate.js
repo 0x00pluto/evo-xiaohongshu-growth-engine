@@ -4,6 +4,10 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
+/** @type {typeof import('./files')} */
+const filesModule = require('./files');
+const { uploadReplicateFile } = filesModule;
+
 const MODEL_URL = 'https://api.replicate.com/v1/models/openai/gpt-image-2.5-flare/predictions';
 const POLL_INTERVAL_MS = 3000;
 const POLL_DEADLINE_MS = 8 * 60 * 1000;
@@ -19,6 +23,7 @@ const IMAGE_INPUT = {
  * @typedef {Record<string, string | undefined>} ImageEnv
  * @typedef {(input: string | URL | Request, init?: RequestInit) => Promise<Response>} FetchFn
  * @typedef {(ms: number) => Promise<void>} SleepFn
+ * @typedef {{ role: string; path: string }} ImageReference
  * @typedef {{
  *   status?: string;
  *   error?: unknown;
@@ -56,6 +61,25 @@ function outputUrl(output) {
     if (typeof record.href === 'string') return record.href;
   }
   return '';
+}
+
+/**
+ * @param {unknown} raw
+ * @returns {ImageReference[]}
+ */
+function normalizeReferences(raw) {
+  if (!Array.isArray(raw) || raw.length === 0) return [];
+  /** @type {ImageReference[]} */
+  const list = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+    const bag = /** @type {Record<string, unknown>} */ (item);
+    const role = typeof bag.role === 'string' ? bag.role.trim() : '';
+    const filePath = typeof bag.path === 'string' ? bag.path.trim() : '';
+    if (!role || !filePath) continue;
+    list.push({ role, path: filePath });
+  }
+  return list;
 }
 
 /**
@@ -110,18 +134,45 @@ async function waitForPrediction(prediction, token, fetchFn, sleepImpl) {
  * @param {{
  *   prompt: unknown;
  *   outputPath: string;
+ *   references?: unknown;
  *   env?: ImageEnv | null;
  *   fetch?: FetchFn;
  *   sleep?: SleepFn;
  * }} args
  * @returns {Promise<string>}
  */
-async function generatePng({ prompt, outputPath, env, fetch: fetchImpl, sleep: sleepImpl }) {
+async function generatePng({
+  prompt,
+  outputPath,
+  references: rawReferences,
+  env,
+  fetch: fetchImpl,
+  sleep: sleepImpl,
+}) {
   const token = String((env && env.REPLICATE_API_TOKEN) || '').trim();
   if (!token) throw new Error('缺少 REPLICATE_API_TOKEN');
   const text = typeof prompt === 'string' ? prompt.trim() : '';
   if (!text) throw new Error('提示词是空的');
   const fetchFn = fetchImpl || globalThis.fetch;
+  const references = normalizeReferences(rawReferences);
+  /** @type {string[]} */
+  const inputImages = [];
+  for (const ref of references) {
+    const uploaded = await uploadReplicateFile({
+      path: ref.path,
+      token,
+      fetch: fetchFn,
+    });
+    inputImages.push(uploaded);
+  }
+  /** @type {Record<string, unknown>} */
+  const input = {
+    prompt: text,
+    ...IMAGE_INPUT,
+  };
+  if (inputImages.length > 0) {
+    input.input_images = inputImages;
+  }
   const created = await fetchFn(MODEL_URL, {
     method: 'POST',
     headers: {
@@ -129,12 +180,7 @@ async function generatePng({ prompt, outputPath, env, fetch: fetchImpl, sleep: s
       'Content-Type': 'application/json',
       Prefer: 'wait=60',
     },
-    body: JSON.stringify({
-      input: {
-        prompt: text,
-        ...IMAGE_INPUT,
-      },
-    }),
+    body: JSON.stringify({ input }),
   });
   const prediction = await readPrediction(created);
   const url = await waitForPrediction(prediction, token, fetchFn, sleepImpl);
@@ -151,5 +197,6 @@ module.exports = {
   IMAGE_INPUT,
   MODEL_URL,
   generatePng,
+  normalizeReferences,
   outputUrl,
 };

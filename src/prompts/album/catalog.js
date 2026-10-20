@@ -38,9 +38,12 @@ function isAlbumToken(value) {
  *   legacyIds: string[];
  *   enabled: boolean;
  *   constraints: AlbumConstraints;
+ *   source: 'factory' | 'user';
+ *   home: string;
  * }} AlbumMeta
  * @typedef {{
  *   promptsDir: string;
+ *   userAlbumsDir: string;
  *   ids: () => string[];
  *   list: () => AlbumMeta[];
  *   get: (id: string) => AlbumMeta;
@@ -154,7 +157,85 @@ function normalizeMeta(raw, fileId) {
     legacyIds,
     enabled,
     constraints,
+    source: 'factory',
+    home: '',
   };
+}
+
+/**
+ * @param {string} promptsDir
+ * @param {string} [userAlbumsDir]
+ * @returns {string}
+ */
+function catalogCacheKey(promptsDir, userAlbumsDir) {
+  const factory = path.resolve(promptsDir);
+  const user = typeof userAlbumsDir === 'string' && userAlbumsDir.trim()
+    ? path.resolve(userAlbumsDir.trim())
+    : '';
+  return `${factory}::${user}`;
+}
+
+/**
+ * @param {AlbumMeta} meta
+ * @returns {string}
+ */
+function albumFilesDir(meta) {
+  return meta.source === 'user' ? meta.home : path.join(meta.home, 'albums');
+}
+
+/**
+ * @param {AlbumMeta} meta
+ * @returns {string}
+ */
+function albumSamplesDir(meta) {
+  return path.join(meta.home, 'samples');
+}
+
+/**
+ * @param {string} dir
+ * @param {'factory' | 'user'} source
+ * @param {string} home
+ * @param {Map<string, string>} legacyMap
+ * @returns {AlbumMeta[]}
+ */
+function scanAlbumDir(dir, source, home, legacyMap) {
+  if (!fs.existsSync(dir)) return [];
+  const names = fs.readdirSync(dir)
+    .filter((name) => name.endsWith('.json'))
+    .sort();
+  /** @type {AlbumMeta[]} */
+  const metas = [];
+  for (const name of names) {
+    const fileId = name.slice(0, -'.json'.length);
+    const file = path.join(dir, name);
+    /** @type {unknown} */
+    let raw;
+    try {
+      raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+    } catch {
+      throw new Error(`图册元数据不是合法 JSON：${fileId}`);
+    }
+    const meta = normalizeMeta(raw, fileId);
+    meta.source = source;
+    meta.home = home;
+    if (!meta.enabled) continue;
+    const md = path.join(dir, `${meta.id}.md`);
+    const sample = path.join(dir, `${meta.id}.copy-sample.md`);
+    if (!fs.existsSync(md)) {
+      throw new Error(`找不到图册题词 ${meta.id}.md`);
+    }
+    if (!fs.existsSync(sample)) {
+      throw new Error(`找不到图册抽取示例 ${meta.id}.copy-sample.md`);
+    }
+    for (const legacy of meta.legacyIds) {
+      if (legacyMap.has(legacy)) {
+        throw new Error(`图册 legacyId 重复：${legacy}`);
+      }
+      legacyMap.set(legacy, meta.id);
+    }
+    metas.push(meta);
+  }
+  return metas;
 }
 
 /**
@@ -173,71 +254,51 @@ function pickOne(list, random = Math.random) {
 }
 
 /**
- * 从 albums/*.json 扫描图册；同接口以后可换成 SQLite。
+ * 出厂图册在 promptsDir/albums；用户图册在 userAlbumsDir（runtime/albums）。
  * @param {string} promptsDir
+ * @param {string} [userAlbumsDir]
  * @returns {AlbumCatalog}
  */
-function loadAlbumCatalog(promptsDir) {
+function loadAlbumCatalog(promptsDir, userAlbumsDir) {
   if (typeof promptsDir !== 'string' || !promptsDir) {
     throw new Error('读取图册需要提示词目录');
   }
   const root = path.resolve(promptsDir);
-  const cached = CACHE.get(root);
+  const userRoot = typeof userAlbumsDir === 'string' && userAlbumsDir.trim()
+    ? path.resolve(userAlbumsDir.trim())
+    : '';
+  const key = catalogCacheKey(root, userRoot);
+  const cached = CACHE.get(key);
   if (cached) return cached;
 
-  const albumsDir = path.join(root, 'albums');
-  if (!fs.existsSync(albumsDir)) {
+  const factoryAlbumsDir = path.join(root, 'albums');
+  if (!fs.existsSync(factoryAlbumsDir)) {
     throw new Error('找不到图册目录 albums');
   }
-  const names = fs.readdirSync(albumsDir)
-    .filter((name) => name.endsWith('.json'))
-    .sort();
-  /** @type {AlbumMeta[]} */
-  const metas = [];
   /** @type {Map<string, string>} */
   const legacyMap = new Map();
+  /** @type {Map<string, AlbumMeta>} */
+  const byId = new Map();
 
-  for (const name of names) {
-    const fileId = name.slice(0, -'.json'.length);
-    const file = path.join(albumsDir, name);
-    /** @type {unknown} */
-    let raw;
-    try {
-      raw = JSON.parse(fs.readFileSync(file, 'utf8'));
-    } catch {
-      throw new Error(`图册元数据不是合法 JSON：${fileId}`);
+  for (const meta of scanAlbumDir(factoryAlbumsDir, 'factory', root, legacyMap)) {
+    byId.set(meta.id, meta);
+  }
+  if (userRoot) {
+    for (const meta of scanAlbumDir(userRoot, 'user', userRoot, legacyMap)) {
+      byId.set(meta.id, meta);
     }
-    const meta = normalizeMeta(raw, fileId);
-    if (!meta.enabled) continue;
-    const md = path.join(albumsDir, `${meta.id}.md`);
-    const sample = path.join(albumsDir, `${meta.id}.copy-sample.md`);
-    if (!fs.existsSync(md)) {
-      throw new Error(`找不到图册题词 ${meta.id}.md`);
-    }
-    if (!fs.existsSync(sample)) {
-      throw new Error(`找不到图册抽取示例 ${meta.id}.copy-sample.md`);
-    }
-    for (const legacy of meta.legacyIds) {
-      if (legacyMap.has(legacy)) {
-        throw new Error(`图册 legacyId 重复：${legacy}`);
-      }
-      legacyMap.set(legacy, meta.id);
-    }
-    metas.push(meta);
   }
 
-  metas.sort((left, right) => left.id.localeCompare(right.id));
+  const metas = Array.from(byId.values()).sort((left, right) => left.id.localeCompare(right.id));
   if (metas.length === 0) {
     throw new Error('图册目录里没有可用图册');
   }
-
-  /** @type {Map<string, AlbumMeta>} */
-  const byId = new Map(metas.map((item) => [item.id, item]));
   const idList = metas.map((item) => item.id);
 
   /** @type {AlbumCatalog} */
   const catalog = {
     promptsDir: root,
+    userAlbumsDir: userRoot,
     ids: () => idList.slice(),
     list: () => metas.slice(),
     get: (id) => {
@@ -255,16 +316,17 @@ function loadAlbumCatalog(promptsDir) {
     pick: (random) => pickOne(idList, random),
   };
 
-  CACHE.set(root, catalog);
+  CACHE.set(key, catalog);
   return catalog;
 }
 
 /**
  * @param {string} [promptsDir]
+ * @param {string} [userAlbumsDir]
  */
-function clearAlbumCatalogCache(promptsDir) {
+function clearAlbumCatalogCache(promptsDir, userAlbumsDir) {
   if (typeof promptsDir === 'string' && promptsDir) {
-    CACHE.delete(path.resolve(promptsDir));
+    CACHE.delete(catalogCacheKey(promptsDir, userAlbumsDir));
     return;
   }
   CACHE.clear();
@@ -272,42 +334,46 @@ function clearAlbumCatalogCache(promptsDir) {
 
 /**
  * @param {string} promptsDir
+ * @param {string} [userAlbumsDir]
  * @returns {string[]}
  */
-function listAlbums(promptsDir) {
-  return loadAlbumCatalog(promptsDir).ids();
+function listAlbums(promptsDir, userAlbumsDir) {
+  return loadAlbumCatalog(promptsDir, userAlbumsDir).ids();
 }
 
 /**
  * @param {unknown} album
  * @param {string} promptsDir
+ * @param {string} [userAlbumsDir]
  * @returns {album is string}
  */
-function isAlbum(album, promptsDir) {
-  return typeof album === 'string' && loadAlbumCatalog(promptsDir).has(album);
+function isAlbum(album, promptsDir, userAlbumsDir) {
+  return typeof album === 'string' && loadAlbumCatalog(promptsDir, userAlbumsDir).has(album);
 }
 
 /**
  * @param {unknown} album
  * @param {string} promptsDir
+ * @param {string} [userAlbumsDir]
  * @returns {string}
  */
-function albumKind(album, promptsDir) {
-  if (!isAlbum(album, promptsDir)) {
+function albumKind(album, promptsDir, userAlbumsDir) {
+  if (!isAlbum(album, promptsDir, userAlbumsDir)) {
     throw new Error('图册不在允许列表');
   }
-  return loadAlbumCatalog(promptsDir).get(album).kind;
+  return loadAlbumCatalog(promptsDir, userAlbumsDir).get(album).kind;
 }
 
 /**
  * @param {unknown} look
  * @param {string} [promptsDir]
+ * @param {string} [userAlbumsDir]
  * @returns {string}
  */
-function migrateAlbumId(look, promptsDir) {
+function migrateAlbumId(look, promptsDir, userAlbumsDir) {
   if (typeof look !== 'string' || !look) return '';
   if (typeof promptsDir === 'string' && promptsDir) {
-    return loadAlbumCatalog(promptsDir).migrateLook(look);
+    return loadAlbumCatalog(promptsDir, userAlbumsDir).migrateLook(look);
   }
   // 无目录时只认「已是新 id」形状，旧短名无法映射则清空。
   const parts = look.split('.');
@@ -335,10 +401,11 @@ function isBuiltinAlbum(id) {
 /**
  * @param {string} promptsDir
  * @param {() => number} [random]
+ * @param {string} [userAlbumsDir]
  * @returns {string}
  */
-function pickAlbum(promptsDir, random) {
-  return loadAlbumCatalog(promptsDir).pick(random);
+function pickAlbum(promptsDir, random, userAlbumsDir) {
+  return loadAlbumCatalog(promptsDir, userAlbumsDir).pick(random);
 }
 
 /** @deprecated 兼容旧名 */
@@ -347,90 +414,121 @@ const pickLook = pickAlbum;
 /**
  * @param {string} promptsDir
  * @param {unknown} album
+ * @param {string} [userAlbumsDir]
  * @returns {string}
  */
-function albumHint(promptsDir, album) {
-  if (!isAlbum(album, promptsDir)) {
+function albumHint(promptsDir, album, userAlbumsDir) {
+  if (!isAlbum(album, promptsDir, userAlbumsDir)) {
     throw new Error('图册不在允许列表');
   }
-  return loadAlbumCatalog(promptsDir).get(album).hint;
+  return loadAlbumCatalog(promptsDir, userAlbumsDir).get(album).hint;
 }
 
 /**
+ * 出厂册相对 promptsDir；用户册返回绝对路径标记（供 readAlbumPromptText 使用）。
  * @param {unknown} album
  * @param {string} promptsDir
+ * @param {string} [userAlbumsDir]
  * @returns {string}
  */
-function albumPromptName(album, promptsDir) {
-  if (!isAlbum(album, promptsDir)) {
+function albumPromptName(album, promptsDir, userAlbumsDir) {
+  if (!isAlbum(album, promptsDir, userAlbumsDir)) {
     throw new Error('图册不在允许列表');
+  }
+  const meta = loadAlbumCatalog(promptsDir, userAlbumsDir).get(/** @type {string} */ (album));
+  if (meta.source === 'user') {
+    return path.join(albumFilesDir(meta), `${meta.id}.md`);
   }
   return `albums/${album}.md`;
 }
 
 /**
- * 样图按扩展名探测；优先 jpg，其次 jpeg / png / webp。
- * @param {string} promptsDir
+ * @param {AlbumMeta} meta
  * @param {string} album
- * @returns {string} 相对 promptsDir 的路径；尚无文件时默认 samples/<id>.jpg
+ * @returns {string}
  */
-function resolveAlbumSampleRel(promptsDir, album) {
-  const samplesDir = path.join(promptsDir, 'samples');
-  /** @type {string[]} */
-  const candidates = [
-    `samples/${album}.jpg`,
-    `samples/${album}.jpeg`,
-    `samples/${album}.png`,
-    `samples/${album}.webp`,
-  ];
-  for (const candidate of candidates) {
-    if (fs.existsSync(path.join(promptsDir, candidate))) return candidate;
+function resolveSampleAbs(meta, album) {
+  const samplesDir = albumSamplesDir(meta);
+  for (const ext of SAMPLE_EXTS) {
+    const candidate = path.join(samplesDir, `${album}${ext}`);
+    if (fs.existsSync(candidate)) return candidate;
   }
   if (fs.existsSync(samplesDir)) {
     for (const name of fs.readdirSync(samplesDir)) {
       const ext = path.extname(name).toLowerCase();
       const base = path.basename(name, path.extname(name));
-      if (base === album && (ext === '.jpg' || ext === '.jpeg' || ext === '.png' || ext === '.webp')) {
-        return `samples/${name}`;
+      if (base === album && SAMPLE_EXTS.includes(ext)) {
+        return path.join(samplesDir, name);
       }
     }
   }
-  return `samples/${album}.jpg`;
+  return path.join(samplesDir, `${album}.jpg`);
 }
 
 /**
+ * 样图相对路径（出厂相对 promptsDir；用户相对 userAlbumsDir）。
  * @param {unknown} album
  * @param {string} promptsDir
+ * @param {string} [userAlbumsDir]
  * @returns {string}
  */
-function albumSamplePath(album, promptsDir) {
-  if (!isAlbum(album, promptsDir)) {
+function albumSamplePath(album, promptsDir, userAlbumsDir) {
+  if (!isAlbum(album, promptsDir, userAlbumsDir)) {
     throw new Error('图册不在允许列表');
   }
-  return resolveAlbumSampleRel(promptsDir, /** @type {string} */ (album));
+  const meta = loadAlbumCatalog(promptsDir, userAlbumsDir).get(/** @type {string} */ (album));
+  const abs = resolveSampleAbs(meta, /** @type {string} */ (album));
+  if (meta.source === 'user') {
+    return path.relative(meta.home, abs).split(path.sep).join('/');
+  }
+  return path.relative(meta.home, abs).split(path.sep).join('/');
 }
 
 /**
  * @param {string} promptsDir
  * @param {unknown} album
+ * @param {string} [userAlbumsDir]
  * @returns {string}
  */
-function albumSampleFile(promptsDir, album) {
-  return path.join(promptsDir, albumSamplePath(album, promptsDir));
+function albumSampleFile(promptsDir, album, userAlbumsDir) {
+  if (!isAlbum(album, promptsDir, userAlbumsDir)) {
+    throw new Error('图册不在允许列表');
+  }
+  const meta = loadAlbumCatalog(promptsDir, userAlbumsDir).get(/** @type {string} */ (album));
+  return resolveSampleAbs(meta, /** @type {string} */ (album));
+}
+
+/**
+ * @param {string} promptsDir
+ * @param {unknown} album
+ * @param {string} [userAlbumsDir]
+ * @returns {string}
+ */
+function readAlbumPromptText(promptsDir, album, userAlbumsDir) {
+  if (!isAlbum(album, promptsDir, userAlbumsDir)) {
+    throw new Error('图册不在允许列表');
+  }
+  const meta = loadAlbumCatalog(promptsDir, userAlbumsDir).get(/** @type {string} */ (album));
+  const file = path.join(albumFilesDir(meta), `${meta.id}.md`);
+  if (!fs.existsSync(file)) {
+    throw new Error(`找不到图册题词 ${meta.id}.md`);
+  }
+  return fs.readFileSync(file, 'utf8');
 }
 
 /**
  * schema 正文来自 JSON，再拼 copy-sample（给策划模型 few-shot）。
  * @param {unknown} album
  * @param {string} promptsDir
+ * @param {string} [userAlbumsDir]
  * @returns {string}
  */
-function copySchema(album, promptsDir) {
-  if (!isAlbum(album, promptsDir)) {
+function copySchema(album, promptsDir, userAlbumsDir) {
+  if (!isAlbum(album, promptsDir, userAlbumsDir)) {
     throw new Error('图册不在允许列表');
   }
-  const meta = loadAlbumCatalog(promptsDir).get(album);
-  const samplePath = path.join(promptsDir, 'albums', `${album}.copy-sample.md`);
+  const meta = loadAlbumCatalog(promptsDir, userAlbumsDir).get(/** @type {string} */ (album));
+  const samplePath = path.join(albumFilesDir(meta), `${album}.copy-sample.md`);
   if (!fs.existsSync(samplePath)) {
     throw new Error(`找不到图册抽取示例 ${album}.copy-sample.md`);
   }
@@ -441,13 +539,24 @@ function copySchema(album, promptsDir) {
 /**
  * @param {unknown} album
  * @param {string} promptsDir
+ * @param {string} [userAlbumsDir]
  * @returns {string}
  */
-function albumLabel(album, promptsDir) {
-  if (!isAlbum(album, promptsDir)) {
+function albumLabel(album, promptsDir, userAlbumsDir) {
+  if (!isAlbum(album, promptsDir, userAlbumsDir)) {
     throw new Error('图册不在允许列表');
   }
-  return loadAlbumCatalog(promptsDir).get(album).label;
+  return loadAlbumCatalog(promptsDir, userAlbumsDir).get(album).label;
+}
+
+/**
+ * 兼容旧调用：出厂 samples 相对路径探测。
+ * @param {string} promptsDir
+ * @param {string} album
+ * @returns {string}
+ */
+function resolveAlbumSampleRel(promptsDir, album) {
+  return albumSamplePath(album, promptsDir, '');
 }
 
 /** @deprecated 兼容旧名 */
@@ -458,12 +567,14 @@ module.exports = {
   ALBUM_KIND_SET,
   SAMPLE_EXTS,
   USER_ALBUM_SEQ_START,
+  albumFilesDir,
   albumHint,
   albumKind,
   albumLabel,
   albumPromptName,
   albumSampleFile,
   albumSamplePath,
+  albumSamplesDir,
   clearAlbumCatalogCache,
   copySchema,
   isAlbum,
@@ -476,5 +587,6 @@ module.exports = {
   pickAlbum,
   pickLook,
   pickOne,
+  readAlbumPromptText,
   resolveAlbumSampleRel,
 };

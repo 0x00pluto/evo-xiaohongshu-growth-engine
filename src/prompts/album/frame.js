@@ -27,10 +27,11 @@ const { albumKind, isAlbum, loadAlbumCatalog } = catalogModule;
 /**
  * @param {string} promptsDir
  * @param {string} album
+ * @param {string} [userAlbumsDir]
  * @returns {{ modules: { min: number; max: number }; steps: { min: number; max: number } }}
  */
-function infographicConstraints(promptsDir, album) {
-  const meta = loadAlbumCatalog(promptsDir).get(album);
+function infographicConstraints(promptsDir, album, userAlbumsDir) {
+  const meta = loadAlbumCatalog(promptsDir, userAlbumsDir).get(album);
   const modules = meta.constraints.modules || { min: 2, max: 6 };
   const steps = meta.constraints.steps || { min: 3, max: 7 };
   return { modules, steps };
@@ -40,11 +41,12 @@ function infographicConstraints(promptsDir, album) {
  * @param {unknown} list
  * @param {string} promptsDir
  * @param {string} album
+ * @param {string} [userAlbumsDir]
  * @returns {InfographicModule[]}
  */
-function normalizeInfographicModules(list, promptsDir, album) {
+function normalizeInfographicModules(list, promptsDir, album, userAlbumsDir) {
   if (!Array.isArray(list)) throw new Error('策划字段不完整');
-  const range = infographicConstraints(promptsDir, album).modules;
+  const range = infographicConstraints(promptsDir, album, userAlbumsDir).modules;
   if (list.length < range.min || list.length > range.max) {
     throw new Error(`知识模块应为 ${range.min} 到 ${range.max} 条`);
   }
@@ -66,11 +68,12 @@ function normalizeInfographicModules(list, promptsDir, album) {
  * @param {unknown} list
  * @param {string} promptsDir
  * @param {string} album
+ * @param {string} [userAlbumsDir]
  * @returns {InfographicStep[]}
  */
-function normalizeInfographicSteps(list, promptsDir, album) {
+function normalizeInfographicSteps(list, promptsDir, album, userAlbumsDir) {
   if (!Array.isArray(list)) throw new Error('策划字段不完整');
-  const range = infographicConstraints(promptsDir, album).steps;
+  const range = infographicConstraints(promptsDir, album, userAlbumsDir).steps;
   if (list.length < range.min || list.length > range.max) {
     throw new Error(`步骤应为 ${range.min} 到 ${range.max} 条`);
   }
@@ -129,11 +132,12 @@ function formatStepsBlock(stepsBar, steps) {
  * @param {unknown} album
  * @param {CopyFrame} frame
  * @param {string} promptsDir
+ * @param {string} [userAlbumsDir]
  * @returns {string}
  */
-function frameDisplayLine(album, frame, promptsDir) {
-  if (!isAlbum(album, promptsDir) || !frame || typeof frame !== 'object') return '';
-  const kind = albumKind(album, promptsDir);
+function frameDisplayLine(album, frame, promptsDir, userAlbumsDir) {
+  if (!isAlbum(album, promptsDir, userAlbumsDir) || !frame || typeof frame !== 'object') return '';
+  const kind = albumKind(album, promptsDir, userAlbumsDir);
   if (kind === 'magazine' || kind === 'scrapbook') {
     return typeof frame.line === 'string' ? frame.line.trim() : '';
   }
@@ -152,24 +156,26 @@ function frameDisplayLine(album, frame, promptsDir) {
  * @param {CopyFrame[]} frames
  * @param {unknown} album
  * @param {string} promptsDir
+ * @param {string} [userAlbumsDir]
  * @returns {string}
  */
-function formatPlannedLines(frames, album, promptsDir) {
+function formatPlannedLines(frames, album, promptsDir, userAlbumsDir) {
   if (!Array.isArray(frames)) return '';
-  return frames.map((frame) => frameDisplayLine(album, frame, promptsDir)).join('\n');
+  return frames.map((frame) => frameDisplayLine(album, frame, promptsDir, userAlbumsDir)).join('\n');
 }
 
 /**
  * @param {unknown} raw
  * @param {string} album
  * @param {string} promptsDir
+ * @param {string} [userAlbumsDir]
  * @returns {CopyFrame}
  */
-function normalizeFrame(raw, album, promptsDir) {
+function normalizeFrame(raw, album, promptsDir, userAlbumsDir) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     throw new Error('策划那一项不是对象');
   }
-  const kind = albumKind(album, promptsDir);
+  const kind = albumKind(album, promptsDir, userAlbumsDir);
   const source = /** @type {Record<string, unknown>} */ (raw);
   /** @type {CopyFrame} */
   const frame = {};
@@ -207,8 +213,8 @@ function normalizeFrame(raw, album, promptsDir) {
     frame.stepsBar = typeof source.stepsBar === 'string' ? source.stepsBar.trim() : '';
     frame.summary = typeof source.summary === 'string' ? source.summary.trim() : '';
     frame.credit = typeof source.credit === 'string' ? source.credit.trim() : '';
-    frame.modules = normalizeInfographicModules(source.modules, promptsDir, album);
-    frame.steps = normalizeInfographicSteps(source.steps, promptsDir, album);
+    frame.modules = normalizeInfographicModules(source.modules, promptsDir, album, userAlbumsDir);
+    frame.steps = normalizeInfographicSteps(source.steps, promptsDir, album, userAlbumsDir);
     if (
       !frame.seriesLabel
       || !frame.theme
@@ -223,7 +229,7 @@ function normalizeFrame(raw, album, promptsDir) {
     return frame;
   }
   // 新 kind：按 copySchema 声明的扁平字段校验；必须有非空 line
-  return normalizeGenericFrame(source, /** @type {string} */ (album), promptsDir);
+  return normalizeGenericFrame(source, /** @type {string} */ (album), promptsDir, userAlbumsDir);
 }
 
 /**
@@ -250,11 +256,12 @@ function schemaFieldNames(schema) {
  * @param {string} promptsDir
  * @param {string} album
  * @param {string} fieldName
+ * @param {string} [userAlbumsDir='']
  * @returns {Record<string, string>[]}
  */
-function normalizeFlexibleArray(list, promptsDir, album, fieldName) {
+function normalizeFlexibleArray(list, promptsDir, album, fieldName, userAlbumsDir = '') {
   if (!Array.isArray(list)) throw new Error('策划字段不完整');
-  const meta = loadAlbumCatalog(promptsDir).get(album);
+  const meta = loadAlbumCatalog(promptsDir, userAlbumsDir).get(album);
   const bag = /** @type {Record<string, { min: number; max: number } | undefined>} */ (
     meta.constraints || {}
   );
@@ -303,10 +310,11 @@ function formatFlexibleBlock(items) {
  * @param {Record<string, unknown>} source
  * @param {string} album
  * @param {string} promptsDir
+ * @param {string} [userAlbumsDir='']
  * @returns {CopyFrame}
  */
-function normalizeGenericFrame(source, album, promptsDir) {
-  const meta = loadAlbumCatalog(promptsDir).get(album);
+function normalizeGenericFrame(source, album, promptsDir, userAlbumsDir = '') {
+  const meta = loadAlbumCatalog(promptsDir, userAlbumsDir).get(album);
   const fields = schemaFieldNames(meta.copySchema);
   if (!fields.includes('line')) {
     throw new Error('新 kind 的 copySchema 须声明 line 字段');
@@ -316,7 +324,7 @@ function normalizeGenericFrame(source, album, promptsDir) {
   for (const name of fields) {
     const value = source[name];
     if (Array.isArray(value)) {
-      frame[name] = normalizeFlexibleArray(value, promptsDir, album, name);
+      frame[name] = normalizeFlexibleArray(value, promptsDir, album, name, userAlbumsDir);
       continue;
     }
     frame[name] = typeof value === 'string' ? value.trim() : '';

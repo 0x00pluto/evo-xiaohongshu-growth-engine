@@ -69,6 +69,8 @@ module.exports = {
     const runner = createRunner({
       postsDir: path.join(dataDir, 'output', 'one-post', 'posts'),
       promptsDir: path.join(pluginRoot(), 'assets', 'prompts', 'one-post'),
+      userAlbumsDir: path.join(dataDir, 'runtime', 'albums'),
+      userImageRefsDir: path.join(dataDir, 'runtime', 'image-refs'),
       env: resolveEnv(ctx),
       revealFile: revealInFolder,
     });

@@ -140,10 +140,11 @@ function normalizeArticleType(value) {
 /**
  * @param {Record<string, unknown>} prompts
  * @param {string} [promptsDir]
+ * @param {string} [userAlbumsDir]
  * @returns {{ storyType: string; look: string }}
  */
-function normalizePromptSlots(prompts, promptsDir) {
-  const look = migrateAlbumId(prompts.look, promptsDir);
+function normalizePromptSlots(prompts, promptsDir, userAlbumsDir) {
+  const look = migrateAlbumId(prompts.look, promptsDir, userAlbumsDir);
   if (prompts.storyType === 'process' || prompts.storyType === 'contrast') {
     return { storyType: prompts.storyType, look };
   }
@@ -261,9 +262,10 @@ function normalizeGalleryRoles(value) {
 /**
  * @param {unknown} raw
  * @param {string} [promptsDir]
+ * @param {string} [userAlbumsDir]
  * @returns {DraftState}
  */
-function normalize(raw, promptsDir) {
+function normalize(raw, promptsDir, userAlbumsDir) {
   const base = emptyState();
   const source = raw && typeof raw === 'object' ? /** @type {Record<string, unknown>} */ (raw) : {};
   base.business = typeof source.business === 'string' ? source.business : '';
@@ -284,7 +286,7 @@ function normalize(raw, promptsDir) {
   const prompts = source.prompts && typeof source.prompts === 'object'
     ? /** @type {Record<string, unknown>} */ (source.prompts)
     : {};
-  const slots = normalizePromptSlots(prompts, promptsDir);
+  const slots = normalizePromptSlots(prompts, promptsDir, userAlbumsDir);
   base.prompts = {
     cover: typeof prompts.cover === 'string' ? prompts.cover : '',
     storyType: slots.storyType,
@@ -316,11 +318,12 @@ function normalize(raw, promptsDir) {
 
 /**
  * @param {string} latestDir
- * @param {{ promptsDir?: string }} [options]
+ * @param {{ promptsDir?: string; userAlbumsDir?: string }} [options]
  * @returns {DraftStore}
  */
 function createStore(latestDir, options) {
   const promptsDir = options && typeof options.promptsDir === 'string' ? options.promptsDir : '';
+  const userAlbumsDir = options && typeof options.userAlbumsDir === 'string' ? options.userAlbumsDir : '';
   const file = path.join(latestDir, 'draft.json');
 
   function exists() {
@@ -333,7 +336,7 @@ function createStore(latestDir, options) {
   function read() {
     if (!exists()) return emptyState();
     try {
-      return normalize(JSON.parse(fs.readFileSync(file, 'utf8')), promptsDir);
+      return normalize(JSON.parse(fs.readFileSync(file, 'utf8')), promptsDir, userAlbumsDir);
     } catch {
       return emptyState();
     }
@@ -346,7 +349,7 @@ function createStore(latestDir, options) {
     // 先写临时文件再替换，轮询才不会读到半截 JSON。
     fs.mkdirSync(latestDir, { recursive: true });
     const tmp = `${file}.${process.pid}.tmp`;
-    fs.writeFileSync(tmp, `${JSON.stringify(normalize(state, promptsDir), null, 2)}\n`);
+    fs.writeFileSync(tmp, `${JSON.stringify(normalize(state, promptsDir, userAlbumsDir), null, 2)}\n`);
     fs.renameSync(tmp, file);
   }
 

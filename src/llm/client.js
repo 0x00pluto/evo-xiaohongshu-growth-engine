@@ -107,7 +107,7 @@ function createLlm(env, fetchImpl) {
           ],
         }],
         response_format: { type: 'json_object' },
-        temperature: 0.7,
+        temperature: 0.2,
       }),
     });
     if (!response.ok) {

@@ -232,6 +232,22 @@ function writePrompts(dir) {
     path.join(dir, 'scenes.md'),
     'SCENES\nCOUNT:{{sceneCount}}\nHINT:{{albumHint}}\nLINES:{{plannedLines}}\n{{tone}}\n{{storyHint}}',
   );
+  fs.writeFileSync(
+    path.join(dir, 'image-refs.md'),
+    [
+      '## template',
+      '',
+      '版式模板参考图，不是成稿。锁定底色、配色关系。',
+      '',
+      '## product',
+      '',
+      '产品参考图。',
+      '',
+      '## logo',
+      '',
+      '品牌标识参考图。',
+    ].join('\n'),
+  );
   for (const id of ALL_ALBUMS) {
     writeAlbum(dir, id);
     writeAlbumMeta(dir, id);
@@ -470,6 +486,36 @@ test('画面条数第一次错、第二次对齐后提示词成功', async () =>
             scenes: ['多一', '多二', '多三', '多四', '多五', '多六'],
           });
         }
+      }
+      return responseFor(prompt, 1);
+    },
+  });
+  runner.generateDraft(draftArgs({ article: '一篇短文', galleryCount: 1 }));
+  const latest = await untilIdle(runner);
+  assert.equal(latest.job.error, '');
+  assert.equal(scenesCalls, 2);
+  assert.equal(latest.prompts.gallery.length, 1);
+  assert.match(latest.prompts.cover, /第1格/);
+});
+
+test('画面第一次重复、第二次各不相同后提示词成功', async () => {
+  const root = tempDir();
+  const promptsDir = path.join(root, 'prompts');
+  writePrompts(promptsDir);
+  let scenesCalls = 0;
+  const runner = createRunner({
+    postsDir: path.join(root, 'latest'),
+    promptsDir,
+    random: firstPick,
+    complete: async (prompt) => {
+      if (prompt.startsWith('SCENES')) {
+        scenesCalls += 1;
+        if (scenesCalls === 1) {
+          return JSON.stringify({
+            scenes: ['同一张画面', '同一张画面'],
+          });
+        }
+        assert.match(prompt, /每一条画面都不能相同/);
       }
       return responseFor(prompt, 1);
     },
@@ -901,6 +947,61 @@ test('抽到对比后配图角色是对照', async () => {
   const imaged = await untilIdle(runner);
   assert.equal(imaged.images.gallery[0].status, '成功');
   assert.equal(fs.existsSync(path.join(imaged.directory, 'gallery-01-1.png')), true);
+});
+
+test('有样图时生图带上 template 参考路径；无样图不传 references', async () => {
+  const root = tempDir();
+  const promptsDir = path.join(root, 'prompts');
+  writePrompts(promptsDir);
+  const samplePath = path.join(promptsDir, 'samples', `${ALBUM_MAGAZINE}.jpg`);
+  fs.mkdirSync(path.dirname(samplePath), { recursive: true });
+  fs.writeFileSync(samplePath, Buffer.from([0xff, 0xd8, 0xff, 0xd9]));
+  /** @type {unknown[]} */
+  const seen = [];
+  const withSample = createRunner({
+    postsDir: path.join(root, 'posts-a'),
+    promptsDir,
+    random: firstPick,
+    complete: async (prompt) => responseFor(prompt, 0),
+    generateImage: async (args) => {
+      seen.push(args);
+      fs.mkdirSync(path.dirname(args.outputPath), { recursive: true });
+      fs.writeFileSync(args.outputPath, 'png');
+    },
+  });
+  withSample.generateDraft(draftArgs({ galleryCount: 0 }));
+  await untilIdle(withSample);
+  assert.equal(withSample.generateImages({ slot: 'cover' }).ok, true);
+  await untilIdle(withSample);
+  assert.equal(seen.length, 1);
+  const first = /** @type {{ references?: { role: string; path: string }[]; prompt: string }} */ (seen[0]);
+  assert.deepEqual(first.references, [{ role: 'template', path: samplePath }]);
+  assert.match(first.prompt, /第一张是版式模板参考图/);
+  assert.doesNotMatch(first.prompt, /@template/);
+  const drafted = withSample.loadLatest();
+  assert.doesNotMatch(drafted.prompts.cover, /【参考图】|第一张是|@template/);
+
+  fs.rmSync(samplePath, { force: true });
+  seen.length = 0;
+  const noSample = createRunner({
+    postsDir: path.join(root, 'posts-b'),
+    promptsDir,
+    random: firstPick,
+    complete: async (prompt) => responseFor(prompt, 0),
+    generateImage: async (args) => {
+      seen.push(args);
+      fs.mkdirSync(path.dirname(args.outputPath), { recursive: true });
+      fs.writeFileSync(args.outputPath, 'png');
+    },
+  });
+  noSample.generateDraft(draftArgs({ galleryCount: 0 }));
+  await untilIdle(noSample);
+  assert.equal(noSample.generateImages({ slot: 'cover' }).ok, true);
+  await untilIdle(noSample);
+  assert.equal(seen.length, 1);
+  const second = /** @type {{ references?: unknown; prompt: string }} */ (seen[0]);
+  assert.equal(Object.prototype.hasOwnProperty.call(second, 'references'), false);
+  assert.doesNotMatch(second.prompt, /【参考图】|第一张是/);
 });
 
 test('重算提示词可固定图册，并列出图册目录', async () => {

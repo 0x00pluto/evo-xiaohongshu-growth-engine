@@ -3,10 +3,12 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const {
   ARTICLE_TYPES,
   STORY_TYPES,
+  TEXT_ONLY_SCENE,
   albumHint,
   albumKind,
   albumSampleFile,
@@ -14,11 +16,15 @@ const {
   assignGalleryRoles,
   assignStoryRoles,
   buildDraftPrompt,
+  clearAlbumCatalogCache,
   copySchema,
   fillPrompt,
   formatGallerySlots,
+  composeImagePrompt,
+  formatImageRefsBlock,
   listAlbums,
   migrateAlbumId,
+  migrateUserAlbumsFromAssets,
   parseDraftText,
   parsePlanText,
   parseScenesText,
@@ -89,6 +95,17 @@ test('成稿和图册提示词能装填，长提示词不在 src 里', () => {
   assert.match(sheet.prompt, /11\. 系列统一规则/);
   assert.match(sheet.prompt, /12\. 主题绘画内容：一个人站在只占画面一角的几何台阶上/);
   assert.match(sheet.prompt, /图片必须准确呈现的中文文案：\n分这一句/);
+  assert.doesNotMatch(sheet.prompt, /@template|【参考图】|第一张是/);
+  assert.doesNotMatch(sheet.prompt, /禁止人物、物体、场景和概念插画/);
+  const composed = composeImagePrompt(sheet.prompt, {
+    promptsDir,
+    look: '000001.magazine.dazibao',
+  });
+  assert.match(composed.prompt, /【参考图】/);
+  assert.match(composed.prompt, /第一张是版式模板参考图/);
+  assert.doesNotMatch(composed.prompt, /@template/);
+  assert.equal(composed.references.length, 1);
+  assert.equal(composed.references[0].role, 'template');
   assert.doesNotMatch(sheet.prompt, /本次主题内容/);
   assert.ok(sheet.prompt.indexOf('11. 系列统一规则') < sheet.prompt.indexOf('12. 主题绘画内容'));
   assert.equal(sheet.style.includes('杂志编辑风'), true);
@@ -253,6 +270,89 @@ test('系列槽位按张数排，句子空、重复都失败', () => {
   );
 });
 
+test('纯文字图册允许相同画面句，并收成固定空指令', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'text-only-scenes-'));
+  fs.mkdirSync(path.join(dir, 'albums'), { recursive: true });
+  const id = '100000.magazine.quote-text';
+  const sheet = [
+    '竖版 3:4，纯文字金句卡。',
+    '1. 背景：白', '2. 色彩：黑', '3. 字体：黑', '4. 字号：大', '5. 字重：粗',
+    '6. 文字排版：中', '7. 文字位置：中', '8. 构图布局：居中', '9. 视觉风格：排版',
+    '10. 光影与质感：平', '11. 系列统一规则：统一',
+    '12. 主题绘画内容：{{scene}}',
+    '',
+    '图片必须准确呈现的中文文案：',
+    '{{line}}',
+    '',
+    '文案必须完整、准确。',
+  ].join('\n');
+  fs.writeFileSync(path.join(dir, 'albums', `${id}.json`), `${JSON.stringify({
+    id,
+    kind: 'magazine',
+    slug: 'quote-text',
+    hint: '纯文字，奶白底大引号金句卡。',
+    label: '纯文字金句卡',
+    copySchema: '每一项对象字段：\n- line：须准确上图的一句中文（非空）\n返回形状：{"frames":[{"line":"..."}]}',
+    legacyIds: [],
+    enabled: true,
+  }, null, 2)}\n`);
+  fs.writeFileSync(path.join(dir, 'albums', `${id}.md`), sheet);
+  fs.writeFileSync(path.join(dir, 'albums', `${id}.copy-sample.md`), '仅示例\n');
+  fs.writeFileSync(
+    path.join(dir, 'image-refs.md'),
+    [
+      '## template',
+      '',
+      '版式模板参考图，不是成稿。锁定底色。',
+      '',
+      '## logo',
+      '',
+      '品牌标识参考图。',
+    ].join('\n'),
+  );
+  clearAlbumCatalogCache(dir);
+
+  const parsed = parseScenesText(JSON.stringify({
+    scenes: ['同一句', '同一句'],
+  }), ['甲', '乙'], id, dir);
+  assert.deepEqual(parsed.scenes, [TEXT_ONLY_SCENE, TEXT_ONLY_SCENE]);
+  assert.equal(parsed.album, id);
+  const textOnlySheet = renderAlbumPrompt(dir, id, TEXT_ONLY_SCENE, { line: '甲' });
+  assert.doesNotMatch(textOnlySheet.prompt, /@template|【参考图】|第一张是|禁止人物/);
+  const samplePath = path.join(dir, 'samples', `${id}.jpg`);
+  fs.mkdirSync(path.dirname(samplePath), { recursive: true });
+  fs.writeFileSync(samplePath, Buffer.from([0xff, 0xd8, 0xff, 0xd9]));
+  clearAlbumCatalogCache(dir);
+  const withTemplate = composeImagePrompt(textOnlySheet.prompt, {
+    promptsDir: dir,
+    look: id,
+  });
+  assert.match(withTemplate.prompt, /第一张是版式模板参考图/);
+  assert.match(withTemplate.prompt, /禁止人物、物体、场景和概念插画/);
+  assert.doesNotMatch(withTemplate.prompt, /@template|@product|第二张/);
+  assert.match(formatImageRefsBlock(dir, [{ role: 'template', path: samplePath }]), /第一张是版式模板参考图/);
+  assert.equal(formatImageRefsBlock(dir, []), '');
+
+  const noDraw = '200000.magazine.no-draw';
+  fs.writeFileSync(path.join(dir, 'albums', `${noDraw}.json`), `${JSON.stringify({
+    id: noDraw,
+    kind: 'magazine',
+    slug: 'no-draw',
+    hint: '排版风，无插画，只换文案。',
+    label: '无插画排版',
+    copySchema: '每一项对象字段：\n- line：须准确上图的一句中文（非空）\n返回形状：{"frames":[{"line":"..."}]}',
+    legacyIds: [],
+    enabled: true,
+  }, null, 2)}\n`);
+  fs.writeFileSync(path.join(dir, 'albums', `${noDraw}.md`), sheet);
+  fs.writeFileSync(path.join(dir, 'albums', `${noDraw}.copy-sample.md`), '仅示例\n');
+  clearAlbumCatalogCache(dir);
+  const again = parseScenesText(JSON.stringify({
+    scenes: ['随便写', '再写一句'],
+  }), ['丙', '丁'], noDraw, dir);
+  assert.deepEqual(again.scenes, [TEXT_ONLY_SCENE, TEXT_ONLY_SCENE]);
+});
+
 test('成稿缺字段时不收下半截结果', () => {
   assert.throws(
     () => parseDraftText('{"title":"有标题","body":"有正文","topics":["一"]}'),
@@ -281,4 +381,50 @@ test('图册非法或文案为空时拼装失败', () => {
     () => renderAlbumPrompt(promptsDir, '000001.magazine.dazibao', '画着台阶', { line: '' }),
     /这一张的文案是空的/,
   );
+});
+
+test('assets 里序号≥100000 的用户册可迁到 runtime/albums', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'album-migrate-'));
+  const promptsDir = path.join(root, 'prompts');
+  const userAlbumsDir = path.join(root, 'runtime', 'albums');
+  fs.mkdirSync(path.join(promptsDir, 'albums'), { recursive: true });
+  fs.mkdirSync(path.join(promptsDir, 'samples'), { recursive: true });
+  const factoryId = '000001.magazine.keep';
+  const userId = '100099.magazine.migrated';
+  for (const id of [factoryId, userId]) {
+    fs.writeFileSync(path.join(promptsDir, 'albums', `${id}.json`), `${JSON.stringify({
+      id,
+      kind: 'magazine',
+      slug: id.split('.')[2],
+      hint: '迁',
+      label: '迁',
+      copySchema: '每一项对象字段：\n- line：一句\n返回形状：{"frames":[{"line":"..."}]}',
+      legacyIds: [],
+      enabled: true,
+    }, null, 2)}\n`);
+    fs.writeFileSync(path.join(promptsDir, 'albums', `${id}.md`), [
+      '竖版 3:4。',
+      '1. 背景：白', '2. 色彩：黑', '3. 字体：黑', '4. 字号：大', '5. 字重：粗',
+      '6. 文字排版：中', '7. 文字位置：中', '8. 构图布局：中', '9. 视觉风格：排',
+      '10. 光影与质感：平', '11. 系列统一规则：统一',
+      '12. 主题绘画内容：{{scene}}',
+      '',
+      '图片必须准确呈现的中文文案：',
+      '{{line}}',
+      '',
+      '文案必须完整、准确。',
+    ].join('\n'));
+    fs.writeFileSync(path.join(promptsDir, 'albums', `${id}.copy-sample.md`), '仅示例\n');
+  }
+  fs.writeFileSync(path.join(promptsDir, 'samples', `${userId}.jpg`), Buffer.from([0xff, 0xd8, 0xff, 0xd9]));
+  const moved = migrateUserAlbumsFromAssets(promptsDir, userAlbumsDir);
+  assert.deepEqual(moved, [userId]);
+  assert.ok(fs.existsSync(path.join(userAlbumsDir, `${userId}.json`)));
+  assert.ok(fs.existsSync(path.join(userAlbumsDir, 'samples', `${userId}.jpg`)));
+  assert.equal(fs.existsSync(path.join(promptsDir, 'albums', `${userId}.json`)), false);
+  assert.ok(fs.existsSync(path.join(promptsDir, 'albums', `${factoryId}.json`)));
+  clearAlbumCatalogCache(promptsDir, userAlbumsDir);
+  const listed = listAlbums(promptsDir, userAlbumsDir);
+  assert.ok(listed.includes(factoryId));
+  assert.ok(listed.includes(userId));
 });

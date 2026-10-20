@@ -152,7 +152,12 @@ function allocatePost(postsDir, date) {
  * @param {string} postsDir
  * @param {string} [promptsDir]
  */
-function importLegacy(postsDir, promptsDir) {
+/**
+ * @param {string} postsDir
+ * @param {string} [promptsDir]
+ * @param {string} [userAlbumsDir]
+ */
+function importLegacy(postsDir, promptsDir, userAlbumsDir) {
   const latestDir = path.join(path.dirname(postsDir), 'latest');
   if (path.resolve(latestDir) === path.resolve(postsDir)) return;
   const legacyFile = path.join(latestDir, 'draft.json');
@@ -162,7 +167,7 @@ function importLegacy(postsDir, promptsDir) {
   const id = uniqueId(postsDir, when);
   const dest = path.join(postsDir, id);
   fs.cpSync(latestDir, dest, { recursive: true });
-  const state = createStore(dest, { promptsDir }).read();
+  const state = createStore(dest, { promptsDir, userAlbumsDir }).read();
   const createdAt = when.toISOString();
   writeIndex(postsDir, {
     posts: [{
@@ -178,11 +183,12 @@ function importLegacy(postsDir, promptsDir) {
 /**
  * @param {string} postsDir
  * @param {string} [promptsDir]
+ * @param {string} [userAlbumsDir]
  * @returns {ListedPost[]}
  */
-function listPosts(postsDir, promptsDir) {
+function listPosts(postsDir, promptsDir, userAlbumsDir) {
   const posts = readIndex(postsDir).posts.map((item) => {
-    const state = createStore(path.join(postsDir, item.id), { promptsDir }).read();
+    const state = createStore(path.join(postsDir, item.id), { promptsDir, userAlbumsDir }).read();
     const draftTitle = state.draft && String(state.draft.title || '').trim();
     return {
       id: item.id,

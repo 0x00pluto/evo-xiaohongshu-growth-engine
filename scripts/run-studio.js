@@ -156,6 +156,8 @@ function createStudio(options) {
   return createRunner({
     postsDir: path.join(root, 'output', 'one-post', 'posts'),
     promptsDir: path.join(root, 'assets', 'prompts', 'one-post'),
+    userAlbumsDir: path.join(root, 'runtime', 'albums'),
+    userImageRefsDir: path.join(root, 'runtime', 'image-refs'),
     env,
     revealFile: options.revealFile || revealInFolder,
   });

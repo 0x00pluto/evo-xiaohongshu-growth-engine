@@ -18,6 +18,7 @@ const FIXED_PROMPT_FILES = new Set([
   'lines/contrast.md',
   'scenes.md',
   'tone.md',
+  'image-refs.md',
 ]);
 
 /**

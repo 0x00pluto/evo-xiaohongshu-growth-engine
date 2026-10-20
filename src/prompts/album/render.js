@@ -5,12 +5,15 @@
 const catalogModule = require('./catalog');
 /** @type {typeof import('./frame')} */
 const frameModule = require('./frame');
+/** @type {typeof import('./refs')} */
+const refsModule = require('./refs');
 /** @type {typeof import('../template')} */
 const templateModule = require('../template');
 
-const { ALBUM_KIND_SET, albumKind, albumLabel, albumPromptName, isAlbum } = catalogModule;
+const { ALBUM_KIND_SET, albumKind, albumLabel, isAlbum, readAlbumPromptText } = catalogModule;
 const { formatFlexibleBlock, formatModulesBlock, formatStepsBlock, frameDisplayLine } = frameModule;
-const { fillPrompt, readPromptFile } = templateModule;
+const { TEXT_ONLY_LOCK } = refsModule;
+const { fillPrompt } = templateModule;
 
 const SHEET_SLOTS = [
   '1. 背景',
@@ -83,24 +86,26 @@ function fillGenericVars(template, bag, display, picture) {
 }
 
 /**
+ * 只装填 12 槽题词；参考图说明与纯文字禁插画在发模型前由 composeImagePrompt 拼接。
  * @param {string} promptsDir
  * @param {unknown} album
  * @param {unknown} scene
  * @param {unknown} frame
+ * @param {string} [userAlbumsDir]
  * @returns {{ prompt: string; style: string }}
  */
-function renderAlbumPrompt(promptsDir, album, scene, frame) {
+function renderAlbumPrompt(promptsDir, album, scene, frame, userAlbumsDir) {
   const picture = typeof scene === 'string' ? scene.trim() : '';
   if (!picture) throw new Error('这一张的画面是空的');
-  if (!isAlbum(album, promptsDir)) throw new Error('图册不在允许列表');
+  if (!isAlbum(album, promptsDir, userAlbumsDir)) throw new Error('图册不在允许列表');
   if (!frame || typeof frame !== 'object' || Array.isArray(frame)) {
     throw new Error('这一张的文案是空的');
   }
   const copy = /** @type {import('./frame').CopyFrame} */ (frame);
-  const display = frameDisplayLine(album, copy, promptsDir);
+  const display = frameDisplayLine(album, copy, promptsDir, userAlbumsDir);
   if (!display) throw new Error('这一张的文案是空的');
-  const kind = albumKind(album, promptsDir);
-  const template = readPromptFile(promptsDir, albumPromptName(album, promptsDir));
+  const kind = albumKind(album, promptsDir, userAlbumsDir);
+  const template = readAlbumPromptText(promptsDir, album, userAlbumsDir);
 
   /** @type {import('../template').PromptVars} */
   let vars = { scene: picture };
@@ -169,12 +174,13 @@ function renderAlbumPrompt(promptsDir, album, scene, frame) {
   }
   return {
     prompt,
-    style: albumLabel(album, promptsDir),
+    style: albumLabel(album, promptsDir, userAlbumsDir),
   };
 }
 
 module.exports = {
   SHEET_SLOTS,
+  TEXT_ONLY_LOCK,
   extractPlaceholders,
   fillGenericVars,
   renderAlbumPrompt,

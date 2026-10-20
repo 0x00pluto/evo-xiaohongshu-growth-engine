@@ -9,12 +9,27 @@ const catalogModule = require('./album/catalog');
 const frameModule = require('./album/frame');
 
 const { validateDraftFace, normalizeFace } = validateModule;
-const { albumKind, isAlbum } = catalogModule;
+const { albumHint, albumKind, isAlbum } = catalogModule;
 const { frameDisplayLine, normalizeFrame } = frameModule;
+
+/** 与 scenes.md 纯文字图册固定空指令一字不差 */
+const TEXT_ONLY_SCENE = '无主题插画，仅纸面与固定装饰。';
 
 /**
  * @typedef {{ album: string; scenes: string[] }} ScenesResult
  */
+
+/**
+ * @param {unknown} album
+ * @param {string} promptsDir
+ * @param {string} [userAlbumsDir]
+ * @returns {boolean}
+ */
+function isTextOnlyAlbum(album, promptsDir, userAlbumsDir) {
+  if (!isAlbum(album, promptsDir, userAlbumsDir)) return false;
+  const hint = albumHint(promptsDir, album, userAlbumsDir);
+  return hint.startsWith('纯文字') || hint.includes('无插画');
+}
 
 /**
  * @param {unknown} text
@@ -71,10 +86,11 @@ function lastBodyLine(body) {
  * @param {unknown} displayLines
  * @param {unknown} album
  * @param {string} promptsDir
+ * @param {string} [userAlbumsDir]
  * @returns {ScenesResult}
  */
-function parseScenesText(text, displayLines, album, promptsDir) {
-  if (!isAlbum(album, promptsDir)) throw new Error('图册不在允许列表');
+function parseScenesText(text, displayLines, album, promptsDir, userAlbumsDir) {
+  if (!isAlbum(album, promptsDir, userAlbumsDir)) throw new Error('图册不在允许列表');
   const data = parseJsonObject(text);
   const expected = Array.isArray(displayLines)
     ? displayLines.map((item) => String(item).trim())
@@ -85,6 +101,12 @@ function parseScenesText(text, displayLines, album, promptsDir) {
   }
   const scenes = data.scenes.map((item) => (typeof item === 'string' ? item.trim() : ''));
   if (scenes.some((item) => !item)) throw new Error('这一张的画面是空的');
+  if (isTextOnlyAlbum(album, promptsDir, userAlbumsDir)) {
+    return {
+      album,
+      scenes: expected.map(() => TEXT_ONLY_SCENE),
+    };
+  }
   const seen = new Set();
   for (let index = 0; index < scenes.length; index += 1) {
     if (scenes[index] === expected[index]) throw new Error('这一张的画面不能只是文案');
@@ -100,17 +122,18 @@ function parseScenesText(text, displayLines, album, promptsDir) {
  * @param {unknown} body
  * @param {unknown} album
  * @param {string} promptsDir
+ * @param {string} [userAlbumsDir='']
  * @returns {import('./album/frame').CopyFrame[]}
  */
-function parsePlanText(text, galleryCount, body, album, promptsDir) {
-  if (!isAlbum(album, promptsDir)) throw new Error('图册不在允许列表');
+function parsePlanText(text, galleryCount, body, album, promptsDir, userAlbumsDir = '') {
+  if (!isAlbum(album, promptsDir, userAlbumsDir)) throw new Error('图册不在允许列表');
   const data = parseJsonObject(text);
   const count = galleryCount + 1;
   const lengthError = `策划句子应为 ${count} 条`;
 
   /** @type {unknown[]} */
   let rawFrames;
-  const kind = albumKind(album, promptsDir);
+  const kind = albumKind(album, promptsDir, userAlbumsDir);
   if (Array.isArray(data.frames)) {
     rawFrames = data.frames;
   } else if (
@@ -126,8 +149,8 @@ function parsePlanText(text, galleryCount, body, album, promptsDir) {
   }
 
   if (rawFrames.length !== count) throw new Error(lengthError);
-  const frames = rawFrames.map((item) => normalizeFrame(item, album, promptsDir));
-  const displays = frames.map((frame) => frameDisplayLine(album, frame, promptsDir));
+  const frames = rawFrames.map((item) => normalizeFrame(item, album, promptsDir, userAlbumsDir));
+  const displays = frames.map((frame) => frameDisplayLine(album, frame, promptsDir, userAlbumsDir));
   if (displays.some((item) => !item)) throw new Error('策划那一句是空的');
   const seen = new Set();
   for (const line of displays) {
@@ -142,6 +165,8 @@ function parsePlanText(text, galleryCount, body, album, promptsDir) {
 }
 
 module.exports = {
+  TEXT_ONLY_SCENE,
+  isTextOnlyAlbum,
   parseDraftText,
   parseJsonObject,
   parsePlanText,

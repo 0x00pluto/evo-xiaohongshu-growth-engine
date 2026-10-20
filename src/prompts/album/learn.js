@@ -249,21 +249,34 @@ function parseLearnResult(raw) {
 }
 
 /**
- * 只在用户带（>= 100000）里取下一个序号；出厂号不参与递增。
- * @param {string} promptsDir
+ * @param {string} dir
+ * @param {number} maxUser
  * @returns {number}
  */
-function nextAlbumSequence(promptsDir) {
-  const albumsDir = path.join(promptsDir, 'albums');
-  let maxUser = USER_ALBUM_SEQ_START - 1;
-  if (fs.existsSync(albumsDir)) {
-    for (const name of fs.readdirSync(albumsDir)) {
-      if (!name.endsWith('.json')) continue;
-      const seq = Number(name.slice(0, 6));
-      if (Number.isInteger(seq) && seq >= USER_ALBUM_SEQ_START && seq > maxUser) {
-        maxUser = seq;
-      }
+function maxSeqInDir(dir, maxUser) {
+  let max = maxUser;
+  if (!fs.existsSync(dir)) return max;
+  for (const name of fs.readdirSync(dir)) {
+    if (!name.endsWith('.json')) continue;
+    const seq = Number(name.slice(0, 6));
+    if (Number.isInteger(seq) && seq >= USER_ALBUM_SEQ_START && seq > max) {
+      max = seq;
     }
+  }
+  return max;
+}
+
+/**
+ * 只在用户带（>= 100000）里取下一个序号；出厂号不参与递增。
+ * @param {string} promptsDir
+ * @param {string} [userAlbumsDir]
+ * @returns {number}
+ */
+function nextAlbumSequence(promptsDir, userAlbumsDir) {
+  let maxUser = USER_ALBUM_SEQ_START - 1;
+  maxUser = maxSeqInDir(path.join(promptsDir, 'albums'), maxUser);
+  if (typeof userAlbumsDir === 'string' && userAlbumsDir.trim()) {
+    maxUser = maxSeqInDir(path.resolve(userAlbumsDir.trim()), maxUser);
   }
   return maxUser + 1;
 }
@@ -271,14 +284,21 @@ function nextAlbumSequence(promptsDir) {
 /**
  * @param {string} promptsDir
  * @param {{ kind: string; slug: string }} parts
+ * @param {string} [userAlbumsDir]
  * @returns {string}
  */
-function allocateAlbumId(promptsDir, parts) {
-  let seq = nextAlbumSequence(promptsDir);
+function allocateAlbumId(promptsDir, parts, userAlbumsDir) {
+  let seq = nextAlbumSequence(promptsDir, userAlbumsDir);
+  const userRoot = typeof userAlbumsDir === 'string' && userAlbumsDir.trim()
+    ? path.resolve(userAlbumsDir.trim())
+    : '';
   for (let attempt = 0; attempt < 20; attempt += 1) {
     const id = `${String(seq).padStart(6, '0')}.${parts.kind}.${parts.slug}`;
-    const jsonPath = path.join(promptsDir, 'albums', `${id}.json`);
-    if (!fs.existsSync(jsonPath)) return id;
+    const factoryPath = path.join(promptsDir, 'albums', `${id}.json`);
+    const userPath = userRoot ? path.join(userRoot, `${id}.json`) : '';
+    if (!fs.existsSync(factoryPath) && (!userPath || !fs.existsSync(userPath))) {
+      return id;
+    }
     seq += 1;
   }
   throw new Error('图册 id 已存在，请再试一次');
@@ -289,11 +309,12 @@ function allocateAlbumId(promptsDir, parts) {
  * @param {unknown} learnRaw
  * @param {{ bytes: Buffer; ext: string; mime: string; dataUrl: string }} image
  * @param {string} draftId
+ * @param {string} [userAlbumsDir]
  * @returns {AlbumDraft}
  */
-function buildAlbumDraft(promptsDir, learnRaw, image, draftId) {
+function buildAlbumDraft(promptsDir, learnRaw, image, draftId, userAlbumsDir) {
   const parsed = parseLearnResult(learnRaw);
-  const id = allocateAlbumId(promptsDir, parsed);
+  const id = allocateAlbumId(promptsDir, parsed, userAlbumsDir);
   return {
     draftId,
     id,
