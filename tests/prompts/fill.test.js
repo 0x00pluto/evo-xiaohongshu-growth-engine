@@ -102,7 +102,16 @@ test('成稿和图册提示词能装填，长提示词不在 src 里', () => {
   assert.match(renderAlbumPrompt(promptsDir, '000002.scrapbook.handnote', '便签旁一支笔', { line: '记一句', note: '圈一下' }).prompt, /#C45C6A/);
   assert.match(renderAlbumPrompt(promptsDir, '000004.card.knowledge', '模块箭头', { mainTitle: '先装命令', point: '再装插件' }).prompt, /#FFF8F0/);
   assert.match(renderAlbumPrompt(promptsDir, '000004.card.knowledge', '模块箭头', { mainTitle: '先装命令', point: '再装插件' }).prompt, /#FF4D00/);
-  for (const album of ALBUMS) {
+  // 只断言出厂五本；本机可能另有 100000+ 用户册，文案不必含「仅示例」
+  const factoryAlbums = [
+    '000001.magazine.dazibao',
+    '000002.scrapbook.handnote',
+    '000003.conceptual.viewpoint',
+    '000004.card.knowledge',
+    '000005.infographic.modules',
+  ];
+  for (const album of factoryAlbums) {
+    assert.ok(ALBUMS.includes(album), `缺出厂图册 ${album}`);
     const schema = copySchema(album, promptsDir);
     assert.match(schema, /仅示例/);
     assert.match(schema, /禁止照抄/);

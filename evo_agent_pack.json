@@ -2,7 +2,7 @@
   "schema_version": 1,
   "name": "evo-xiaohongshu-growth-engine",
   "dirname": "0007-小红书增长引擎",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "origin": "https://github.com/0x00pluto/evo-xiaohongshu-growth-engine.git",
   "dependencies": {}
 }
