@@ -44,8 +44,7 @@ function sheetPrompt() {
     '8. 构图布局：偏',
     '9. 视觉风格：测',
     '10. 光影与质感：平',
-    '11. 系列统一规则：统一',
-    '12. 主题绘画内容：{{scene}}',
+    '11. 主题绘画内容：{{scene}}',
     '',
     '图片必须准确呈现的中文文案：',
     '{{line}}',
@@ -103,7 +102,7 @@ function seedFactoryAlbums(dir) {
         '竖版 3:4，测。',
         '1. 背景：白', '2. 色彩：黑', '3. 字体：黑', '4. 字号：大', '5. 字重：粗',
         '6. 文字排版：短', '7. 文字位置：中', '8. 构图布局：偏', '9. 视觉风格：测', '10. 光影与质感：平',
-        '11. 系列统一规则：统一', '12. 主题绘画内容：{{scene}}',
+ '11. 主题绘画内容：{{scene}}',
         '', '本次主题内容：', '{{theme}}', '', '主标题：', '{{mainTitle}}', '', '副标题：', '{{subTitle}}',
         '', '文案必须完整、准确。',
       ].join('\n');
@@ -113,7 +112,7 @@ function seedFactoryAlbums(dir) {
         '竖版 3:4，测。',
         '1. 背景：白', '2. 色彩：黑', '3. 字体：黑', '4. 字号：大', '5. 字重：粗',
         '6. 文字排版：短', '7. 文字位置：中', '8. 构图布局：偏', '9. 视觉风格：测', '10. 光影与质感：平',
-        '11. 系列统一规则：统一', '12. 主题绘画内容：{{scene}}',
+ '11. 主题绘画内容：{{scene}}',
         '', '主标题：', '{{mainTitle}}', '', '底部要点：', '{{point}}',
         '', '文案必须完整、准确。',
       ].join('\n');
@@ -123,7 +122,7 @@ function seedFactoryAlbums(dir) {
         '竖版 3:4，测。',
         '1. 背景：白', '2. 色彩：黑', '3. 字体：黑', '4. 字号：大', '5. 字重：粗',
         '6. 文字排版：短', '7. 文字位置：中', '8. 构图布局：偏', '9. 视觉风格：测', '10. 光影与质感：平',
-        '11. 系列统一规则：统一', '12. 主题绘画内容：{{scene}}',
+ '11. 主题绘画内容：{{scene}}',
         '', '栏目标签：', '{{seriesLabel}}', '', '本次主题内容：', '{{theme}}',
         '', '主标题：', '{{mainTitle}}', '', '副标题：', '{{subTitle}}',
         '', '{{modulesBlock}}', '', '{{stepsBlock}}',
@@ -142,6 +141,7 @@ function seedFactoryAlbums(dir) {
       copySchema,
       legacyIds: [],
       enabled: true,
+      promptSheetVersion: 2,
       ...(kind === 'infographic' ? {
         constraints: { modules: { min: 2, max: 6 }, steps: { min: 3, max: 7 } },
       } : {}),
@@ -245,7 +245,7 @@ test('新 kind 通用槽能 normalizeFrame 与 renderAlbumPrompt', () => {
   const frame = normalizeFrame({ line: '这一句上图' }, draft.id, dir, userDir);
   assert.equal(frame.line, '这一句上图');
   const rendered = renderAlbumPrompt(dir, draft.id, '画面里有一块几何色块', frame, userDir);
-  assert.match(rendered.prompt, /12\. 主题绘画内容/);
+  assert.match(rendered.prompt, /11\. 主题绘画内容/);
   assert.match(rendered.prompt, /这一句上图/);
   assert.match(rendered.prompt, /画面里有一块几何色块/);
   assert.doesNotMatch(rendered.prompt, /【参考图】|第一张是|@template|禁止人物/);
@@ -271,8 +271,7 @@ test('新 kind 含 modulesBlock 能装填；未知 fooBlock 不拦', () => {
     '竖版 3:4，峰会海报。',
     '1. 背景：白', '2. 色彩：黑', '3. 字体：黑', '4. 字号：大', '5. 字重：粗',
     '6. 文字排版：左', '7. 文字位置：左', '8. 构图布局：分栏', '9. 视觉风格：商务',
-    '10. 光影与质感：平', '11. 系列统一规则：统一',
-    '12. 主题绘画内容：{{scene}}',
+    '10. 光影与质感：平',    '11. 主题绘画内容：{{scene}}',
     '',
     '图片必须准确呈现的中文文案：',
     '标签：{{kicker}}',
@@ -369,4 +368,65 @@ test('runner 学习写入删除：失败零落盘；出厂拒绝', async () => {
   const deleted = runner.deleteAlbum({ id: committed.id });
   assert.equal(deleted.ok, true);
   assert.equal(fs.existsSync(path.join(userAlbumsDir, `${committed.id}.json`)), false);
+});
+
+test('commit 可带改过的题词；用户册可 update；出厂拒绝', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'album-prompt-edit-'));
+  const postsDir = path.join(dir, 'posts');
+  const promptsDir = path.join(dir, 'prompts');
+  const userAlbumsDir = path.join(dir, 'runtime', 'albums');
+  seedFactoryAlbums(promptsDir);
+  fs.mkdirSync(postsDir, { recursive: true });
+
+  const runner = createRunner({
+    postsDir,
+    promptsDir,
+    userAlbumsDir,
+    env: { DEEPSEEK_API_KEY: 'k' },
+    completeVision: async () => JSON.stringify(learnPayload({
+      slug: 'edit-me',
+      promptMd: sheetPrompt().replace('2. 色彩：黑', '2. 色彩：主文字 #112233'),
+    })),
+  });
+
+  const learned = await runner.learnAlbum({
+    dataUrl: `data:image/jpeg;base64,${JPEG_BYTES.toString('base64')}`,
+  });
+  assert.equal(learned.ok, true);
+  const edited = String(learned.draft.promptTemplate).replace('#112233', '#AABBCC');
+  const committed = runner.commitAlbum({
+    draftId: learned.draft.draftId,
+    promptTemplate: edited,
+  });
+  assert.equal(committed.ok, true);
+  const mdPath = path.join(userAlbumsDir, `${committed.id}.md`);
+  assert.match(fs.readFileSync(mdPath, 'utf8'), /#AABBCC/);
+  assert.doesNotMatch(fs.readFileSync(mdPath, 'utf8'), /#112233/);
+  assert.doesNotMatch(fs.readFileSync(mdPath, 'utf8'), /系列统一规则/);
+  const meta = JSON.parse(fs.readFileSync(path.join(userAlbumsDir, `${committed.id}.json`), 'utf8'));
+  assert.equal(meta.promptSheetVersion, 2);
+
+  const detail = runner.getAlbumDetail({ id: committed.id });
+  assert.equal(detail.ok, true);
+  assert.equal(detail.editable, true);
+  assert.equal(detail.promptSheetVersion, 2);
+
+  const updatedText = edited.replace('#AABBCC', '#00FF00');
+  const updated = runner.updateAlbumPrompt({
+    id: committed.id,
+    promptTemplate: updatedText,
+  });
+  assert.equal(updated.ok, true);
+  assert.match(fs.readFileSync(mdPath, 'utf8'), /#00FF00/);
+
+  const refuseFactory = runner.updateAlbumPrompt({
+    id: '000001.magazine.seed',
+    promptTemplate: sheetPrompt(),
+  });
+  assert.equal(refuseFactory.ok, false);
+  assert.match(refuseFactory.message || '', /出厂/);
+
+  const factoryDetail = runner.getAlbumDetail({ id: '000001.magazine.seed' });
+  assert.equal(factoryDetail.ok, true);
+  assert.equal(factoryDetail.editable, false);
 });

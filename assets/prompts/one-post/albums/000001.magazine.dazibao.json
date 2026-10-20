@@ -5,6 +5,9 @@
   "hint": "杂志编辑风，高辨识度大字报，概念插画",
   "label": "杂志编辑风，高辨识度大字报，概念插画",
   "copySchema": "大字报一行。每一项对象字段：\n- line：须准确上图的一句中文（非空）\n返回形状：{\"frames\":[{\"line\":\"...\"},{\"line\":\"...\"}]}",
-  "legacyIds": ["magazine"],
-  "enabled": true
+  "legacyIds": [
+    "magazine"
+  ],
+  "enabled": true,
+  "promptSheetVersion": 2
 }

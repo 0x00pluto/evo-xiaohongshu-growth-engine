@@ -23,6 +23,8 @@ const {
   albumHint,
   albumSampleFile,
   albumSamplePath,
+  assertPromptPlaceholders,
+  assertPromptSheet,
   assignContrastSlots,
   assignGalleryRoles,
   assignStoryRoles,
@@ -53,6 +55,7 @@ const {
   readPromptFile,
   renderAlbumPrompt,
   storyPromptName,
+  updateAlbumPromptMd,
 } = fillModule;
 const { createStore, emptyState, nextImageFile } = storeModule;
 const {
@@ -833,6 +836,20 @@ function createRunner(options) {
   }
 
   /**
+   * @param {string} promptMd
+   * @param {string} kind
+   * @param {string} schema
+   * @returns {string}
+   */
+  function validatedPromptTemplate(promptMd, kind, schema) {
+    const text = String(promptMd || '').trim();
+    if (!text) throw new Error('绘图题词是空的');
+    assertPromptSheet(text);
+    assertPromptPlaceholders(kind, text, schema);
+    return text;
+  }
+
+  /**
    * @param {Record<string, unknown>} payload
    */
   function commitAlbum(payload) {
@@ -845,11 +862,51 @@ function createRunner(options) {
       return { ok: false, message: '草稿已过期，请重新学习' };
     }
     try {
+      if (typeof source.promptTemplate === 'string') {
+        albumDraft.promptMd = validatedPromptTemplate(
+          source.promptTemplate,
+          albumDraft.kind,
+          albumDraft.copySchema,
+        );
+      }
       const result = commitAlbumDraft(userAlbumsDir, albumDraft, promptsDir);
       albumDraft = null;
       return { ok: true, id: result.id };
     } catch (err) {
       return { ok: false, message: err instanceof Error ? err.message : '写入失败' };
+    }
+  }
+
+  /**
+   * @param {Record<string, unknown>} payload
+   */
+  function updateAlbumPrompt(payload) {
+    if (lock) return busy();
+    if (!userAlbumsDir) return { ok: false, message: '缺少用户图册目录' };
+    const source = payload && typeof payload === 'object' ? payload : {};
+    const id = typeof source.id === 'string' ? source.id.trim() : '';
+    if (!id) return { ok: false, message: '要指明图册' };
+    if (isBuiltinAlbum(id)) return { ok: false, message: '出厂图册不能修改' };
+    if (!isAlbum(id, promptsDir, userAlbumsDir)) {
+      return { ok: false, message: '图册不在允许列表' };
+    }
+    if (albumBusy(id)) {
+      return { ok: false, message: '这本图册正在用于生成，请等这一轮结束' };
+    }
+    try {
+      const meta = loadAlbumCatalog(promptsDir, userAlbumsDir).get(id);
+      if (meta.source !== 'user') {
+        return { ok: false, message: '出厂图册不能修改' };
+      }
+      const promptMd = validatedPromptTemplate(
+        typeof source.promptTemplate === 'string' ? source.promptTemplate : '',
+        meta.kind,
+        meta.copySchema,
+      );
+      updateAlbumPromptMd(promptsDir, userAlbumsDir, id, promptMd);
+      return { ok: true, id };
+    } catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : '保存失败' };
     }
   }
 
@@ -917,7 +974,9 @@ function createRunner(options) {
       id: meta.id,
       label: meta.label,
       hint: meta.hint,
+      editable: meta.source === 'user',
       hasSample: fs.existsSync(albumSampleFile(promptsDir, id, userAlbumsDir)),
+      promptSheetVersion: meta.promptSheetVersion,
       promptTemplate,
     };
   }
@@ -1084,6 +1143,7 @@ function createRunner(options) {
     retryImage,
     saveEditor,
     startNew,
+    updateAlbumPrompt,
   };
 }
 

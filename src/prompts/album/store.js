@@ -8,6 +8,8 @@ const path = require('node:path');
 const catalogModule = require('./catalog');
 /** @type {typeof import('./learn')} */
 const learnModule = require('./learn');
+/** @type {typeof import('./sheet')} */
+const sheetModule = require('./sheet');
 
 const {
   USER_ALBUM_SEQ_START,
@@ -17,7 +19,8 @@ const {
   isBuiltinAlbum,
   loadAlbumCatalog,
 } = catalogModule;
-const { isBuiltinAlbumId } = learnModule;
+const { assertPromptPlaceholders, assertPromptSheet, isBuiltinAlbumId } = learnModule;
+const { PROMPT_SHEET_VERSION } = sheetModule;
 
 /**
  * @typedef {import('./learn').AlbumDraft} AlbumDraft
@@ -155,6 +158,7 @@ function commitAlbumDraft(userAlbumsDir, draft, promptsDir) {
       copySchema: draft.copySchema,
       legacyIds: [],
       enabled: true,
+      promptSheetVersion: PROMPT_SHEET_VERSION,
     };
     fs.writeFileSync(jsonPath, `${JSON.stringify(meta, null, 2)}\n`, 'utf8');
     written.push(jsonPath);
@@ -218,8 +222,48 @@ function deleteAlbumFiles(promptsDir, userAlbumsDir, id) {
   clearAlbumCatalogCache(promptsDir, userAlbumsDir);
 }
 
+/**
+ * 覆盖用户图册绘图题词（仅 runtime 用户册）。
+ * @param {string} promptsDir
+ * @param {string} userAlbumsDir
+ * @param {string} id
+ * @param {string} promptMd
+ * @returns {{ id: string }}
+ */
+function updateAlbumPromptMd(promptsDir, userAlbumsDir, id, promptMd) {
+  const albumId = String(id || '').trim();
+  if (!albumId) throw new Error('要指明图册');
+  if (isBuiltinAlbum(albumId) || isBuiltinAlbumId(albumId)) {
+    throw new Error('出厂图册不能修改');
+  }
+  if (!isAlbum(albumId, promptsDir, userAlbumsDir)) {
+    throw new Error('图册不在允许列表');
+  }
+  const meta = loadAlbumCatalog(promptsDir, userAlbumsDir).get(albumId);
+  if (meta.source !== 'user') {
+    throw new Error('出厂图册不能修改');
+  }
+  const text = String(promptMd || '').trim();
+  if (!text) throw new Error('绘图题词是空的');
+  assertPromptSheet(text);
+  assertPromptPlaceholders(meta.kind, text, meta.copySchema);
+  if (meta.promptSheetVersion !== PROMPT_SHEET_VERSION) {
+    throw new Error(
+      `图册题词结构是 v${meta.promptSheetVersion}，当前只支持 v${PROMPT_SHEET_VERSION}；请重新学习或改 JSON 的 promptSheetVersion`,
+    );
+  }
+  const mdPath = path.join(meta.home, `${albumId}.md`);
+  if (!fs.existsSync(mdPath)) {
+    throw new Error(`找不到图册题词 ${albumId}.md`);
+  }
+  fs.writeFileSync(mdPath, `${text}\n`, 'utf8');
+  clearAlbumCatalogCache(promptsDir, userAlbumsDir);
+  return { id: albumId };
+}
+
 module.exports = {
   commitAlbumDraft,
   deleteAlbumFiles,
   migrateUserAlbumsFromAssets,
+  updateAlbumPromptMd,
 };

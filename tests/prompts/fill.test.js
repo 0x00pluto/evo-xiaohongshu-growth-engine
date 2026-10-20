@@ -25,6 +25,7 @@ const {
   listAlbums,
   migrateAlbumId,
   migrateUserAlbumsFromAssets,
+  normalizeFrame,
   parseDraftText,
   parsePlanText,
   parseScenesText,
@@ -92,8 +93,8 @@ test('成稿和图册提示词能装填，长提示词不在 src 里', () => {
   assert.match(sheet.prompt, /#F2F0E6/);
   assert.match(sheet.prompt, /#2B2B2B/);
   assert.match(sheet.prompt, /#E4572E/);
-  assert.match(sheet.prompt, /11\. 系列统一规则/);
-  assert.match(sheet.prompt, /12\. 主题绘画内容：一个人站在只占画面一角的几何台阶上/);
+  assert.match(sheet.prompt, /11\. 主题绘画内容/);
+  assert.match(sheet.prompt, /11\. 主题绘画内容：一个人站在只占画面一角的几何台阶上/);
   assert.match(sheet.prompt, /图片必须准确呈现的中文文案：\n分这一句/);
   assert.doesNotMatch(sheet.prompt, /@template|【参考图】|第一张是/);
   assert.doesNotMatch(sheet.prompt, /禁止人物、物体、场景和概念插画/);
@@ -107,7 +108,8 @@ test('成稿和图册提示词能装填，长提示词不在 src 里', () => {
   assert.equal(composed.references.length, 1);
   assert.equal(composed.references[0].role, 'template');
   assert.doesNotMatch(sheet.prompt, /本次主题内容/);
-  assert.ok(sheet.prompt.indexOf('11. 系列统一规则') < sheet.prompt.indexOf('12. 主题绘画内容'));
+  assert.ok(sheet.prompt.includes('11. 主题绘画内容'));
+  assert.ok(!sheet.prompt.includes('系列统一规则'));
   assert.equal(sheet.style.includes('杂志编辑风'), true);
   assert.match(conceptual.prompt, /#E8EEF2/);
   assert.match(conceptual.prompt, /#3D8BFF/);
@@ -278,8 +280,7 @@ test('纯文字图册允许相同画面句，并收成固定空指令', () => {
     '竖版 3:4，纯文字金句卡。',
     '1. 背景：白', '2. 色彩：黑', '3. 字体：黑', '4. 字号：大', '5. 字重：粗',
     '6. 文字排版：中', '7. 文字位置：中', '8. 构图布局：居中', '9. 视觉风格：排版',
-    '10. 光影与质感：平', '11. 系列统一规则：统一',
-    '12. 主题绘画内容：{{scene}}',
+    '10. 光影与质感：平',    '11. 主题绘画内容：{{scene}}',
     '',
     '图片必须准确呈现的中文文案：',
     '{{line}}',
@@ -295,6 +296,7 @@ test('纯文字图册允许相同画面句，并收成固定空指令', () => {
     copySchema: '每一项对象字段：\n- line：须准确上图的一句中文（非空）\n返回形状：{"frames":[{"line":"..."}]}',
     legacyIds: [],
     enabled: true,
+      promptSheetVersion: 2,
   }, null, 2)}\n`);
   fs.writeFileSync(path.join(dir, 'albums', `${id}.md`), sheet);
   fs.writeFileSync(path.join(dir, 'albums', `${id}.copy-sample.md`), '仅示例\n');
@@ -343,6 +345,7 @@ test('纯文字图册允许相同画面句，并收成固定空指令', () => {
     copySchema: '每一项对象字段：\n- line：须准确上图的一句中文（非空）\n返回形状：{"frames":[{"line":"..."}]}',
     legacyIds: [],
     enabled: true,
+      promptSheetVersion: 2,
   }, null, 2)}\n`);
   fs.writeFileSync(path.join(dir, 'albums', `${noDraw}.md`), sheet);
   fs.writeFileSync(path.join(dir, 'albums', `${noDraw}.copy-sample.md`), '仅示例\n');
@@ -383,6 +386,112 @@ test('图册非法或文案为空时拼装失败', () => {
   );
 });
 
+test('magazine 题词多占位符时按模板装填，不因 kind 丢字段', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'album-mag-extra-'));
+  const id = '100050.magazine.foreign-like';
+  fs.mkdirSync(path.join(dir, 'albums'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'albums', `${id}.json`), `${JSON.stringify({
+    id,
+    kind: 'magazine',
+    slug: 'foreign-like',
+    hint: '外刊形多字段',
+    label: '外刊形',
+    copySchema: [
+      '每一项对象字段：',
+      '- line：中文大标题（非空）',
+      '- kicker：英文小标题，可空',
+      '- bodyEn：英文正文，可空',
+      '- bodyCn：中文正文，可空',
+      '- credit：署名，可空',
+      '返回形状：{"frames":[{"line":"...","kicker":"...","bodyEn":"...","bodyCn":"...","credit":"..."}]}',
+    ].join('\n'),
+    legacyIds: [],
+    enabled: true,
+    promptSheetVersion: 2,
+  }, null, 2)}\n`);
+  fs.writeFileSync(path.join(dir, 'albums', `${id}.md`), [
+    '竖版 3:4。外刊形。',
+    '1. 背景：白', '2. 色彩：黑', '3. 字体：宋', '4. 字号：大', '5. 字重：粗',
+    '6. 文字排版：中', '7. 文字位置：中', '8. 构图布局：中', '9. 视觉风格：刊',
+    '10. 光影与质感：平',
+    '11. 主题绘画内容：{{scene}}',
+    '',
+    '图片必须准确呈现的中文文案：',
+    '{{line}}',
+    '',
+    '英文小标题：',
+    '{{kicker}}',
+    '',
+    '英文正文：',
+    '{{bodyEn}}',
+    '',
+    '中文正文：',
+    '{{bodyCn}}',
+    '',
+    '署名：',
+    '{{credit}}',
+    '',
+    '文案必须完整、准确。',
+  ].join('\n'));
+  fs.writeFileSync(path.join(dir, 'albums', `${id}.copy-sample.md`), '仅示例\n');
+  clearAlbumCatalogCache(dir);
+
+  const filled = renderAlbumPrompt(dir, id, '上方插画一座城', {
+    line: '一个人加AI就能干完',
+    kicker: 'AI ISSUE.',
+    bodyEn: 'A short English body.',
+    bodyCn: '一段中文正文。',
+    credit: '@demo',
+  });
+  assert.match(filled.prompt, /一个人加AI就能干完/);
+  assert.match(filled.prompt, /AI ISSUE\./);
+  assert.match(filled.prompt, /A short English body\./);
+  assert.match(filled.prompt, /一段中文正文。/);
+  assert.match(filled.prompt, /@demo/);
+  assert.match(filled.prompt, /上方插画一座城/);
+
+  const sparse = renderAlbumPrompt(dir, id, '上方插画一座城', {
+    line: '只有标题',
+  });
+  assert.match(sparse.prompt, /只有标题/);
+  assert.doesNotMatch(sparse.prompt, /\{\{kicker\}\}/);
+  assert.ok(sparse.prompt.includes('英文小标题：\n\n'));
+
+  const planned = parsePlanText(JSON.stringify({
+    frames: [{
+      line: '以前做视频|得凑齐一个队',
+      kicker: 'SOLO ISSUE.',
+      bodyEn: 'One person plus AI.',
+      bodyCn: '一个人加AI。',
+      credit: '@studio',
+    }],
+  }), 0, '正文结尾别抄', id, dir);
+  assert.equal(planned.length, 1);
+  assert.equal(planned[0].line, '以前做视频|得凑齐一个队');
+  assert.equal(planned[0].kicker, 'SOLO ISSUE.');
+  assert.equal(planned[0].bodyEn, 'One person plus AI.');
+  assert.equal(planned[0].bodyCn, '一个人加AI。');
+  assert.equal(planned[0].credit, '@studio');
+
+  const kept = normalizeFrame({
+    line: '标题',
+    kicker: 'K.',
+    bodyEn: 'En',
+    bodyCn: '中',
+    credit: '@c',
+    extraShouldDrop: 'nope',
+  }, id, dir);
+  assert.equal(kept.kicker, 'K.');
+  assert.equal(kept.credit, '@c');
+  assert.equal(/** @type {Record<string, unknown>} */ (kept).extraShouldDrop, undefined);
+
+  const roundtrip = renderAlbumPrompt(dir, id, '上方插画一座城', planned[0]);
+  assert.match(roundtrip.prompt, /SOLO ISSUE\./);
+  assert.match(roundtrip.prompt, /One person plus AI\./);
+  assert.match(roundtrip.prompt, /一个人加AI。/);
+  assert.match(roundtrip.prompt, /@studio/);
+});
+
 test('assets 里序号≥100000 的用户册可迁到 runtime/albums', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'album-migrate-'));
   const promptsDir = path.join(root, 'prompts');
@@ -401,13 +510,13 @@ test('assets 里序号≥100000 的用户册可迁到 runtime/albums', () => {
       copySchema: '每一项对象字段：\n- line：一句\n返回形状：{"frames":[{"line":"..."}]}',
       legacyIds: [],
       enabled: true,
+      promptSheetVersion: 2,
     }, null, 2)}\n`);
     fs.writeFileSync(path.join(promptsDir, 'albums', `${id}.md`), [
       '竖版 3:4。',
       '1. 背景：白', '2. 色彩：黑', '3. 字体：黑', '4. 字号：大', '5. 字重：粗',
       '6. 文字排版：中', '7. 文字位置：中', '8. 构图布局：中', '9. 视觉风格：排',
-      '10. 光影与质感：平', '11. 系列统一规则：统一',
-      '12. 主题绘画内容：{{scene}}',
+      '10. 光影与质感：平',      '11. 主题绘画内容：{{scene}}',
       '',
       '图片必须准确呈现的中文文案：',
       '{{line}}',

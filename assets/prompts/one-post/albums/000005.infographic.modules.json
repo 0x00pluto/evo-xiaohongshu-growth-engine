@@ -5,10 +5,19 @@
   "hint": "暖米色知识信息图，模块卡片与步骤流，大标题",
   "label": "暖米色知识信息图",
   "copySchema": "知识信息图 layout。每一项对象字段：\n- seriesLabel：栏目标签（非空）\n- theme：本次主题内容（非空）\n- mainTitle：主标题，可含 \\n 两行（非空）\n- subTitle：副标题（非空）\n- modules：数组，长度 2～6；每项 { title, body, note, icon }，note 可空字符串\n- stepsBar：步骤区标题条（非空）\n- steps：数组，长度 3～7；每项 { name, body, icon }\n- summary：总结金句（非空）\n- credit：栏目署名（非空）\n模块数与步骤数按文章自定，不要锁死为 3 与 5。\n返回外壳：{\"frames\":[{...},{...}]}",
-  "legacyIds": ["infographic"],
+  "legacyIds": [
+    "infographic"
+  ],
   "enabled": true,
   "constraints": {
-    "modules": { "min": 2, "max": 6 },
-    "steps": { "min": 3, "max": 7 }
-  }
+    "modules": {
+      "min": 2,
+      "max": 6
+    },
+    "steps": {
+      "min": 3,
+      "max": 7
+    }
+  },
+  "promptSheetVersion": 2
 }

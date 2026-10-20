@@ -6,26 +6,22 @@ const path = require('node:path');
 
 /** @type {typeof import('./catalog')} */
 const catalogModule = require('./catalog');
+/** @type {typeof import('./frame')} */
+const frameModule = require('./frame');
+/** @type {typeof import('./sheet')} */
+const sheetModule = require('./sheet');
 const { ALBUM_KIND_SET } = catalogModule;
+const { schemaFieldNames } = frameModule;
+const {
+  PROMPT_SHEET_VERSION,
+  SHEET_SLOTS,
+  assertPromptSheet,
+} = sheetModule;
 
 const LEARN_PROMPT_REL = 'learn-album/system.md';
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 /** 用户自加图册序号起点；000001～099999 系统预留 */
 const USER_ALBUM_SEQ_START = 100000;
-const SHEET_SLOTS = [
-  '1. 背景',
-  '2. 色彩',
-  '3. 字体',
-  '4. 字号',
-  '5. 字重',
-  '6. 文字排版',
-  '7. 文字位置',
-  '8. 构图布局',
-  '9. 视觉风格',
-  '10. 光影与质感',
-  '11. 系列统一规则',
-  '12. 主题绘画内容',
-];
 
 /**
  * @typedef {{
@@ -146,65 +142,25 @@ function normalizeReferenceImage(source) {
 }
 
 /**
- * @param {string} promptMd
- */
-function assertPromptSheet(promptMd) {
-  for (const slot of SHEET_SLOTS) {
-    if (!promptMd.includes(slot)) {
-      throw new Error(`绘图题词缺了 ${slot}`);
-    }
-  }
-  if (!promptMd.includes('{{scene}}')) {
-    throw new Error('绘图题词缺了 {{scene}}');
-  }
-  const seriesAt = promptMd.indexOf('11. 系列统一规则');
-  const sceneAt = promptMd.indexOf('12. 主题绘画内容');
-  if (seriesAt < 0 || sceneAt < 0 || seriesAt > sceneAt) {
-    throw new Error('绘图题词槽序不对');
-  }
-}
-
-/**
- * @param {string} kind
+ * copySchema 字段须在题词中有 {{name}} 或 {{nameBlock}}（与装填约定一致）。
+ * @param {string} _kind 保留参数兼容旧调用；校验不再按 kind 分支
  * @param {string} promptMd
  * @param {string} copySchema
  */
-function assertPromptPlaceholders(kind, promptMd, copySchema) {
-  if (kind === 'magazine') {
-    if (!promptMd.includes('{{line}}')) throw new Error('绘图题词缺了 {{line}}');
-    return;
+function assertPromptPlaceholders(_kind, promptMd, copySchema) {
+  const fields = schemaFieldNames(copySchema);
+  if (fields.length === 0) {
+    throw new Error('copySchema 未声明任何字段');
   }
-  if (kind === 'scrapbook') {
-    if (!promptMd.includes('{{line}}')) throw new Error('绘图题词缺了 {{line}}');
-    return;
-  }
-  if (kind === 'conceptual') {
-    for (const name of ['theme', 'mainTitle', 'subTitle']) {
-      if (!promptMd.includes(`{{${name}}}`)) throw new Error(`绘图题词缺了 {{${name}}}`);
-    }
-    return;
-  }
-  if (kind === 'card') {
-    for (const name of ['mainTitle', 'point']) {
-      if (!promptMd.includes(`{{${name}}}`)) throw new Error(`绘图题词缺了 {{${name}}}`);
-    }
-    return;
-  }
-  if (kind === 'infographic') {
-    for (const name of ['seriesLabel', 'theme', 'mainTitle', 'subTitle', 'summary', 'credit']) {
-      if (!promptMd.includes(`{{${name}}}`)) throw new Error(`绘图题词缺了 {{${name}}}`);
-    }
-    return;
-  }
-  // 新 kind：至少要有 {{line}}，且 copySchema 声明了 line
-  if (!promptMd.includes('{{line}}')) {
-    throw new Error('新 kind 绘图题词须含 {{line}}');
-  }
-  if (!/(?:^|\n)\s*-\s*line\s*[：:]/m.test(copySchema)) {
-    throw new Error('新 kind 的 copySchema 须声明 line 字段');
+  for (const name of fields) {
+    const scalar = `{{${name}}}`;
+    const block = `{{${name}Block}}`;
+    if (promptMd.includes(scalar) || promptMd.includes(block)) continue;
+    // stepsBar 只参与 stepsBlock 排版，题词里通常不单独占位
+    if (name === 'stepsBar' && promptMd.includes('{{stepsBlock}}')) continue;
+    throw new Error(`绘图题词缺了 ${scalar}（或 ${block}）`);
   }
 }
-
 /**
  * @param {unknown} raw
  * @returns {{
@@ -366,8 +322,12 @@ module.exports = {
   ALBUM_KIND_SET,
   LEARN_PROMPT_REL,
   MAX_IMAGE_BYTES,
+  PROMPT_SHEET_VERSION,
+  SHEET_SLOTS,
   USER_ALBUM_SEQ_START,
   allocateAlbumId,
+  assertPromptPlaceholders,
+  assertPromptSheet,
   buildAlbumDraft,
   detectImageKind,
   draftPublicView,

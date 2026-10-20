@@ -102,6 +102,12 @@ module.exports = {
       /**
        * @param {unknown} payload
        */
+      updateAlbumPrompt(payload) {
+        return runner.updateAlbumPrompt(asObject(payload));
+      },
+      /**
+       * @param {unknown} payload
+       */
       discardAlbum(payload) {
         return runner.discardAlbum(asObject(payload));
       },

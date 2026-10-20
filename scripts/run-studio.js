@@ -27,6 +27,7 @@ const METHODS = new Set([
   'getAlbumDetail',
   'learnAlbum',
   'commitAlbum',
+  'updateAlbumPrompt',
   'discardAlbum',
   'deleteAlbum',
   'startNew',

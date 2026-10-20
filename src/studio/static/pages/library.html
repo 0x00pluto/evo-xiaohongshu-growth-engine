@@ -129,7 +129,7 @@
       role="dialog"
       aria-modal="true"
       aria-labelledby="library-detail-title"
-      @keydown.escape.window="closeDetail()"
+      @keydown.escape.window="!eyedropper.open && !unsavedOpen && detailOpen && closeDetail()"
     >
       <button class="absolute inset-0 cursor-default" type="button" aria-label="关闭" @click="closeDetail()"></button>
       <div class="relative z-10 grid h-[calc(100dvh-2rem)] w-full max-w-3xl min-h-0 grid-cols-1 grid-rows-[12rem_minmax(0,1fr)] items-stretch overflow-hidden rounded-lg border border-base-300 bg-base-100 shadow-lg sm:grid-cols-2 sm:grid-rows-1" @click.stop>
@@ -143,9 +143,35 @@
             <button class="btn btn-ghost btn-square btn-sm shrink-0" type="button" aria-label="关闭" @click="closeDetail()">×</button>
           </div>
           <p class="shrink-0 text-sm leading-6 text-base-content/70" x-text="detail && detail.hint"></p>
-          <div class="flex min-h-0 flex-1 flex-col gap-1 overflow-hidden">
-            <p class="shrink-0 text-sm font-medium">图册提示词</p>
-            <pre class="min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words rounded-md border border-base-300 bg-base-200 p-3 text-xs leading-5" x-text="detail && detail.promptTemplate"></pre>
+          <div class="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
+            <div class="flex shrink-0 items-center justify-between gap-2">
+              <div class="min-w-0">
+                <p class="text-sm font-medium">图册提示词</p>
+                <p
+                  class="mt-0.5 text-xs text-base-content/50"
+                  x-show="detail && detail.promptSheetVersion"
+                  x-text="'题词结构 v' + (detail && detail.promptSheetVersion)"
+                ></p>
+              </div>
+              <button
+                class="btn btn-primary btn-xs"
+                type="button"
+                x-show="detailEditable()"
+                @click="saveDetailPrompt()"
+                :disabled="savingDetail || !detailDirty()"
+              >保存</button>
+            </div>
+            <div
+              class="prompt-editor min-h-0 flex-1 overflow-auto rounded-md border border-base-300 bg-base-100 p-3 text-xs leading-5"
+              x-ref="detailPromptEditor"
+              role="textbox"
+              aria-multiline="true"
+              aria-label="图册提示词"
+              :contenteditable="detailEditable() ? 'true' : 'false'"
+              @input="onPromptEditorInput('detail')"
+              @blur="onPromptEditorBlur('detail')"
+              @click="onPromptEditorClick($event, 'detail')"
+            ></div>
           </div>
         </div>
       </div>
@@ -159,7 +185,7 @@
       role="dialog"
       aria-modal="true"
       aria-labelledby="library-draft-title"
-      @keydown.escape.window="onDiscardDraft()"
+      @keydown.escape.window="!eyedropper.open && draftOpen && onDiscardDraft()"
     >
       <button class="absolute inset-0 cursor-default" type="button" aria-label="关闭" @click="onDiscardDraft()"></button>
       <div class="relative z-10 grid h-[calc(100dvh-2rem)] w-full max-w-3xl min-h-0 grid-cols-1 grid-rows-[12rem_minmax(0,1fr)] items-stretch overflow-hidden rounded-lg border border-base-300 bg-base-100 shadow-lg sm:grid-cols-2 sm:grid-rows-1" @click.stop>
@@ -175,14 +201,95 @@
             </div>
           </div>
           <p class="shrink-0 text-sm leading-6 text-base-content/70" x-text="draft && draft.hint"></p>
-          <div class="flex min-h-0 flex-1 flex-col gap-1 overflow-hidden">
+          <div class="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
             <p class="shrink-0 text-sm font-medium">图册提示词</p>
-            <pre class="min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words rounded-md border border-base-300 bg-base-200 p-3 text-xs leading-5" x-text="draft && draft.promptTemplate"></pre>
+            <div
+              class="prompt-editor min-h-0 flex-1 overflow-auto rounded-md border border-base-300 bg-base-100 p-3 text-xs leading-5"
+              x-ref="draftPromptEditor"
+              role="textbox"
+              aria-multiline="true"
+              aria-label="图册提示词"
+              contenteditable="true"
+              @input="onPromptEditorInput('draft')"
+              @blur="onPromptEditorBlur('draft')"
+              @click="onPromptEditorClick($event, 'draft')"
+            ></div>
           </div>
           <div class="flex shrink-0 justify-end gap-2">
             <button class="btn btn-ghost btn-sm" type="button" @click="onDiscardDraft()" :disabled="committing">放弃</button>
             <button class="btn btn-primary btn-sm" type="button" @click="onCommitDraft()" :disabled="committing">确定写入</button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="library-eyedropper"
+      class="fixed inset-0 z-[60] flex flex-col bg-black/80"
+      x-show="eyedropper.open"
+      x-cloak
+      role="dialog"
+      aria-modal="true"
+      aria-label="从样图吸色"
+      @keydown.escape.window="eyedropper.open && closeEyedropper()"
+    >
+      <div class="flex shrink-0 items-center justify-between gap-3 px-4 py-3 text-white">
+        <p class="text-sm">十字中心为取样点。单击取色，Esc 取消。</p>
+        <div class="flex items-center gap-2">
+          <span
+            class="inline-block h-5 w-5 rounded border border-white/50"
+            x-show="eyedropper.previewHex"
+            :style="'background:' + eyedropper.previewHex"
+          ></span>
+          <span class="font-mono text-xs" x-text="eyedropper.previewHex || ''"></span>
+          <button class="btn btn-ghost btn-sm text-white" type="button" @click="closeEyedropper()">取消</button>
+        </div>
+      </div>
+      <div
+        class="relative min-h-0 flex-1 cursor-none overflow-hidden p-4"
+        @mousemove="onEyedropperMove($event)"
+        @click="onEyedropperPick($event)"
+      >
+        <img
+          class="mx-auto max-h-full max-w-full object-contain select-none"
+          x-ref="eyedropperImage"
+          :src="eyedropper.imageUrl"
+          alt=""
+          draggable="false"
+          @load="onEyedropperImageLoad()"
+        />
+        <div
+          class="pointer-events-none absolute z-10"
+          x-show="eyedropper.loupeVisible"
+          :style="'left:' + eyedropper.loupeX + 'px;top:' + eyedropper.loupeY + 'px;'"
+        >
+          <canvas
+            class="block -translate-x-1/2 -translate-y-1/2 rounded-full shadow-lg"
+            x-ref="eyedropperLoupe"
+            width="112"
+            height="112"
+          ></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="library-unsaved-modal"
+      class="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4"
+      x-show="unsavedOpen"
+      x-cloak
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="library-unsaved-title"
+      @keydown.escape.window="unsavedOpen && cancelUnsavedClose()"
+    >
+      <button class="absolute inset-0 cursor-default" type="button" aria-label="取消" @click="cancelUnsavedClose()"></button>
+      <div class="relative z-10 w-full max-w-sm rounded-lg border border-base-300 bg-base-100 p-4 shadow-lg" @click.stop>
+        <h3 id="library-unsaved-title" class="text-base font-medium">题词已改但还没保存，确定关闭？</h3>
+        <p class="mt-2 text-sm leading-6 text-base-content/70">关闭后未保存的修改会丢失。</p>
+        <div class="mt-4 flex justify-end gap-2">
+          <button class="btn btn-ghost btn-sm" type="button" @click="cancelUnsavedClose()">取消</button>
+          <button class="btn btn-neutral btn-sm" type="button" @click="confirmUnsavedClose()">仍要关闭</button>
         </div>
       </div>
     </div>

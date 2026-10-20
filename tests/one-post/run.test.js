@@ -28,10 +28,11 @@ function albumKindOf(album) {
 function assertCover(prompt, line = '一句', album = ALBUM_MAGAZINE) {
   const kind = albumKindOf(album);
   assert.match(prompt, /1\. 背景/);
-  assert.match(prompt, /11\. 系列统一规则/);
-  assert.match(prompt, /12\. 主题绘画内容：第1格画着相连的一件事/);
+  assert.match(prompt, /11\. 主题绘画内容/);
+  assert.match(prompt, /11\. 主题绘画内容：第1格画着相连的一件事/);
   assert.equal(prompt.includes(line), true);
-  assert.ok(prompt.indexOf('11. 系列统一规则') < prompt.indexOf('12. 主题绘画内容'));
+  assert.ok(prompt.includes('11. 主题绘画内容'));
+  assert.ok(!prompt.includes('系列统一规则'));
   assert.doesNotMatch(prompt, /85%/);
   assert.doesNotMatch(prompt, /LARGE/);
   if (kind === 'magazine') {
@@ -78,8 +79,7 @@ function albumSlots(id) {
     '8. 构图布局：可以偏心',
     '9. 视觉风格：测试图册',
     '10. 光影与质感：平面插画',
-    '11. 系列统一规则：每张只换画面和文案',
-    '12. 主题绘画内容：{{scene}}',
+    '11. 主题绘画内容：{{scene}}',
     '',
   ];
   if (kind === 'conceptual') {
@@ -183,7 +183,19 @@ const ALBUM_META = {
   [ALBUM_INFOGRAPHIC]: {
     hint: '暖米色知识信息图，模块卡片与步骤流，大标题',
     label: '暖米色知识信息图',
-    copySchema: '知识信息图 layout。每一项对象字段：\n- modules：数组\n- steps：数组\n返回外壳：{"frames":[{...}]}',
+    copySchema: [
+      '知识信息图 layout。每一项对象字段：',
+      '- seriesLabel：栏目标签（非空）',
+      '- theme：本次主题内容（非空）',
+      '- mainTitle：主标题（非空）',
+      '- subTitle：副标题（非空）',
+      '- modules：数组，长度 2～6',
+      '- stepsBar：步骤区标题条（非空）',
+      '- steps：数组，长度 3～7',
+      '- summary：总结金句（非空）',
+      '- credit：栏目署名（非空）',
+      '返回外壳：{"frames":[{...}]}',
+    ].join('\n'),
     legacyIds: ['infographic'],
     constraints: {
       modules: { min: 2, max: 6 },
@@ -205,6 +217,7 @@ function writeAlbumMeta(dir, id) {
     copySchema: meta.copySchema,
     legacyIds: meta.legacyIds,
     enabled: true,
+      promptSheetVersion: 2,
     ...(meta.constraints ? { constraints: meta.constraints } : {}),
   }, null, 2)}\n`);
 }
@@ -1029,7 +1042,7 @@ test('重算提示词可固定图册，并列出图册目录', async () => {
   assert.equal(detail.ok, true);
   assert.equal(detail.id, ALBUM_CARD);
   assert.equal(detail.label, '强对比知识卡片风');
-  assert.match(detail.promptTemplate, /12\. 主题绘画内容/);
+  assert.match(detail.promptTemplate, /11\. 主题绘画内容/);
   assert.match(detail.promptTemplate, /\{\{mainTitle\}\}/);
   assert.equal(runner.getAlbumDetail({ id: 'nope' }).ok, false);
 

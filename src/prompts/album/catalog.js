@@ -4,6 +4,10 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
+/** @type {typeof import('./sheet')} */
+const sheetModule = require('./sheet');
+const { normalizePromptSheetVersion } = sheetModule;
+
 /** @type {ReadonlyArray<string>} */
 const ALBUM_KINDS = ['magazine', 'scrapbook', 'conceptual', 'card', 'infographic'];
 /** @type {ReadonlySet<string>} */
@@ -38,6 +42,7 @@ function isAlbumToken(value) {
  *   legacyIds: string[];
  *   enabled: boolean;
  *   constraints: AlbumConstraints;
+ *   promptSheetVersion: number;
  *   source: 'factory' | 'user';
  *   home: string;
  * }} AlbumMeta
@@ -147,6 +152,7 @@ function normalizeMeta(raw, fileId) {
     if (modules) constraints.modules = modules;
     if (steps) constraints.steps = steps;
   }
+  const promptSheetVersion = normalizePromptSheetVersion(source.promptSheetVersion);
   return {
     id,
     kind,
@@ -157,6 +163,7 @@ function normalizeMeta(raw, fileId) {
     legacyIds,
     enabled,
     constraints,
+    promptSheetVersion,
     source: 'factory',
     home: '',
   };

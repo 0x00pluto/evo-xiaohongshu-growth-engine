@@ -98,6 +98,7 @@
           await loadScript(`pages/${id}.js`);
           // 资料库壳下面还有资源 Tab 模块，须在 initTree 前挂好。
           if (id === 'library') {
+            await loadScript('lib/prompt-colors.js');
             await loadScript('pages/library/albums.js');
           }
           const response = await fetch(`pages/${id}.html`);

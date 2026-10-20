@@ -36,6 +36,33 @@
       white-space: pre-wrap;
       overflow-wrap: anywhere;
     }
+    .prompt-editor {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+    .prompt-color-run {
+      white-space: nowrap;
+    }
+    .prompt-color-swatch {
+      display: inline-block;
+      width: 0.75rem;
+      height: 0.75rem;
+      margin: 0 0.15rem;
+      vertical-align: -0.1rem;
+      border: 1px solid rgba(17, 17, 17, 0.3);
+      border-radius: 2px;
+      padding: 0;
+      cursor: pointer;
+    }
+    .prompt-color-swatch:disabled {
+      cursor: default;
+      opacity: 0.7;
+    }
+    .prompt-editor:focus {
+      outline: none;
+      border-color: rgba(17, 17, 17, 0.4);
+    }
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after {
         animation-duration: 0.01ms !important;

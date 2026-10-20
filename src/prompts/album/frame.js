@@ -175,61 +175,23 @@ function normalizeFrame(raw, album, promptsDir, userAlbumsDir) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     throw new Error('策划那一项不是对象');
   }
-  const kind = albumKind(album, promptsDir, userAlbumsDir);
   const source = /** @type {Record<string, unknown>} */ (raw);
-  /** @type {CopyFrame} */
-  const frame = {};
-  if (kind === 'magazine') {
-    frame.line = typeof source.line === 'string' ? source.line.trim() : '';
-    if (!frame.line) throw new Error('策划那一句是空的');
-    return frame;
-  }
-  if (kind === 'scrapbook') {
-    frame.line = typeof source.line === 'string' ? source.line.trim() : '';
-    frame.note = typeof source.note === 'string' ? source.note.trim() : '';
-    if (!frame.line) throw new Error('策划那一句是空的');
-    return frame;
-  }
-  if (kind === 'conceptual') {
-    frame.theme = typeof source.theme === 'string' ? source.theme.trim() : '';
-    frame.mainTitle = typeof source.mainTitle === 'string' ? source.mainTitle.trim() : '';
-    frame.subTitle = typeof source.subTitle === 'string' ? source.subTitle.trim() : '';
-    if (!frame.theme || !frame.mainTitle || !frame.subTitle) throw new Error('策划字段不完整');
-    return frame;
-  }
-  if (kind === 'card') {
-    frame.mainTitle = typeof source.mainTitle === 'string' ? source.mainTitle.trim() : '';
-    frame.point = typeof source.point === 'string' ? source.point.trim() : '';
-    if (!frame.mainTitle || !frame.point) throw new Error('策划字段不完整');
-    return frame;
-  }
-  if (kind === 'infographic') {
-    frame.seriesLabel = typeof source.seriesLabel === 'string' ? source.seriesLabel.trim() : '';
-    frame.theme = typeof source.theme === 'string' ? source.theme.trim() : '';
-    frame.mainTitle = typeof source.mainTitle === 'string'
-      ? source.mainTitle.replace(/\\n/g, '\n').trim()
-      : '';
-    frame.subTitle = typeof source.subTitle === 'string' ? source.subTitle.trim() : '';
-    frame.stepsBar = typeof source.stepsBar === 'string' ? source.stepsBar.trim() : '';
-    frame.summary = typeof source.summary === 'string' ? source.summary.trim() : '';
-    frame.credit = typeof source.credit === 'string' ? source.credit.trim() : '';
-    frame.modules = normalizeInfographicModules(source.modules, promptsDir, album, userAlbumsDir);
-    frame.steps = normalizeInfographicSteps(source.steps, promptsDir, album, userAlbumsDir);
-    if (
-      !frame.seriesLabel
-      || !frame.theme
-      || !frame.mainTitle
-      || !frame.subTitle
-      || !frame.stepsBar
-      || !frame.summary
-      || !frame.credit
-    ) {
-      throw new Error('策划字段不完整');
-    }
-    return frame;
-  }
-  // 新 kind：按 copySchema 声明的扁平字段校验；必须有非空 line
-  return normalizeGenericFrame(source, /** @type {string} */ (album), promptsDir, userAlbumsDir);
+  return normalizeSchemaFrame(source, /** @type {string} */ (album), promptsDir, userAlbumsDir);
+}
+
+/**
+ * copySchema 里该字段说明是否允许空（可空 / 可选 / 没有则…）。
+ * @param {string} schema
+ * @param {string} fieldName
+ * @returns {boolean}
+ */
+function isOptionalSchemaField(schema, fieldName) {
+  const re = new RegExp(
+    `(?:^|\\n)\\s*-\\s*${fieldName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*[：:]([^\\n]*)`,
+  );
+  const match = schema.match(re);
+  if (!match) return false;
+  return /可空|可选|没有则/.test(match[1] || '');
 }
 
 /**
@@ -307,31 +269,61 @@ function formatFlexibleBlock(items) {
 }
 
 /**
+ * 按图册 copySchema 声明的字段入站；不按 kind 白名单砍键。
  * @param {Record<string, unknown>} source
  * @param {string} album
  * @param {string} promptsDir
  * @param {string} [userAlbumsDir='']
  * @returns {CopyFrame}
  */
-function normalizeGenericFrame(source, album, promptsDir, userAlbumsDir = '') {
+function normalizeSchemaFrame(source, album, promptsDir, userAlbumsDir = '') {
   const meta = loadAlbumCatalog(promptsDir, userAlbumsDir).get(album);
   const fields = schemaFieldNames(meta.copySchema);
-  if (!fields.includes('line')) {
-    throw new Error('新 kind 的 copySchema 须声明 line 字段');
+  if (fields.length === 0) {
+    throw new Error('copySchema 未声明任何字段');
   }
   /** @type {CopyFrame & Record<string, unknown>} */
   const frame = {};
+  const useInfographicArrays = meta.kind === 'infographic'
+    || Boolean(meta.constraints.modules || meta.constraints.steps);
   for (const name of fields) {
     const value = source[name];
+    if (name === 'modules' && useInfographicArrays) {
+      frame.modules = normalizeInfographicModules(value, promptsDir, album, userAlbumsDir);
+      continue;
+    }
+    if (name === 'steps' && useInfographicArrays) {
+      frame.steps = normalizeInfographicSteps(value, promptsDir, album, userAlbumsDir);
+      continue;
+    }
     if (Array.isArray(value)) {
       frame[name] = normalizeFlexibleArray(value, promptsDir, album, name, userAlbumsDir);
       continue;
     }
-    frame[name] = typeof value === 'string' ? value.trim() : '';
+    if (name === 'mainTitle' && typeof value === 'string') {
+      frame[name] = value.replace(/\\n/g, '\n').trim();
+    } else {
+      frame[name] = typeof value === 'string' ? value.trim() : '';
+    }
+    if (
+      typeof frame[name] === 'string'
+      && !frame[name]
+      && !isOptionalSchemaField(meta.copySchema, name)
+    ) {
+      throw new Error(name === 'line' ? '策划那一句是空的' : '策划字段不完整');
+    }
   }
-  if (typeof frame.line !== 'string' || !frame.line) throw new Error('策划那一句是空的');
+  const display = frameDisplayLine(album, /** @type {CopyFrame} */ (frame), promptsDir, userAlbumsDir);
+  if (!display) {
+    throw new Error(
+      fields.includes('line') ? '策划那一句是空的' : '策划字段不完整',
+    );
+  }
   return /** @type {CopyFrame} */ (frame);
 }
+
+/** @deprecated 兼容旧名 */
+const normalizeGenericFrame = normalizeSchemaFrame;
 
 module.exports = {
   formatFlexibleBlock,
@@ -339,6 +331,9 @@ module.exports = {
   formatPlannedLines,
   formatStepsBlock,
   frameDisplayLine,
+  isOptionalSchemaField,
   normalizeFrame,
+  normalizeGenericFrame,
+  normalizeSchemaFrame,
   schemaFieldNames,
 };

@@ -7,28 +7,28 @@ const catalogModule = require('./catalog');
 const frameModule = require('./frame');
 /** @type {typeof import('./refs')} */
 const refsModule = require('./refs');
+/** @type {typeof import('./sheet')} */
+const sheetModule = require('./sheet');
 /** @type {typeof import('../template')} */
 const templateModule = require('../template');
 
-const { ALBUM_KIND_SET, albumKind, albumLabel, isAlbum, readAlbumPromptText } = catalogModule;
+const {
+  ALBUM_KIND_SET,
+  albumKind,
+  albumLabel,
+  isAlbum,
+  loadAlbumCatalog,
+  readAlbumPromptText,
+} = catalogModule;
 const { formatFlexibleBlock, formatModulesBlock, formatStepsBlock, frameDisplayLine } = frameModule;
 const { TEXT_ONLY_LOCK } = refsModule;
+const {
+  PROMPT_SHEET_VERSION,
+  SHEET_SLOTS,
+  assertCurrentPromptSheetVersion,
+  assertPromptSheet,
+} = sheetModule;
 const { fillPrompt } = templateModule;
-
-const SHEET_SLOTS = [
-  '1. 背景',
-  '2. 色彩',
-  '3. 字体',
-  '4. 字号',
-  '5. 字重',
-  '6. 文字排版',
-  '7. 文字位置',
-  '8. 构图布局',
-  '9. 视觉风格',
-  '10. 光影与质感',
-  '11. 系列统一规则',
-  '12. 主题绘画内容',
-];
 
 /**
  * @param {string} template
@@ -48,7 +48,34 @@ function extractPlaceholders(template) {
 }
 
 /**
- * 新 kind：按题词占位符从策划帧自动装填；缺的填空串，不拦学习产物。
+ * 按占位符名把数组帧格式化成题词块（不按 album kind）。
+ * @param {string} name
+ * @param {Record<string, unknown>} bag
+ * @returns {string}
+ */
+function formatNamedBlock(name, bag) {
+  if (name === 'noteBlock') {
+    const note = bag.note;
+    return typeof note === 'string' && note ? `旁注：${note}\n` : '';
+  }
+  if (name === 'modulesBlock') {
+    const modules = bag.modules;
+    return formatModulesBlock(Array.isArray(modules) ? modules : []);
+  }
+  if (name === 'stepsBlock') {
+    const stepsBar = typeof bag.stepsBar === 'string' ? bag.stepsBar : '';
+    const steps = Array.isArray(bag.steps) ? bag.steps : [];
+    return formatStepsBlock(stepsBar, /** @type {import('./frame').InfographicStep[]} */ (steps));
+  }
+  const base = name.slice(0, -5);
+  const raw = bag[base];
+  if (Array.isArray(raw)) return formatFlexibleBlock(raw);
+  if (typeof raw === 'string') return raw;
+  return '';
+}
+
+/**
+ * 按题词占位符从策划帧装填；缺的填空串。出厂册与自学册同一条路。
  * @param {string} template
  * @param {Record<string, unknown>} bag
  * @param {string} display
@@ -60,33 +87,25 @@ function fillGenericVars(template, bag, display, picture) {
   const vars = { scene: picture };
   for (const name of extractPlaceholders(template)) {
     if (name === 'scene') continue;
+    if (name.endsWith('Block')) {
+      vars[name] = formatNamedBlock(name, bag);
+      continue;
+    }
     const value = bag[name];
     if (typeof value === 'string') {
       vars[name] = value;
       continue;
     }
-    if (name.endsWith('Block')) {
-      const base = name.slice(0, -5);
-      const raw = bag[base];
-      if (Array.isArray(raw)) {
-        vars[name] = formatFlexibleBlock(raw);
-      } else if (typeof raw === 'string') {
-        vars[name] = raw
-          ? (base === 'note' ? `旁注：${raw}\n` : raw)
-          : '';
-      } else {
-        vars[name] = '';
-      }
-      continue;
-    }
     vars[name] = '';
   }
-  if (!vars.line) vars.line = (typeof bag.line === 'string' && bag.line) || display;
+  if (Object.prototype.hasOwnProperty.call(vars, 'line') && !vars.line) {
+    vars.line = (typeof bag.line === 'string' && bag.line) || display;
+  }
   return vars;
 }
 
 /**
- * 只装填 12 槽题词；参考图说明与纯文字禁插画在发模型前由 composeImagePrompt 拼接。
+ * 只装填 v2（11 槽）题词；参考图说明与纯文字禁插画在发模型前由 composeImagePrompt 拼接。
  * @param {string} promptsDir
  * @param {unknown} album
  * @param {unknown} scene
@@ -101,43 +120,22 @@ function renderAlbumPrompt(promptsDir, album, scene, frame, userAlbumsDir) {
   if (!frame || typeof frame !== 'object' || Array.isArray(frame)) {
     throw new Error('这一张的文案是空的');
   }
+  const albumId = String(album || '').trim();
+  const meta = loadAlbumCatalog(promptsDir, userAlbumsDir).get(albumId);
+  assertCurrentPromptSheetVersion(meta.promptSheetVersion);
   const copy = /** @type {import('./frame').CopyFrame} */ (frame);
   const display = frameDisplayLine(album, copy, promptsDir, userAlbumsDir);
   if (!display) throw new Error('这一张的文案是空的');
   const kind = albumKind(album, promptsDir, userAlbumsDir);
   const template = readAlbumPromptText(promptsDir, album, userAlbumsDir);
+  assertPromptSheet(template);
 
-  /** @type {import('../template').PromptVars} */
-  let vars = { scene: picture };
-  if (kind === 'magazine') {
-    vars.line = copy.line || '';
-  } else if (kind === 'scrapbook') {
-    vars.line = copy.line || '';
-    vars.noteBlock = copy.note ? `旁注：${copy.note}\n` : '';
-  } else if (kind === 'conceptual') {
-    vars.theme = copy.theme || '';
-    vars.mainTitle = copy.mainTitle || '';
-    vars.subTitle = copy.subTitle || '';
-  } else if (kind === 'card') {
-    vars.mainTitle = copy.mainTitle || '';
-    vars.point = copy.point || '';
-  } else if (kind === 'infographic') {
-    vars.seriesLabel = copy.seriesLabel || '';
-    vars.theme = copy.theme || '';
-    vars.mainTitle = copy.mainTitle || '';
-    vars.subTitle = copy.subTitle || '';
-    vars.modulesBlock = formatModulesBlock(copy.modules || []);
-    vars.stepsBlock = formatStepsBlock(copy.stepsBar || '', copy.steps || []);
-    vars.summary = copy.summary || '';
-    vars.credit = copy.credit || '';
-  } else {
-    vars = fillGenericVars(
-      template,
-      /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (copy)),
-      display,
-      picture,
-    );
-  }
+  const vars = fillGenericVars(
+    template,
+    /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (copy)),
+    display,
+    picture,
+  );
 
   const prompt = fillPrompt(template, vars).trim();
   if (SHEET_SLOTS.some((slot) => !prompt.includes(slot)) || !prompt.includes(picture) || !prompt.includes(display)) {
@@ -167,11 +165,6 @@ function renderAlbumPrompt(promptsDir, album, scene, frame, userAlbumsDir) {
   } else if (!ALBUM_KIND_SET.has(kind)) {
     // 通用槽：展示句已写入 prompt（上方统一检查）
   }
-  const seriesAt = prompt.indexOf('11. 系列统一规则');
-  const sceneAt = prompt.indexOf('12. 主题绘画内容');
-  if (seriesAt < 0 || sceneAt < 0 || seriesAt > sceneAt) {
-    throw new Error('绘图提示词槽序不对');
-  }
   return {
     prompt,
     style: albumLabel(album, promptsDir, userAlbumsDir),
@@ -179,6 +172,7 @@ function renderAlbumPrompt(promptsDir, album, scene, frame, userAlbumsDir) {
 }
 
 module.exports = {
+  PROMPT_SHEET_VERSION,
   SHEET_SLOTS,
   TEXT_ONLY_LOCK,
   extractPlaceholders,

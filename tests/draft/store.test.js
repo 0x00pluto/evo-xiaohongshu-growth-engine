@@ -50,8 +50,7 @@ test('读写时保留用户图册 look，需带上 userAlbumsDir', () => {
     '竖版 3:4。',
     '1. 背景：白', '2. 色彩：黑', '3. 字体：黑', '4. 字号：大', '5. 字重：粗',
     '6. 文字排版：中', '7. 文字位置：中', '8. 构图布局：中', '9. 视觉风格：排',
-    '10. 光影与质感：平', '11. 系列统一规则：统一',
-    '12. 主题绘画内容：{{scene}}',
+    '10. 光影与质感：平',    '11. 主题绘画内容：{{scene}}',
     '',
     '图片必须准确呈现的中文文案：',
     '{{line}}',
@@ -67,6 +66,7 @@ test('读写时保留用户图册 look，需带上 userAlbumsDir', () => {
     copySchema: '每一项对象字段：\n- line：一句\n返回形状：{"frames":[{"line":"..."}]}',
     legacyIds: [],
     enabled: true,
+      promptSheetVersion: 2,
   }, null, 2)}\n`;
   fs.writeFileSync(path.join(promptsDir, 'albums', `${factoryId}.json`), meta(factoryId, 'seed'));
   fs.writeFileSync(path.join(promptsDir, 'albums', `${factoryId}.md`), sheet);

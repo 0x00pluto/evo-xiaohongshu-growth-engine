@@ -5,6 +5,9 @@
   "hint": "手帐拼贴，马克笔笔记感，少装饰纸面",
   "label": "手帐拼贴风",
   "copySchema": "手帐便签式。每一项对象字段：\n- line：须准确上图的一句中文（非空）\n- note：可选短旁注；没有则写空字符串 \"\"\n返回形状：{\"frames\":[{\"line\":\"...\",\"note\":\"\"},{\"line\":\"...\",\"note\":\"圈一下\"}]}",
-  "legacyIds": ["scrapbook"],
-  "enabled": true
+  "legacyIds": [
+    "scrapbook"
+  ],
+  "enabled": true,
+  "promptSheetVersion": 2
 }
