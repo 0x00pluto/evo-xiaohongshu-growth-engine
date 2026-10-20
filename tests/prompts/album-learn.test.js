@@ -233,6 +233,65 @@ test('新 kind 通用槽能 normalizeFrame 与 renderAlbumPrompt', () => {
   assert.equal(rendered.style, '粗字海报风');
 });
 
+test('新 kind 含 modulesBlock 能装填；未知 fooBlock 不拦', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'album-modules-'));
+  seedFactoryAlbums(dir);
+  const image = normalizeReferenceImage({
+    dataUrl: `data:image/jpeg;base64,${JPEG_BYTES.toString('base64')}`,
+  });
+  const promptWithBlocks = [
+    '竖版 3:4，峰会海报。',
+    '1. 背景：白', '2. 色彩：黑', '3. 字体：黑', '4. 字号：大', '5. 字重：粗',
+    '6. 文字排版：左', '7. 文字位置：左', '8. 构图布局：分栏', '9. 视觉风格：商务',
+    '10. 光影与质感：平', '11. 系列统一规则：统一',
+    '12. 主题绘画内容：{{scene}}',
+    '',
+    '图片必须准确呈现的中文文案：',
+    '标签：{{kicker}}',
+    '主标题：{{line}}',
+    '亮点：',
+    '{{modulesBlock}}',
+    '{{fooBlock}}',
+    '',
+    '文案必须完整、准确。',
+  ].join('\n');
+  const draft = buildAlbumDraft(dir, learnPayload({
+    slug: 'summit-poster',
+    label: '峰会海报',
+    copySchema: [
+      '峰会海报。每一项对象字段：',
+      '- line：主标题（非空）',
+      '- kicker：小标签（可空）',
+      '- modules：亮点数组，每条含 icon、head、body',
+      '返回形状：{"frames":[{"line":"...","kicker":"...","modules":[{"icon":"...","head":"...","body":"..."}]}]}',
+    ].join('\n'),
+    promptMd: promptWithBlocks,
+    copySample: '仅示例。',
+  }), image, 'draft-m');
+  commitAlbumDraft(dir, draft);
+  clearAlbumCatalogCache(dir);
+
+  const frame = normalizeFrame({
+    line: '智算峰会',
+    kicker: 'INVITE',
+    modules: [
+      { icon: '箭头', head: '算力', body: '弹性扩容' },
+      { icon: '盾', head: '安全', body: '合规托管' },
+    ],
+  }, draft.id, dir);
+  assert.equal(frame.line, '智算峰会');
+  assert.ok(Array.isArray(/** @type {{ modules?: unknown }} */ (frame).modules));
+  assert.equal(/** @type {{ modules: unknown[] }} */ (frame).modules.length, 2);
+
+  const rendered = renderAlbumPrompt(dir, draft.id, '右侧城市剪影', frame);
+  assert.match(rendered.prompt, /智算峰会/);
+  assert.match(rendered.prompt, /INVITE/);
+  assert.match(rendered.prompt, /算力/);
+  assert.match(rendered.prompt, /弹性扩容/);
+  assert.doesNotMatch(rendered.prompt, /\{\{modulesBlock\}\}/);
+  assert.doesNotMatch(rendered.prompt, /\{\{fooBlock\}\}/);
+});
+
 test('runner 学习写入删除：失败零落盘；出厂拒绝', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'album-runner-'));
   const postsDir = path.join(dir, 'posts');

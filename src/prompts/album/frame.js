@@ -6,7 +6,7 @@ const catalogModule = require('./catalog');
 const { albumKind, isAlbum, loadAlbumCatalog } = catalogModule;
 
 /**
- * @typedef {{ title: string; body: string; note: string; icon: string }} InfographicModule
+ * @typedef {{ title: string; body: string; note: string; icon: string; head?: string }} InfographicModule
  * @typedef {{ name: string; body: string; icon: string }} InfographicStep
  * @typedef {{
  *   line?: string;
@@ -94,8 +94,9 @@ function normalizeInfographicSteps(list, promptsDir, album) {
 function formatModulesBlock(modules) {
   const lines = ['核心信息模块：'];
   modules.forEach((item, index) => {
+    const title = (item.title || item.head || '').trim();
     lines.push(`第${index + 1}张卡片：`);
-    lines.push(`标题：${item.title}`);
+    lines.push(`标题：${title}`);
     lines.push(`说明：${item.body}`);
     if (item.note) lines.push(`补充说明：${item.note}`);
     lines.push(`图标：${item.icon}`);
@@ -244,6 +245,61 @@ function schemaFieldNames(schema) {
 }
 
 /**
+ * 新 kind 数组字段：每项只留字符串叶子，条数默认 1～8（册上 constraints 优先）。
+ * @param {unknown} list
+ * @param {string} promptsDir
+ * @param {string} album
+ * @param {string} fieldName
+ * @returns {Record<string, string>[]}
+ */
+function normalizeFlexibleArray(list, promptsDir, album, fieldName) {
+  if (!Array.isArray(list)) throw new Error('策划字段不完整');
+  const meta = loadAlbumCatalog(promptsDir).get(album);
+  const bag = /** @type {Record<string, { min: number; max: number } | undefined>} */ (
+    meta.constraints || {}
+  );
+  const range = bag[fieldName] || { min: 1, max: 8 };
+  if (list.length < range.min || list.length > range.max) {
+    throw new Error(`${fieldName} 应为 ${range.min} 到 ${range.max} 条`);
+  }
+  return list.map((item) => {
+    if (typeof item === 'string') {
+      const text = item.trim();
+      if (!text) throw new Error('策划字段不完整');
+      return { value: text };
+    }
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      throw new Error('策划字段不完整');
+    }
+    /** @type {Record<string, string>} */
+    const out = {};
+    for (const [key, value] of Object.entries(/** @type {Record<string, unknown>} */ (item))) {
+      if (typeof value === 'string' && value.trim()) out[key] = value.trim();
+    }
+    if (Object.keys(out).length === 0) throw new Error('策划字段不完整');
+    return out;
+  });
+}
+
+/**
+ * 新 kind 把对象数组打成多行文本，不假设字段名。
+ * @param {unknown} items
+ * @returns {string}
+ */
+function formatFlexibleBlock(items) {
+  if (!Array.isArray(items) || items.length === 0) return '';
+  return items.map((item, index) => {
+    if (typeof item === 'string') return item;
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return '';
+    const lines = [`第${index + 1}项：`];
+    for (const [key, value] of Object.entries(/** @type {Record<string, unknown>} */ (item))) {
+      if (typeof value === 'string' && value) lines.push(`${key}：${value}`);
+    }
+    return lines.join('\n');
+  }).filter(Boolean).join('\n\n');
+}
+
+/**
  * @param {Record<string, unknown>} source
  * @param {string} album
  * @param {string} promptsDir
@@ -255,19 +311,22 @@ function normalizeGenericFrame(source, album, promptsDir) {
   if (!fields.includes('line')) {
     throw new Error('新 kind 的 copySchema 须声明 line 字段');
   }
-  /** @type {CopyFrame & Record<string, string>} */
+  /** @type {CopyFrame & Record<string, unknown>} */
   const frame = {};
   for (const name of fields) {
-    // 数组类字段（modules/steps）留给出厂 infographic；通用槽只收字符串
-    if (name === 'modules' || name === 'steps') continue;
     const value = source[name];
+    if (Array.isArray(value)) {
+      frame[name] = normalizeFlexibleArray(value, promptsDir, album, name);
+      continue;
+    }
     frame[name] = typeof value === 'string' ? value.trim() : '';
   }
-  if (!frame.line) throw new Error('策划那一句是空的');
-  return frame;
+  if (typeof frame.line !== 'string' || !frame.line) throw new Error('策划那一句是空的');
+  return /** @type {CopyFrame} */ (frame);
 }
 
 module.exports = {
+  formatFlexibleBlock,
   formatModulesBlock,
   formatPlannedLines,
   formatStepsBlock,

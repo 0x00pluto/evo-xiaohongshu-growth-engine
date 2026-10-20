@@ -33,4 +33,8 @@ assets/**/*.7z
 assets/**/*.wav
 assets/**/*.mp3
 
+# 用户自加图册（序号 >= 100000），只留本机，勿提交发版
+assets/prompts/one-post/albums/[1-9][0-9][0-9][0-9][0-9][0-9].*
+assets/prompts/one-post/samples/[1-9][0-9][0-9][0-9][0-9][0-9].*
+
 node_modules/

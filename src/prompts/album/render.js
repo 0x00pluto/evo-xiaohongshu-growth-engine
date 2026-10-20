@@ -9,7 +9,7 @@ const frameModule = require('./frame');
 const templateModule = require('../template');
 
 const { ALBUM_KIND_SET, albumKind, albumLabel, albumPromptName, isAlbum } = catalogModule;
-const { formatModulesBlock, formatStepsBlock, frameDisplayLine } = frameModule;
+const { formatFlexibleBlock, formatModulesBlock, formatStepsBlock, frameDisplayLine } = frameModule;
 const { fillPrompt, readPromptFile } = templateModule;
 
 const SHEET_SLOTS = [
@@ -26,6 +26,61 @@ const SHEET_SLOTS = [
   '11. 系列统一规则',
   '12. 主题绘画内容',
 ];
+
+/**
+ * @param {string} template
+ * @returns {string[]}
+ */
+function extractPlaceholders(template) {
+  /** @type {string[]} */
+  const names = [];
+  const re = /\{\{([^{}]+)\}\}/g;
+  let match = re.exec(template);
+  while (match) {
+    const name = String(match[1] || '').trim();
+    if (name && !names.includes(name)) names.push(name);
+    match = re.exec(template);
+  }
+  return names;
+}
+
+/**
+ * 新 kind：按题词占位符从策划帧自动装填；缺的填空串，不拦学习产物。
+ * @param {string} template
+ * @param {Record<string, unknown>} bag
+ * @param {string} display
+ * @param {string} picture
+ * @returns {import('../template').PromptVars}
+ */
+function fillGenericVars(template, bag, display, picture) {
+  /** @type {import('../template').PromptVars} */
+  const vars = { scene: picture };
+  for (const name of extractPlaceholders(template)) {
+    if (name === 'scene') continue;
+    const value = bag[name];
+    if (typeof value === 'string') {
+      vars[name] = value;
+      continue;
+    }
+    if (name.endsWith('Block')) {
+      const base = name.slice(0, -5);
+      const raw = bag[base];
+      if (Array.isArray(raw)) {
+        vars[name] = formatFlexibleBlock(raw);
+      } else if (typeof raw === 'string') {
+        vars[name] = raw
+          ? (base === 'note' ? `旁注：${raw}\n` : raw)
+          : '';
+      } else {
+        vars[name] = '';
+      }
+      continue;
+    }
+    vars[name] = '';
+  }
+  if (!vars.line) vars.line = (typeof bag.line === 'string' && bag.line) || display;
+  return vars;
+}
 
 /**
  * @param {string} promptsDir
@@ -45,9 +100,10 @@ function renderAlbumPrompt(promptsDir, album, scene, frame) {
   const display = frameDisplayLine(album, copy, promptsDir);
   if (!display) throw new Error('这一张的文案是空的');
   const kind = albumKind(album, promptsDir);
+  const template = readPromptFile(promptsDir, albumPromptName(album, promptsDir));
 
   /** @type {import('../template').PromptVars} */
-  const vars = { scene: picture };
+  let vars = { scene: picture };
   if (kind === 'magazine') {
     vars.line = copy.line || '';
   } else if (kind === 'scrapbook') {
@@ -70,15 +126,15 @@ function renderAlbumPrompt(promptsDir, album, scene, frame) {
     vars.summary = copy.summary || '';
     vars.credit = copy.credit || '';
   } else {
-    // 新 kind：题词 {{占位符}} 与策划字段同名装填
-    const bag = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (copy));
-    for (const [key, value] of Object.entries(bag)) {
-      if (typeof value === 'string') vars[key] = value;
-    }
-    if (!vars.line) vars.line = copy.line || display;
+    vars = fillGenericVars(
+      template,
+      /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (copy)),
+      display,
+      picture,
+    );
   }
 
-  const prompt = fillPrompt(readPromptFile(promptsDir, albumPromptName(album, promptsDir)), vars).trim();
+  const prompt = fillPrompt(template, vars).trim();
   if (SHEET_SLOTS.some((slot) => !prompt.includes(slot)) || !prompt.includes(picture) || !prompt.includes(display)) {
     throw new Error('绘图提示词缺了一槽');
   }
@@ -119,5 +175,7 @@ function renderAlbumPrompt(promptsDir, album, scene, frame) {
 
 module.exports = {
   SHEET_SLOTS,
+  extractPlaceholders,
+  fillGenericVars,
   renderAlbumPrompt,
 };
