@@ -171,9 +171,9 @@
               </div>
             </template>
           </div>
-          <div class="flex gap-2" x-show="activeVersions.length" x-cloak>
+          <div class="grid grid-cols-[repeat(15,minmax(0,1fr))] gap-2" x-show="activeVersions.length" x-cloak>
             <template x-for="(version, index) in activeVersions" :key="version.path">
-              <button class="relative h-12 w-9 shrink-0 overflow-hidden bg-base-100" type="button" :class="versionChosen(activeSlot, index) ? 'ring-2 ring-base-content' : ''" :aria-label="'第 ' + (index + 1) + ' 张'" :aria-pressed="versionChosen(activeSlot, index) ? 'true' : 'false'" @click="onChooseVersion(activeSlot, index + 1)" :disabled="job.running">
+              <button class="relative aspect-[3/4] w-full overflow-hidden bg-base-100" type="button" :class="versionChosen(activeSlot, index) ? 'ring-2 ring-base-content' : ''" :aria-label="'第 ' + (index + 1) + ' 张'" :aria-pressed="versionChosen(activeSlot, index) ? 'true' : 'false'" @click="onChooseVersion(activeSlot, index + 1)" :disabled="job.running">
                 <img class="h-full w-full object-cover" x-show="versionPreview(version)" :src="versionPreview(version)" alt="" />
                 <span class="absolute bottom-0 right-0 bg-base-100 px-0.5 text-[10px] leading-none" x-text="index + 1"></span>
               </button>
