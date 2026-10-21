@@ -37,6 +37,29 @@ test('同一张图的修订号会留下来', () => {
   assert.equal(store.read().images.cover.revisedAt, 12);
 });
 
+test('旧稿没有 uploadRefs / picks 时读成空列表', () => {
+  const latestDir = fs.mkdtempSync(path.join(os.tmpdir(), 'one-post-store-mat-'));
+  fs.mkdirSync(latestDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(latestDir, 'draft.json'),
+    `${JSON.stringify({
+      business: '测',
+      article: '',
+      articleType: '素人',
+      galleryCount: 1,
+      draft: null,
+      prompts: { cover: '', storyType: '', look: '', gallery: [], galleryLines: [], galleryRoles: [], style: '', stale: false, basis: null },
+      images: { cover: { status: '空', path: '', selected: 0, revisedAt: 0, versions: [] }, gallery: [] },
+      job: { running: false, step: '', error: '' },
+    }, null, 2)}\n`,
+  );
+  const store = createStore(latestDir);
+  const state = store.read();
+  assert.deepEqual(state.uploadRefs, []);
+  assert.deepEqual(state.picks.cover.materialIds, []);
+  assert.equal(state.picks.gallery.length, 1);
+});
+
 test('读写时保留用户图册 look，需带上 userAlbumsDir', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'one-post-look-'));
   const latestDir = path.join(root, 'post');
@@ -68,12 +91,14 @@ test('读写时保留用户图册 look，需带上 userAlbumsDir', () => {
     enabled: true,
       promptSheetVersion: 2,
   }, null, 2)}\n`;
-  fs.writeFileSync(path.join(promptsDir, 'albums', `${factoryId}.json`), meta(factoryId, 'seed'));
-  fs.writeFileSync(path.join(promptsDir, 'albums', `${factoryId}.md`), sheet);
-  fs.writeFileSync(path.join(promptsDir, 'albums', `${factoryId}.copy-sample.md`), '仅示例\n');
-  fs.writeFileSync(path.join(userAlbumsDir, `${id}.json`), meta(id, 'peach-quote-card'));
-  fs.writeFileSync(path.join(userAlbumsDir, `${id}.md`), sheet);
-  fs.writeFileSync(path.join(userAlbumsDir, `${id}.copy-sample.md`), '仅示例\n');
+  fs.mkdirSync(path.join(promptsDir, 'albums', factoryId), { recursive: true });
+  fs.writeFileSync(path.join(promptsDir, 'albums', factoryId, 'album.json'), meta(factoryId, 'seed'));
+  fs.writeFileSync(path.join(promptsDir, 'albums', factoryId, 'prompt.md'), sheet);
+  fs.writeFileSync(path.join(promptsDir, 'albums', factoryId, 'copy-sample.md'), '仅示例\n');
+  fs.mkdirSync(path.join(userAlbumsDir, id), { recursive: true });
+  fs.writeFileSync(path.join(userAlbumsDir, id, 'album.json'), meta(id, 'peach-quote-card'));
+  fs.writeFileSync(path.join(userAlbumsDir, id, 'prompt.md'), sheet);
+  fs.writeFileSync(path.join(userAlbumsDir, id, 'copy-sample.md'), '仅示例\n');
 
   const withoutUser = createStore(latestDir, { promptsDir });
   const wiped = withoutUser.read();

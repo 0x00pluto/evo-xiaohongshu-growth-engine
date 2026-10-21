@@ -183,23 +183,62 @@ function catalogCacheKey(promptsDir, userAlbumsDir) {
 }
 
 /**
+ * 一册一夹：factory → home/albums/<id>；user → home/<id>。
+ * @param {AlbumMeta} meta
+ * @returns {string}
+ */
+function albumPackDir(meta) {
+  if (meta.source === 'user') {
+    return path.join(meta.home, meta.id);
+  }
+  return path.join(meta.home, 'albums', meta.id);
+}
+
+/**
+ * @deprecated 兼容旧名：现等于 pack 目录
  * @param {AlbumMeta} meta
  * @returns {string}
  */
 function albumFilesDir(meta) {
-  return meta.source === 'user' ? meta.home : path.join(meta.home, 'albums');
+  return albumPackDir(meta);
 }
 
 /**
+ * @deprecated 兼容旧名：样图也在 pack 内
  * @param {AlbumMeta} meta
  * @returns {string}
  */
 function albumSamplesDir(meta) {
-  return path.join(meta.home, 'samples');
+  return albumPackDir(meta);
 }
 
 /**
- * @param {string} dir
+ * @param {string} packDir
+ * @returns {string}
+ */
+function albumMetaPath(packDir) {
+  return path.join(packDir, 'album.json');
+}
+
+/**
+ * @param {string} packDir
+ * @returns {string}
+ */
+function albumPromptPath(packDir) {
+  return path.join(packDir, 'prompt.md');
+}
+
+/**
+ * @param {string} packDir
+ * @returns {string}
+ */
+function albumCopySamplePath(packDir) {
+  return path.join(packDir, 'copy-sample.md');
+}
+
+/**
+ * 扫描 albums 根：只认子目录下的 album.json。
+ * @param {string} dir factory 为 promptsDir/albums；user 为 runtime/albums
  * @param {'factory' | 'user'} source
  * @param {string} home
  * @param {Map<string, string>} legacyMap
@@ -207,32 +246,36 @@ function albumSamplesDir(meta) {
  */
 function scanAlbumDir(dir, source, home, legacyMap) {
   if (!fs.existsSync(dir)) return [];
-  const names = fs.readdirSync(dir)
-    .filter((name) => name.endsWith('.json'))
-    .sort();
+  const names = fs.readdirSync(dir).sort();
   /** @type {AlbumMeta[]} */
   const metas = [];
   for (const name of names) {
-    const fileId = name.slice(0, -'.json'.length);
-    const file = path.join(dir, name);
+    const packDir = path.join(dir, name);
+    let stat;
+    try {
+      stat = fs.statSync(packDir);
+    } catch {
+      continue;
+    }
+    if (!stat.isDirectory()) continue;
+    const file = albumMetaPath(packDir);
+    if (!fs.existsSync(file)) continue;
     /** @type {unknown} */
     let raw;
     try {
       raw = JSON.parse(fs.readFileSync(file, 'utf8'));
     } catch {
-      throw new Error(`图册元数据不是合法 JSON：${fileId}`);
+      throw new Error(`图册元数据不是合法 JSON：${name}`);
     }
-    const meta = normalizeMeta(raw, fileId);
+    const meta = normalizeMeta(raw, name);
     meta.source = source;
     meta.home = home;
     if (!meta.enabled) continue;
-    const md = path.join(dir, `${meta.id}.md`);
-    const sample = path.join(dir, `${meta.id}.copy-sample.md`);
-    if (!fs.existsSync(md)) {
-      throw new Error(`找不到图册题词 ${meta.id}.md`);
+    if (!fs.existsSync(albumPromptPath(packDir))) {
+      throw new Error(`找不到图册题词 ${meta.id}/prompt.md`);
     }
-    if (!fs.existsSync(sample)) {
-      throw new Error(`找不到图册抽取示例 ${meta.id}.copy-sample.md`);
+    if (!fs.existsSync(albumCopySamplePath(packDir))) {
+      throw new Error(`找不到图册抽取示例 ${meta.id}/copy-sample.md`);
     }
     for (const legacy of meta.legacyIds) {
       if (legacyMap.has(legacy)) {
@@ -444,9 +487,9 @@ function albumPromptName(album, promptsDir, userAlbumsDir) {
   }
   const meta = loadAlbumCatalog(promptsDir, userAlbumsDir).get(/** @type {string} */ (album));
   if (meta.source === 'user') {
-    return path.join(albumFilesDir(meta), `${meta.id}.md`);
+    return albumPromptPath(albumPackDir(meta));
   }
-  return `albums/${album}.md`;
+  return `albums/${album}/prompt.md`;
 }
 
 /**
@@ -455,21 +498,27 @@ function albumPromptName(album, promptsDir, userAlbumsDir) {
  * @returns {string}
  */
 function resolveSampleAbs(meta, album) {
-  const samplesDir = albumSamplesDir(meta);
+  const packDir = albumPackDir(meta);
   for (const ext of SAMPLE_EXTS) {
-    const candidate = path.join(samplesDir, `${album}${ext}`);
+    const candidate = path.join(packDir, `sample${ext}`);
     if (fs.existsSync(candidate)) return candidate;
   }
-  if (fs.existsSync(samplesDir)) {
-    for (const name of fs.readdirSync(samplesDir)) {
+  // 兼容旧扁平：pack 旁 samples/<id>.* 或 pack/<id>.*
+  const legacySamples = path.join(meta.home, 'samples');
+  for (const ext of SAMPLE_EXTS) {
+    const candidate = path.join(legacySamples, `${album}${ext}`);
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  if (fs.existsSync(packDir)) {
+    for (const name of fs.readdirSync(packDir)) {
       const ext = path.extname(name).toLowerCase();
       const base = path.basename(name, path.extname(name));
-      if (base === album && SAMPLE_EXTS.includes(ext)) {
-        return path.join(samplesDir, name);
+      if ((base === 'sample' || base === album) && SAMPLE_EXTS.includes(ext)) {
+        return path.join(packDir, name);
       }
     }
   }
-  return path.join(samplesDir, `${album}.jpg`);
+  return path.join(packDir, 'sample.jpg');
 }
 
 /**
@@ -516,9 +565,9 @@ function readAlbumPromptText(promptsDir, album, userAlbumsDir) {
     throw new Error('图册不在允许列表');
   }
   const meta = loadAlbumCatalog(promptsDir, userAlbumsDir).get(/** @type {string} */ (album));
-  const file = path.join(albumFilesDir(meta), `${meta.id}.md`);
+  const file = albumPromptPath(albumPackDir(meta));
   if (!fs.existsSync(file)) {
-    throw new Error(`找不到图册题词 ${meta.id}.md`);
+    throw new Error(`找不到图册题词 ${meta.id}/prompt.md`);
   }
   return fs.readFileSync(file, 'utf8');
 }
@@ -535,9 +584,9 @@ function copySchema(album, promptsDir, userAlbumsDir) {
     throw new Error('图册不在允许列表');
   }
   const meta = loadAlbumCatalog(promptsDir, userAlbumsDir).get(/** @type {string} */ (album));
-  const samplePath = path.join(albumFilesDir(meta), `${album}.copy-sample.md`);
+  const samplePath = albumCopySamplePath(albumPackDir(meta));
   if (!fs.existsSync(samplePath)) {
-    throw new Error(`找不到图册抽取示例 ${album}.copy-sample.md`);
+    throw new Error(`找不到图册抽取示例 ${album}/copy-sample.md`);
   }
   const sample = fs.readFileSync(samplePath, 'utf8').trim();
   return `${meta.copySchema}\n\n${sample}`;
@@ -574,11 +623,15 @@ module.exports = {
   ALBUM_KIND_SET,
   SAMPLE_EXTS,
   USER_ALBUM_SEQ_START,
+  albumCopySamplePath,
   albumFilesDir,
   albumHint,
   albumKind,
   albumLabel,
+  albumMetaPath,
+  albumPackDir,
   albumPromptName,
+  albumPromptPath,
   albumSampleFile,
   albumSamplePath,
   albumSamplesDir,

@@ -16,8 +16,15 @@ const storeModule = require('../draft/store');
 const validateModule = require('../draft/validate');
 /** @type {typeof import('./posts')} */
 const postsModule = require('./posts');
+/** @type {typeof import('../upload-refs/rules')} */
+const uploadRefRules = require('../upload-refs/rules');
+/** @type {typeof import('../upload-refs/files')} */
+const uploadRefFiles = require('../upload-refs/files');
+/** @type {typeof import('../prompts/parse')} */
+const parseModule = require('../prompts/parse');
 
 const { createLlm } = llmModule;
+const { isTextOnlyAlbum, parseJsonObject } = parseModule;
 const { generatePng } = imageModule;
 const {
   albumHint,
@@ -43,6 +50,7 @@ const {
   isArticleType,
   isBuiltinAlbum,
   loadAlbumCatalog,
+  migrateUserAlbumPacks,
   migrateUserAlbumsFromAssets,
   normalizeReferenceImage,
   parseDraftText,
@@ -86,6 +94,8 @@ const BUSY_MESSAGE = '正在生成，请等这一轮结束';
  *   promptsDir: string;
  *   userAlbumsDir?: string;
  *   userImageRefsDir?: string;
+ *   userUploadRefsDir?: string;
+ *   userMaterialsDir?: string;
  *   env?: Record<string, string | undefined>;
  *   readEnv?: () => Record<string, string | undefined>;
  *   fetch?: import('../llm/client').FetchFn;
@@ -212,6 +222,18 @@ function createRunner(options) {
   const userImageRefsDir = typeof options.userImageRefsDir === 'string' && options.userImageRefsDir.trim()
     ? path.resolve(options.userImageRefsDir.trim())
     : '';
+  const userUploadRefsDir = (() => {
+    if (typeof options.userUploadRefsDir === 'string' && options.userUploadRefsDir.trim()) {
+      return path.resolve(options.userUploadRefsDir.trim());
+    }
+    // 兼容旧字段：原先指 runtime/materials，现叶子在 upload-refs
+    if (typeof options.userMaterialsDir === 'string' && options.userMaterialsDir.trim()) {
+      const resolved = path.resolve(options.userMaterialsDir.trim());
+      if (path.basename(resolved) === 'upload-refs') return resolved;
+      return path.join(resolved, 'upload-refs');
+    }
+    return '';
+  })();
   const staticEnv = options.env || {};
   const readEnv = typeof options.readEnv === 'function'
     ? options.readEnv
@@ -220,6 +242,10 @@ function createRunner(options) {
   const now = options.now || (() => new Date());
   if (userAlbumsDir) {
     migrateUserAlbumsFromAssets(promptsDir, userAlbumsDir);
+    migrateUserAlbumPacks(userAlbumsDir, promptsDir);
+  }
+  if (userUploadRefsDir) {
+    uploadRefFiles.migrateLibraryUploadRefsLayout(userUploadRefsDir);
   }
   importLegacy(postsDir, promptsDir, userAlbumsDir);
   let currentId = '';
@@ -255,6 +281,7 @@ function createRunner(options) {
   function usePost(id) {
     currentId = id;
     currentDir = path.join(postsDir, id);
+    uploadRefFiles.migratePostUploadRefsLayout(currentDir);
     store = createStore(currentDir, { promptsDir, userAlbumsDir });
     const writeFile = store.write;
     store.write = (state) => {
@@ -595,11 +622,17 @@ function createRunner(options) {
         store.write(current);
         const outputPath = path.join(currentDir, file);
         try {
+          const pick = job.slot === 'cover'
+            ? current.picks.cover
+            : (current.picks.gallery[job.index - 1] || uploadRefRules.emptySlotPick());
           const composed = composeImagePrompt(job.prompt, {
             promptsDir,
             look,
             userAlbumsDir,
             userImageRefsDir,
+            postDir: currentDir,
+            uploadRefs: current.uploadRefs,
+            pick,
           });
           await generateImage({
             prompt: composed.prompt,
@@ -1001,6 +1034,21 @@ function createRunner(options) {
       store.write(state);
       return { ok: false, message: reason };
     }
+    const look = state.prompts && typeof state.prompts.look === 'string'
+      ? state.prompts.look.trim()
+      : '';
+    const pick = only.slot === 'cover'
+      ? state.picks.cover
+      : (state.picks.gallery[only.index - 1] || uploadRefRules.emptySlotPick());
+    const pickBlocked = uploadRefRules.textOnlyPickBlockReason(
+      isTextOnlyAlbum(look, promptsDir, userAlbumsDir),
+      state.uploadRefs,
+      pick,
+    );
+    if (pickBlocked) {
+      store.write(state);
+      return { ok: false, message: pickBlocked };
+    }
     lock = 'generateImages';
     state.job = {
       running: true,
@@ -1127,27 +1175,351 @@ function createRunner(options) {
     return { ok: true, path: abs };
   }
 
+  /**
+   * @param {Record<string, unknown>} payload
+   */
+  /**
+   * @param {Record<string, unknown>} payload
+   */
+  function addUploadRef(payload) {
+    if (!store || !currentDir) return { ok: false, message: '没有这一篇' };
+    if (lock) return busy();
+    uploadRefFiles.migratePostUploadRefsLayout(currentDir);
+    const state = store.read();
+    if (state.uploadRefs.length >= uploadRefRules.MAX_UPLOAD_REFS_PER_POST) {
+      return {
+        ok: false,
+        message: `一篇最多囤 ${uploadRefRules.MAX_UPLOAD_REFS_PER_POST} 张上传参考`,
+      };
+    }
+    const source = payload && typeof payload === 'object' ? payload : {};
+    const usageCheck = uploadRefRules.validateUsage(source.usage);
+    if (!usageCheck.ok) return usageCheck;
+    /** @type {ReturnType<typeof normalizeReferenceImage>} */
+    let image;
+    try {
+      image = normalizeReferenceImage(source);
+    } catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : '上传参考图不合格' };
+    }
+    try {
+      const item = uploadRefFiles.writePostUploadRef(currentDir, image, usageCheck.usage);
+      state.uploadRefs = state.uploadRefs.concat([item]);
+      state.picks = uploadRefRules.addUploadRefToAllPicks(state.picks, item.id);
+      store.write(state);
+      return { ok: true, uploadRef: item, uploadRefs: state.uploadRefs, picks: state.picks };
+    } catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : '上传失败' };
+    }
+  }
+
+  /**
+   * @param {Record<string, unknown>} payload
+   */
+  function updateUploadRefUsage(payload) {
+    if (!store) return { ok: false, message: '没有这一篇' };
+    if (lock) return busy();
+    const source = payload && typeof payload === 'object' ? payload : {};
+    const id = typeof source.id === 'string' ? source.id.trim() : '';
+    if (!id) return { ok: false, message: '要指明上传参考' };
+    const usageCheck = uploadRefRules.validateUsage(source.usage);
+    if (!usageCheck.ok) return usageCheck;
+    const state = store.read();
+    const index = state.uploadRefs.findIndex((item) => item.id === id);
+    if (index < 0) return { ok: false, message: '没有这条上传参考' };
+    const next = state.uploadRefs.slice();
+    next[index] = { ...next[index], usage: usageCheck.usage };
+    state.uploadRefs = next;
+    store.write(state);
+    return { ok: true, uploadRefs: state.uploadRefs, picks: state.picks };
+  }
+
+  /**
+   * @param {Record<string, unknown>} payload
+   */
+  function deleteUploadRef(payload) {
+    if (!store || !currentDir) return { ok: false, message: '没有这一篇' };
+    if (lock) return busy();
+    const source = payload && typeof payload === 'object' ? payload : {};
+    const id = typeof source.id === 'string' ? source.id.trim() : '';
+    if (!id) return { ok: false, message: '要指明上传参考' };
+    const state = store.read();
+    const item = state.uploadRefs.find((entry) => entry.id === id);
+    if (!item) return { ok: false, message: '没有这条上传参考' };
+    uploadRefFiles.deletePostUploadRefFile(currentDir, item.fileName);
+    state.uploadRefs = state.uploadRefs.filter((entry) => entry.id !== id);
+    state.picks = uploadRefRules.removeUploadRefFromPicks(state.picks, id);
+    store.write(state);
+    return { ok: true, uploadRefs: state.uploadRefs, picks: state.picks };
+  }
+
+  /**
+   * @param {Record<string, unknown>} payload
+   */
+  function setSlotPick(payload) {
+    if (!store) return { ok: false, message: '没有这一篇' };
+    if (lock) return busy();
+    const source = payload && typeof payload === 'object' ? payload : {};
+    const only = requestedSlot(source);
+    if (!only) return { ok: false, message: '要指明封面或配图序号' };
+    const state = store.read();
+    if (only.slot === 'gallery' && only.index > state.galleryCount) {
+      return { ok: false, message: '没有这一张配图' };
+    }
+    if (Array.isArray(source.materialIds)
+      && source.materialIds.length > uploadRefRules.MAX_APPLIED_UPLOAD_REFS) {
+      return { ok: false, message: uploadRefRules.APPLY_LIMIT_MESSAGE };
+    }
+    const pick = uploadRefRules.normalizeSlotPick({
+      materialIds: source.materialIds,
+      overrides: source.overrides,
+    });
+    /** @type {Set<string>} */
+    const known = new Set(state.uploadRefs.map((item) => item.id));
+    for (const id of pick.materialIds) {
+      if (!known.has(id)) return { ok: false, message: '勾选了不存在的上传参考' };
+    }
+    const look = state.prompts && typeof state.prompts.look === 'string'
+      ? state.prompts.look.trim()
+      : '';
+    const textOnly = isTextOnlyAlbum(look, promptsDir, userAlbumsDir);
+    const blocked = uploadRefRules.textOnlyPickBlockReason(textOnly, state.uploadRefs, pick);
+    if (blocked) return { ok: false, message: blocked };
+    if (only.slot === 'cover') {
+      state.picks.cover = pick;
+    } else {
+      const gallery = state.picks.gallery.slice();
+      while (gallery.length < only.index) gallery.push(uploadRefRules.emptySlotPick());
+      gallery[only.index - 1] = pick;
+      state.picks.gallery = gallery;
+    }
+    state.picks = uploadRefRules.normalizePicks(state.picks, state.galleryCount);
+    store.write(state);
+    return { ok: true, picks: state.picks, uploadRefs: state.uploadRefs };
+  }
+
+  /**
+   * @param {Record<string, unknown>} payload
+   */
+  function previewUploadRef(payload) {
+    if (!currentDir) return { ok: false, message: '没有这一篇' };
+    const source = payload && typeof payload === 'object' ? payload : {};
+    const id = typeof source.id === 'string' ? source.id.trim() : '';
+    if (!id || !store) return { ok: false, message: '没有这条上传参考' };
+    uploadRefFiles.migratePostUploadRefsLayout(currentDir);
+    const state = store.read();
+    const item = state.uploadRefs.find((entry) => entry.id === id);
+    if (!item) return { ok: false, message: '没有这条上传参考' };
+    const preview = uploadRefFiles.readPostUploadRefPreview(currentDir, item.fileName);
+    if (!preview) return { ok: false, message: '找不到上传参考文件' };
+    return { ok: true, dataUrl: preview.dataUrl };
+  }
+
+  function listLibraryUploadRefs() {
+    if (!userUploadRefsDir) return { ok: true, uploadRefs: [] };
+    return {
+      ok: true,
+      uploadRefs: uploadRefFiles.listLibraryUploadRefs(userUploadRefsDir).map((item) => ({
+        id: item.id,
+        usage: item.usage,
+        createdAt: item.createdAt,
+      })),
+    };
+  }
+
+  /**
+   * @param {Record<string, unknown>} payload
+   */
+  function previewLibraryUploadRef(payload) {
+    if (!userUploadRefsDir) return { ok: false, message: '缺少上传参考库目录' };
+    const source = payload && typeof payload === 'object' ? payload : {};
+    const id = typeof source.id === 'string' ? source.id.trim() : '';
+    if (!id) return { ok: false, message: '要指明上传参考' };
+    const preview = uploadRefFiles.readLibraryUploadRefPreview(userUploadRefsDir, id);
+    if (!preview) return { ok: false, message: '库里没有这条上传参考' };
+    return { ok: true, dataUrl: preview.dataUrl, usage: preview.usage };
+  }
+
+  /**
+   * @param {Record<string, unknown>} payload
+   */
+  async function draftUploadRefUsage(payload) {
+    if (lock) return busy();
+    const source = payload && typeof payload === 'object' ? payload : {};
+    /** @type {ReturnType<typeof normalizeReferenceImage>} */
+    let image;
+    try {
+      image = normalizeReferenceImage(source);
+    } catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : '上传参考图不合格' };
+    }
+    lock = 'draftUploadRefUsage';
+    try {
+      const system = uploadRefFiles.readUploadRefUsageSystemPrompt(promptsDir);
+      const raw = await completeVision({ text: system, dataUrl: image.dataUrl });
+      const data = parseJsonObject(raw);
+      const usageCheck = uploadRefRules.validateUsage(
+        typeof data.usage === 'string' ? data.usage : '',
+      );
+      if (!usageCheck.ok) {
+        return { ok: false, message: '识图没有写出可用的用法句，请手写' };
+      }
+      return { ok: true, usage: usageCheck.usage };
+    } catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : '识图失败' };
+    } finally {
+      lock = null;
+    }
+  }
+
+  /**
+   * @param {Record<string, unknown>} payload
+   */
+  function saveUploadRefToLibrary(payload) {
+    if (!store || !currentDir) return { ok: false, message: '没有这一篇' };
+    if (!userUploadRefsDir) return { ok: false, message: '缺少上传参考库目录' };
+    if (lock) return busy();
+    const source = payload && typeof payload === 'object' ? payload : {};
+    const id = typeof source.id === 'string' ? source.id.trim() : '';
+    if (!id) return { ok: false, message: '要指明上传参考' };
+    const state = store.read();
+    const index = state.uploadRefs.findIndex((entry) => entry.id === id);
+    if (index < 0) return { ok: false, message: '没有这条上传参考' };
+    const item = state.uploadRefs[index];
+    const usageCheck = uploadRefRules.validateUsage(
+      typeof source.usage === 'string' ? source.usage : item.usage,
+    );
+    if (!usageCheck.ok) return usageCheck;
+    try {
+      const saved = uploadRefFiles.saveUploadRefToLibrary(
+        userUploadRefsDir,
+        currentDir,
+        { ...item, usage: usageCheck.usage },
+      );
+      const next = state.uploadRefs.slice();
+      next[index] = { ...item, usage: usageCheck.usage, libraryId: saved.id };
+      state.uploadRefs = next;
+      store.write(state);
+      return { ok: true, id: saved.id, usage: saved.usage, uploadRefs: state.uploadRefs };
+    } catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : '存进库失败' };
+    }
+  }
+
+  /**
+   * @param {Record<string, unknown>} payload
+   */
+  function pickLibraryUploadRef(payload) {
+    if (!store || !currentDir) return { ok: false, message: '没有这一篇' };
+    if (!userUploadRefsDir) return { ok: false, message: '缺少上传参考库目录' };
+    if (lock) return busy();
+    uploadRefFiles.migratePostUploadRefsLayout(currentDir);
+    const state = store.read();
+    if (state.uploadRefs.length >= uploadRefRules.MAX_UPLOAD_REFS_PER_POST) {
+      return {
+        ok: false,
+        message: `一篇最多囤 ${uploadRefRules.MAX_UPLOAD_REFS_PER_POST} 张上传参考`,
+      };
+    }
+    const source = payload && typeof payload === 'object' ? payload : {};
+    const id = typeof source.id === 'string' ? source.id.trim() : '';
+    if (!id) return { ok: false, message: '要指明上传参考' };
+    try {
+      const item = uploadRefFiles.pickLibraryUploadRefIntoPost(userUploadRefsDir, currentDir, id);
+      state.uploadRefs = state.uploadRefs.concat([item]);
+      state.picks = uploadRefRules.addUploadRefToAllPicks(state.picks, item.id);
+      store.write(state);
+      return { ok: true, uploadRef: item, uploadRefs: state.uploadRefs, picks: state.picks };
+    } catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : '从库挑失败' };
+    }
+  }
+
+  /**
+   * @param {Record<string, unknown>} payload
+   */
+  function deleteLibraryUploadRef(payload) {
+    if (!userUploadRefsDir) return { ok: false, message: '缺少上传参考库目录' };
+    if (lock) return busy();
+    const source = payload && typeof payload === 'object' ? payload : {};
+    const id = typeof source.id === 'string' ? source.id.trim() : '';
+    if (!id) return { ok: false, message: '要指明上传参考' };
+    try {
+      uploadRefFiles.deleteLibraryUploadRef(userUploadRefsDir, id);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : '删除失败' };
+    }
+  }
+
+  /**
+   * 资料库直建上传参考，不依赖当前篇。
+   * @param {Record<string, unknown>} payload
+   */
+  function addLibraryUploadRef(payload) {
+    if (!userUploadRefsDir) return { ok: false, message: '缺少上传参考库目录' };
+    if (lock) return busy();
+    const source = payload && typeof payload === 'object' ? payload : {};
+    const usageCheck = uploadRefRules.validateUsage(source.usage);
+    if (!usageCheck.ok) return usageCheck;
+    /** @type {ReturnType<typeof normalizeReferenceImage>} */
+    let image;
+    try {
+      image = normalizeReferenceImage(source);
+    } catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : '上传参考图不合格' };
+    }
+    try {
+      uploadRefFiles.migrateLibraryUploadRefsLayout(userUploadRefsDir);
+      const saved = uploadRefFiles.writeLibraryUploadRef(
+        userUploadRefsDir,
+        image,
+        usageCheck.usage,
+      );
+      return {
+        ok: true,
+        id: saved.id,
+        usage: saved.usage,
+        createdAt: saved.createdAt,
+      };
+    } catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : '入库失败' };
+    }
+  }
+
   return {
+    addLibraryUploadRef,
+    addUploadRef,
     chooseImage,
     commitAlbum,
     deleteAlbum,
+    deleteLibraryUploadRef,
+    deleteUploadRef,
     discardAlbum,
+    draftUploadRefUsage,
     generateDraft,
     generateImages,
     generatePrompts,
     getAlbumDetail,
     learnAlbum,
     listAlbums,
+    listLibraryUploadRefs,
     listPosts: catalog,
     loadLatest,
     openPost,
+    pickLibraryUploadRef,
     previewAlbumSample,
     previewImage,
+    previewLibraryUploadRef,
+    previewUploadRef,
     revealImage,
     retryImage,
     saveEditor,
+    saveUploadRefToLibrary,
+    setSlotPick,
     startNew,
     updateAlbumPrompt,
+    updateUploadRefUsage,
   };
 }
 

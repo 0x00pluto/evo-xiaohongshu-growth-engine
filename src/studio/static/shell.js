@@ -100,6 +100,7 @@
           if (id === 'library') {
             await loadScript('lib/prompt-colors.js');
             await loadScript('pages/library/albums.js');
+            await loadScript('pages/library/upload-refs.js');
           }
           const response = await fetch(`pages/${id}.html`);
           if (!response.ok) throw new Error('没有打开这一页');

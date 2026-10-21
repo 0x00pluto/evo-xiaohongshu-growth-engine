@@ -134,9 +134,9 @@ test('成稿和图册提示词能装填，长提示词不在 src 里', () => {
     const schema = copySchema(album, promptsDir);
     assert.match(schema, /仅示例/);
     assert.match(schema, /禁止照抄/);
-    assert.equal(albumSamplePath(album, promptsDir), `samples/${album}.jpg`);
-    assert.equal(albumSampleFile(promptsDir, album), path.join(promptsDir, `samples/${album}.jpg`));
-    assert.equal(fs.existsSync(path.join(promptsDir, 'albums', `${album}.json`)), true);
+    assert.equal(albumSamplePath(album, promptsDir), `albums/${album}/sample.jpg`);
+    assert.equal(albumSampleFile(promptsDir, album), path.join(promptsDir, 'albums', album, 'sample.jpg'));
+    assert.equal(fs.existsSync(path.join(promptsDir, 'albums', album, 'album.json')), true);
   }
   assert.equal(albumKind('000004.card.knowledge', promptsDir), 'card');
   assert.equal(migrateAlbumId('magazine', promptsDir), '000001.magazine.dazibao');
@@ -144,7 +144,7 @@ test('成稿和图册提示词能装填，长提示词不在 src 里', () => {
   assert.equal(migrateAlbumId('unknown', promptsDir), '');
   const infoSchema = copySchema('000005.infographic.modules', promptsDir);
   assert.match(infoSchema, /modules/);
-  const albumBody = readPromptFile(promptsDir, 'albums/000005.infographic.modules.md');
+  const albumBody = readPromptFile(promptsDir, 'albums/000005.infographic.modules/prompt.md');
   assert.doesNotMatch(albumBody, /做个人IP/);
   assert.doesNotMatch(albumBody, /超哥IP笔记/);
   const infoFrame = {
@@ -181,7 +181,7 @@ test('成稿和图册提示词能装填，长提示词不在 src 里', () => {
     '000004.card.knowledge',
     '000005.infographic.modules',
   ]) {
-    assert.equal(fs.existsSync(path.join(promptsDir, 'samples', `${id}.jpg`)), true);
+    assert.equal(fs.existsSync(path.join(promptsDir, 'albums', id, 'sample.jpg')), true);
   }
   assert.throws(
     () => parsePlanText(JSON.stringify({
@@ -287,7 +287,8 @@ test('纯文字图册允许相同画面句，并收成固定空指令', () => {
     '',
     '文案必须完整、准确。',
   ].join('\n');
-  fs.writeFileSync(path.join(dir, 'albums', `${id}.json`), `${JSON.stringify({
+  fs.mkdirSync(path.join(dir, 'albums', id), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'albums', id, 'album.json'), `${JSON.stringify({
     id,
     kind: 'magazine',
     slug: 'quote-text',
@@ -298,8 +299,8 @@ test('纯文字图册允许相同画面句，并收成固定空指令', () => {
     enabled: true,
       promptSheetVersion: 2,
   }, null, 2)}\n`);
-  fs.writeFileSync(path.join(dir, 'albums', `${id}.md`), sheet);
-  fs.writeFileSync(path.join(dir, 'albums', `${id}.copy-sample.md`), '仅示例\n');
+  fs.writeFileSync(path.join(dir, 'albums', id, 'prompt.md'), sheet);
+  fs.writeFileSync(path.join(dir, 'albums', id, 'copy-sample.md'), '仅示例\n');
   fs.writeFileSync(
     path.join(dir, 'image-refs.md'),
     [
@@ -321,7 +322,7 @@ test('纯文字图册允许相同画面句，并收成固定空指令', () => {
   assert.equal(parsed.album, id);
   const textOnlySheet = renderAlbumPrompt(dir, id, TEXT_ONLY_SCENE, { line: '甲' });
   assert.doesNotMatch(textOnlySheet.prompt, /@template|【参考图】|第一张是|禁止人物/);
-  const samplePath = path.join(dir, 'samples', `${id}.jpg`);
+  const samplePath = path.join(dir, 'albums', id, 'sample.jpg');
   fs.mkdirSync(path.dirname(samplePath), { recursive: true });
   fs.writeFileSync(samplePath, Buffer.from([0xff, 0xd8, 0xff, 0xd9]));
   clearAlbumCatalogCache(dir);
@@ -336,7 +337,8 @@ test('纯文字图册允许相同画面句，并收成固定空指令', () => {
   assert.equal(formatImageRefsBlock(dir, []), '');
 
   const noDraw = '200000.magazine.no-draw';
-  fs.writeFileSync(path.join(dir, 'albums', `${noDraw}.json`), `${JSON.stringify({
+  fs.mkdirSync(path.join(dir, 'albums', noDraw), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'albums', noDraw, 'album.json'), `${JSON.stringify({
     id: noDraw,
     kind: 'magazine',
     slug: 'no-draw',
@@ -347,8 +349,8 @@ test('纯文字图册允许相同画面句，并收成固定空指令', () => {
     enabled: true,
       promptSheetVersion: 2,
   }, null, 2)}\n`);
-  fs.writeFileSync(path.join(dir, 'albums', `${noDraw}.md`), sheet);
-  fs.writeFileSync(path.join(dir, 'albums', `${noDraw}.copy-sample.md`), '仅示例\n');
+  fs.writeFileSync(path.join(dir, 'albums', noDraw, 'prompt.md'), sheet);
+  fs.writeFileSync(path.join(dir, 'albums', noDraw, 'copy-sample.md'), '仅示例\n');
   clearAlbumCatalogCache(dir);
   const again = parseScenesText(JSON.stringify({
     scenes: ['随便写', '再写一句'],
@@ -390,7 +392,8 @@ test('magazine 题词多占位符时按模板装填，不因 kind 丢字段', ()
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'album-mag-extra-'));
   const id = '100050.magazine.foreign-like';
   fs.mkdirSync(path.join(dir, 'albums'), { recursive: true });
-  fs.writeFileSync(path.join(dir, 'albums', `${id}.json`), `${JSON.stringify({
+  fs.mkdirSync(path.join(dir, 'albums', id), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'albums', id, 'album.json'), `${JSON.stringify({
     id,
     kind: 'magazine',
     slug: 'foreign-like',
@@ -409,7 +412,7 @@ test('magazine 题词多占位符时按模板装填，不因 kind 丢字段', ()
     enabled: true,
     promptSheetVersion: 2,
   }, null, 2)}\n`);
-  fs.writeFileSync(path.join(dir, 'albums', `${id}.md`), [
+  fs.writeFileSync(path.join(dir, 'albums', id, 'prompt.md'), [
     '竖版 3:4。外刊形。',
     '1. 背景：白', '2. 色彩：黑', '3. 字体：宋', '4. 字号：大', '5. 字重：粗',
     '6. 文字排版：中', '7. 文字位置：中', '8. 构图布局：中', '9. 视觉风格：刊',
@@ -433,7 +436,7 @@ test('magazine 题词多占位符时按模板装填，不因 kind 丢字段', ()
     '',
     '文案必须完整、准确。',
   ].join('\n'));
-  fs.writeFileSync(path.join(dir, 'albums', `${id}.copy-sample.md`), '仅示例\n');
+  fs.writeFileSync(path.join(dir, 'albums', id, 'copy-sample.md'), '仅示例\n');
   clearAlbumCatalogCache(dir);
 
   const filled = renderAlbumPrompt(dir, id, '上方插画一座城', {
@@ -501,7 +504,8 @@ test('assets 里序号≥100000 的用户册可迁到 runtime/albums', () => {
   const factoryId = '000001.magazine.keep';
   const userId = '100099.magazine.migrated';
   for (const id of [factoryId, userId]) {
-    fs.writeFileSync(path.join(promptsDir, 'albums', `${id}.json`), `${JSON.stringify({
+    fs.mkdirSync(path.join(promptsDir, 'albums', id), { recursive: true });
+    fs.writeFileSync(path.join(promptsDir, 'albums', id, 'album.json'), `${JSON.stringify({
       id,
       kind: 'magazine',
       slug: id.split('.')[2],
@@ -512,7 +516,7 @@ test('assets 里序号≥100000 的用户册可迁到 runtime/albums', () => {
       enabled: true,
       promptSheetVersion: 2,
     }, null, 2)}\n`);
-    fs.writeFileSync(path.join(promptsDir, 'albums', `${id}.md`), [
+    fs.writeFileSync(path.join(promptsDir, 'albums', id, 'prompt.md'), [
       '竖版 3:4。',
       '1. 背景：白', '2. 色彩：黑', '3. 字体：黑', '4. 字号：大', '5. 字重：粗',
       '6. 文字排版：中', '7. 文字位置：中', '8. 构图布局：中', '9. 视觉风格：排',
@@ -523,15 +527,15 @@ test('assets 里序号≥100000 的用户册可迁到 runtime/albums', () => {
       '',
       '文案必须完整、准确。',
     ].join('\n'));
-    fs.writeFileSync(path.join(promptsDir, 'albums', `${id}.copy-sample.md`), '仅示例\n');
+    fs.writeFileSync(path.join(promptsDir, 'albums', id, 'copy-sample.md'), '仅示例\n');
   }
-  fs.writeFileSync(path.join(promptsDir, 'samples', `${userId}.jpg`), Buffer.from([0xff, 0xd8, 0xff, 0xd9]));
+  fs.writeFileSync(path.join(promptsDir, 'albums', userId, 'sample.jpg'), Buffer.from([0xff, 0xd8, 0xff, 0xd9]));
   const moved = migrateUserAlbumsFromAssets(promptsDir, userAlbumsDir);
   assert.deepEqual(moved, [userId]);
-  assert.ok(fs.existsSync(path.join(userAlbumsDir, `${userId}.json`)));
-  assert.ok(fs.existsSync(path.join(userAlbumsDir, 'samples', `${userId}.jpg`)));
-  assert.equal(fs.existsSync(path.join(promptsDir, 'albums', `${userId}.json`)), false);
-  assert.ok(fs.existsSync(path.join(promptsDir, 'albums', `${factoryId}.json`)));
+  assert.ok(fs.existsSync(path.join(userAlbumsDir, userId, 'album.json')));
+  assert.ok(fs.existsSync(path.join(userAlbumsDir, userId, 'sample.jpg')));
+  assert.equal(fs.existsSync(path.join(promptsDir, 'albums', userId, 'album.json')), false);
+  assert.ok(fs.existsSync(path.join(promptsDir, 'albums', factoryId, 'album.json')));
   clearAlbumCatalogCache(promptsDir, userAlbumsDir);
   const listed = listAlbums(promptsDir, userAlbumsDir);
   assert.ok(listed.includes(factoryId));

@@ -3,6 +3,7 @@ function libraryPage() {
     hostReady: window.studioHost.ready,
     tabs: [
       { id: 'albums', label: '图库' },
+      { id: 'upload-refs', label: '上传参考' },
     ],
     activeTab: 'albums',
     createOpen: false,
@@ -35,7 +36,16 @@ function libraryPage() {
 
     onCreateAlbums() {
       this.closeCreate();
+      this.activeTab = 'albums';
       this.$dispatch('library-pick-image');
+    },
+
+    onCreateUploadRefs() {
+      this.closeCreate();
+      this.activeTab = 'upload-refs';
+      this.$nextTick(() => {
+        this.$dispatch('library-pick-upload-ref');
+      });
     },
   };
 }

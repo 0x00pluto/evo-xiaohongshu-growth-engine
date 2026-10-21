@@ -71,6 +71,7 @@ module.exports = {
       promptsDir: path.join(pluginRoot(), 'assets', 'prompts', 'one-post'),
       userAlbumsDir: path.join(dataDir, 'runtime', 'albums'),
       userImageRefsDir: path.join(dataDir, 'runtime', 'image-refs'),
+      userUploadRefsDir: path.join(dataDir, 'runtime', 'materials', 'upload-refs'),
       // 设置页保存不重跑 apply；真正发请求时再读 pluginEnv。
       readEnv: () => resolveEnv(ctx),
       revealFile: revealInFolder,
@@ -81,6 +82,15 @@ module.exports = {
       },
       listAlbums() {
         return runner.listAlbums();
+      },
+      listLibraryUploadRefs() {
+        return runner.listLibraryUploadRefs();
+      },
+      /**
+       * @param {unknown} payload
+       */
+      addLibraryUploadRef(payload) {
+        return runner.addLibraryUploadRef(asObject(payload));
       },
       /**
        * @param {unknown} payload
@@ -180,6 +190,66 @@ module.exports = {
        */
       revealImage(payload) {
         return runner.revealImage(asObject(payload));
+      },
+      /**
+       * @param {unknown} payload
+       */
+      addUploadRef(payload) {
+        return runner.addUploadRef(asObject(payload));
+      },
+      /**
+       * @param {unknown} payload
+       */
+      updateUploadRefUsage(payload) {
+        return runner.updateUploadRefUsage(asObject(payload));
+      },
+      /**
+       * @param {unknown} payload
+       */
+      deleteUploadRef(payload) {
+        return runner.deleteUploadRef(asObject(payload));
+      },
+      /**
+       * @param {unknown} payload
+       */
+      setSlotPick(payload) {
+        return runner.setSlotPick(asObject(payload));
+      },
+      /**
+       * @param {unknown} payload
+       */
+      previewUploadRef(payload) {
+        return runner.previewUploadRef(asObject(payload));
+      },
+      /**
+       * @param {unknown} payload
+       */
+      previewLibraryUploadRef(payload) {
+        return runner.previewLibraryUploadRef(asObject(payload));
+      },
+      /**
+       * @param {unknown} payload
+       */
+      draftUploadRefUsage(payload) {
+        return runner.draftUploadRefUsage(asObject(payload));
+      },
+      /**
+       * @param {unknown} payload
+       */
+      saveUploadRefToLibrary(payload) {
+        return runner.saveUploadRefToLibrary(asObject(payload));
+      },
+      /**
+       * @param {unknown} payload
+       */
+      pickLibraryUploadRef(payload) {
+        return runner.pickLibraryUploadRef(asObject(payload));
+      },
+      /**
+       * @param {unknown} payload
+       */
+      deleteLibraryUploadRef(payload) {
+        return runner.deleteLibraryUploadRef(asObject(payload));
       },
       startNew() {
         return runner.startNew();

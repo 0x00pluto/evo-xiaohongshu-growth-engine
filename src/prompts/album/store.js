@@ -12,8 +12,12 @@ const learnModule = require('./learn');
 const sheetModule = require('./sheet');
 
 const {
+  SAMPLE_EXTS,
   USER_ALBUM_SEQ_START,
-  albumSampleFile,
+  albumCopySamplePath,
+  albumMetaPath,
+  albumPackDir,
+  albumPromptPath,
   clearAlbumCatalogCache,
   isAlbum,
   isBuiltinAlbum,
@@ -52,7 +56,67 @@ function moveFile(src, dest) {
 }
 
 /**
- * 把 assets 里序号 ≥ 100000 的用户册迁到 runtime/albums。
+ * @param {string} root
+ * @param {string} id
+ * @returns {string | null}
+ */
+function findLegacySample(root, id) {
+  const samplesDir = path.join(root, 'samples');
+  for (const ext of SAMPLE_EXTS) {
+    const candidate = path.join(samplesDir, `${id}${ext}`);
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
+/**
+ * 把扁平四件套迁进 <id>/ 包目录（可重复跑）。
+ * @param {string} albumsRoot factory albums 或 runtime/albums
+ * @returns {string[]}
+ */
+function migrateFlatAlbumsInRoot(albumsRoot) {
+  if (!albumsRoot || !fs.existsSync(albumsRoot)) return [];
+  /** @type {string[]} */
+  const moved = [];
+  for (const name of fs.readdirSync(albumsRoot)) {
+    if (!name.endsWith('.json')) continue;
+    if (name === 'album.json') continue;
+    const id = name.slice(0, -'.json'.length);
+    if (!/^\d{6}\./.test(id)) continue;
+    const pack = path.join(albumsRoot, id);
+    const destMeta = albumMetaPath(pack);
+    if (fs.existsSync(destMeta)) {
+      // 已是包结构：清掉旁路扁平残留
+      for (const suffix of ['.json', '.md', '.copy-sample.md']) {
+        unlinkQuiet(path.join(albumsRoot, `${id}${suffix}`));
+      }
+      const legacySample = findLegacySample(albumsRoot, id);
+      if (legacySample) unlinkQuiet(legacySample);
+      continue;
+    }
+    const srcJson = path.join(albumsRoot, `${id}.json`);
+    const srcMd = path.join(albumsRoot, `${id}.md`);
+    const srcCopy = path.join(albumsRoot, `${id}.copy-sample.md`);
+    if (!fs.existsSync(srcJson) || !fs.existsSync(srcMd) || !fs.existsSync(srcCopy)) {
+      continue;
+    }
+    fs.mkdirSync(pack, { recursive: true });
+    moveFile(srcJson, destMeta);
+    moveFile(srcMd, albumPromptPath(pack));
+    moveFile(srcCopy, albumCopySamplePath(pack));
+    const legacySample = findLegacySample(albumsRoot, id);
+    if (legacySample) {
+      const ext = path.extname(legacySample).toLowerCase();
+      const safeExt = ext === '.jpeg' ? '.jpg' : ext;
+      moveFile(legacySample, path.join(pack, `sample${safeExt}`));
+    }
+    moved.push(id);
+  }
+  return moved;
+}
+
+/**
+ * 把 assets 里序号 ≥ 100000 的用户册迁到 runtime/albums（包目录）。
  * @param {string} promptsDir
  * @param {string} userAlbumsDir
  * @returns {string[]} 迁走的 id 列表
@@ -61,50 +125,66 @@ function migrateUserAlbumsFromAssets(promptsDir, userAlbumsDir) {
   if (typeof promptsDir !== 'string' || !promptsDir) return [];
   if (typeof userAlbumsDir !== 'string' || !userAlbumsDir.trim()) return [];
   const factoryAlbums = path.join(promptsDir, 'albums');
-  const factorySamples = path.join(promptsDir, 'samples');
   const userRoot = path.resolve(userAlbumsDir.trim());
   if (!fs.existsSync(factoryAlbums)) return [];
+
+  // 先把两边扁平结构收成包
+  migrateFlatAlbumsInRoot(factoryAlbums);
+  migrateFlatAlbumsInRoot(userRoot);
 
   /** @type {string[]} */
   const moved = [];
   for (const name of fs.readdirSync(factoryAlbums)) {
-    if (!name.endsWith('.json')) continue;
-    const id = name.slice(0, -'.json'.length);
+    const pack = path.join(factoryAlbums, name);
+    let stat;
+    try {
+      stat = fs.statSync(pack);
+    } catch {
+      continue;
+    }
+    if (!stat.isDirectory()) continue;
+    if (!fs.existsSync(albumMetaPath(pack))) continue;
+    const id = name;
     const seq = Number(id.slice(0, 6));
     if (!Number.isInteger(seq) || seq < USER_ALBUM_SEQ_START) continue;
 
-    const destJson = path.join(userRoot, `${id}.json`);
-    if (fs.existsSync(destJson)) {
-      // 目标已有则只清资产侧副本
-      for (const suffix of ['.json', '.md', '.copy-sample.md']) {
-        unlinkQuiet(path.join(factoryAlbums, `${id}${suffix}`));
-      }
-      for (const ext of ['.jpg', '.jpeg', '.png', '.webp']) {
-        unlinkQuiet(path.join(factorySamples, `${id}${ext}`));
-      }
+    const destPack = path.join(userRoot, id);
+    if (fs.existsSync(albumMetaPath(destPack))) {
+      fs.rmSync(pack, { recursive: true, force: true });
       moved.push(id);
       continue;
     }
 
     fs.mkdirSync(userRoot, { recursive: true });
-    fs.mkdirSync(path.join(userRoot, 'samples'), { recursive: true });
-    for (const suffix of ['.json', '.md', '.copy-sample.md']) {
-      const src = path.join(factoryAlbums, `${id}${suffix}`);
-      if (fs.existsSync(src)) {
-        moveFile(src, path.join(userRoot, `${id}${suffix}`));
-      }
-    }
-    for (const ext of ['.jpg', '.jpeg', '.png', '.webp']) {
-      const src = path.join(factorySamples, `${id}${ext}`);
-      if (fs.existsSync(src)) {
-        moveFile(src, path.join(userRoot, 'samples', `${id}${ext}`));
-        break;
-      }
+    try {
+      fs.renameSync(pack, destPack);
+    } catch {
+      fs.cpSync(pack, destPack, { recursive: true });
+      fs.rmSync(pack, { recursive: true, force: true });
     }
     moved.push(id);
   }
   if (moved.length > 0) {
     clearAlbumCatalogCache(promptsDir, userRoot);
+  }
+  return moved;
+}
+
+/**
+ * 启动时把用户 runtime 扁平册收成包。
+ * @param {string} userAlbumsDir
+ * @param {string} [promptsDir]
+ * @returns {string[]}
+ */
+function migrateUserAlbumPacks(userAlbumsDir, promptsDir) {
+  if (typeof userAlbumsDir !== 'string' || !userAlbumsDir.trim()) return [];
+  const userRoot = path.resolve(userAlbumsDir.trim());
+  const moved = migrateFlatAlbumsInRoot(userRoot);
+  if (moved.length > 0) {
+    clearAlbumCatalogCache(
+      typeof promptsDir === 'string' ? promptsDir : userRoot,
+      userRoot,
+    );
   }
   return moved;
 }
@@ -125,30 +205,33 @@ function commitAlbumDraft(userAlbumsDir, draft, promptsDir) {
     throw new Error('缺少用户图册目录');
   }
   const albumsDir = path.resolve(userAlbumsDir.trim());
-  const samplesDir = path.join(albumsDir, 'samples');
+  const pack = path.join(albumsDir, id);
   fs.mkdirSync(albumsDir, { recursive: true });
-  fs.mkdirSync(samplesDir, { recursive: true });
 
-  const jsonPath = path.join(albumsDir, `${id}.json`);
-  const mdPath = path.join(albumsDir, `${id}.md`);
-  const sampleMdPath = path.join(albumsDir, `${id}.copy-sample.md`);
+  const jsonPath = albumMetaPath(pack);
+  const mdPath = albumPromptPath(pack);
+  const sampleMdPath = albumCopySamplePath(pack);
   const ext = typeof draft.sampleExt === 'string' && draft.sampleExt.startsWith('.')
-    ? draft.sampleExt
+    ? (draft.sampleExt === '.jpeg' ? '.jpg' : draft.sampleExt)
     : '.jpg';
-  const samplePath = path.join(samplesDir, `${id}${ext}`);
+  const samplePath = path.join(pack, `sample${ext}`);
 
   if (
     fs.existsSync(jsonPath)
     || fs.existsSync(mdPath)
     || fs.existsSync(sampleMdPath)
     || fs.existsSync(samplePath)
+    || fs.existsSync(pack)
   ) {
-    throw new Error('图册文件已存在，请放弃后重新学习');
+    if (fs.existsSync(pack) && fs.readdirSync(pack).length > 0) {
+      throw new Error('图册文件已存在，请放弃后重新学习');
+    }
   }
 
   /** @type {string[]} */
   const written = [];
   try {
+    fs.mkdirSync(pack, { recursive: true });
     const meta = {
       id,
       kind: draft.kind,
@@ -170,6 +253,13 @@ function commitAlbumDraft(userAlbumsDir, draft, promptsDir) {
     written.push(samplePath);
   } catch (err) {
     for (const file of written) unlinkQuiet(file);
+    try {
+      if (fs.existsSync(pack) && fs.readdirSync(pack).length === 0) {
+        fs.rmdirSync(pack);
+      }
+    } catch {
+      // ignore
+    }
     throw err instanceof Error ? err : new Error('写入图册失败');
   }
 
@@ -180,6 +270,11 @@ function commitAlbumDraft(userAlbumsDir, draft, promptsDir) {
       loadAlbumCatalog(factoryDir, albumsDir).get(id);
     } catch (err) {
       for (const file of written) unlinkQuiet(file);
+      try {
+        fs.rmSync(pack, { recursive: true, force: true });
+      } catch {
+        // ignore
+      }
       clearAlbumCatalogCache(factoryDir, albumsDir);
       throw err instanceof Error ? err : new Error('写入后图册校验失败');
     }
@@ -206,18 +301,9 @@ function deleteAlbumFiles(promptsDir, userAlbumsDir, id) {
     throw new Error('出厂图册不能删除');
   }
 
-  const albumsDir = meta.home;
-  /** @type {string[]} */
-  const targets = [
-    path.join(albumsDir, `${albumId}.json`),
-    path.join(albumsDir, `${albumId}.md`),
-    path.join(albumsDir, `${albumId}.copy-sample.md`),
-  ];
-  const sampleAbs = albumSampleFile(promptsDir, albumId, userAlbumsDir);
-  if (fs.existsSync(sampleAbs)) targets.push(sampleAbs);
-
-  for (const file of targets) {
-    if (fs.existsSync(file)) fs.unlinkSync(file);
+  const pack = albumPackDir(meta);
+  if (fs.existsSync(pack)) {
+    fs.rmSync(pack, { recursive: true, force: true });
   }
   clearAlbumCatalogCache(promptsDir, userAlbumsDir);
 }
@@ -252,9 +338,9 @@ function updateAlbumPromptMd(promptsDir, userAlbumsDir, id, promptMd) {
       `图册题词结构是 v${meta.promptSheetVersion}，当前只支持 v${PROMPT_SHEET_VERSION}；请重新学习或改 JSON 的 promptSheetVersion`,
     );
   }
-  const mdPath = path.join(meta.home, `${albumId}.md`);
+  const mdPath = albumPromptPath(albumPackDir(meta));
   if (!fs.existsSync(mdPath)) {
-    throw new Error(`找不到图册题词 ${albumId}.md`);
+    throw new Error(`找不到图册题词 ${albumId}/prompt.md`);
   }
   fs.writeFileSync(mdPath, `${text}\n`, 'utf8');
   clearAlbumCatalogCache(promptsDir, userAlbumsDir);
@@ -264,6 +350,8 @@ function updateAlbumPromptMd(promptsDir, userAlbumsDir, id, promptMd) {
 module.exports = {
   commitAlbumDraft,
   deleteAlbumFiles,
+  migrateFlatAlbumsInRoot,
+  migrateUserAlbumPacks,
   migrateUserAlbumsFromAssets,
   updateAlbumPromptMd,
 };

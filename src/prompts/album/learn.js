@@ -213,8 +213,20 @@ function maxSeqInDir(dir, maxUser) {
   let max = maxUser;
   if (!fs.existsSync(dir)) return max;
   for (const name of fs.readdirSync(dir)) {
-    if (!name.endsWith('.json')) continue;
-    const seq = Number(name.slice(0, 6));
+    // 包目录名即 id；也兼容旧扁平 <id>.json
+    let id = '';
+    const abs = path.join(dir, name);
+    try {
+      if (fs.statSync(abs).isDirectory() && fs.existsSync(path.join(abs, 'album.json'))) {
+        id = name;
+      } else if (name.endsWith('.json') && name !== 'album.json') {
+        id = name.slice(0, -'.json'.length);
+      }
+    } catch {
+      continue;
+    }
+    if (!id) continue;
+    const seq = Number(id.slice(0, 6));
     if (Number.isInteger(seq) && seq >= USER_ALBUM_SEQ_START && seq > max) {
       max = seq;
     }
@@ -250,8 +262,8 @@ function allocateAlbumId(promptsDir, parts, userAlbumsDir) {
     : '';
   for (let attempt = 0; attempt < 20; attempt += 1) {
     const id = `${String(seq).padStart(6, '0')}.${parts.kind}.${parts.slug}`;
-    const factoryPath = path.join(promptsDir, 'albums', `${id}.json`);
-    const userPath = userRoot ? path.join(userRoot, `${id}.json`) : '';
+    const factoryPath = path.join(promptsDir, 'albums', id, 'album.json');
+    const userPath = userRoot ? path.join(userRoot, id, 'album.json') : '';
     if (!fs.existsSync(factoryPath) && (!userPath || !fs.existsSync(userPath))) {
       return id;
     }

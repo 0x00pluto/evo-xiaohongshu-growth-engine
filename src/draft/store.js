@@ -6,7 +6,10 @@ const path = require('node:path');
 
 /** @type {typeof import('../prompts/fill')} */
 const fillModule = require('../prompts/fill');
+/** @type {typeof import('../upload-refs/rules')} */
+const uploadRefRules = require('../upload-refs/rules');
 const { migrateAlbumId } = fillModule;
+const { emptyPicks, normalizePicks, readUploadRefsFromDraft } = uploadRefRules;
 
 const STATUSES = new Set(['空', '生成中', '成功', '失败', '作废']);
 
@@ -39,6 +42,8 @@ const STATUSES = new Set(['空', '生成中', '成功', '失败', '作废']);
  *   draft: import('./validate').DraftFace | null;
  *   prompts: PromptsState;
  *   images: { cover: ImageSlot; gallery: ImageSlot[] };
+ *   uploadRefs: import('../upload-refs/rules').UploadRefItem[];
+ *   picks: import('../upload-refs/rules').PicksState;
  *   job: { running: boolean; step: string; error: string };
  * }} DraftState
  * @typedef {{
@@ -124,6 +129,8 @@ function emptyState() {
       basis: null,
     },
     images: { cover: emptySlot(), gallery: [] },
+    uploadRefs: [],
+    picks: emptyPicks(1),
     job: { running: false, step: '', error: '' },
   };
 }
@@ -305,6 +312,8 @@ function normalize(raw, promptsDir, userAlbumsDir) {
     cover: normalizeSlot(images.cover),
     gallery: Array.isArray(images.gallery) ? images.gallery.map((slot) => normalizeSlot(slot)) : [],
   };
+  base.uploadRefs = readUploadRefsFromDraft(source);
+  base.picks = normalizePicks(source.picks, base.galleryCount);
   const job = source.job && typeof source.job === 'object'
     ? /** @type {Record<string, unknown>} */ (source.job)
     : {};

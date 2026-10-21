@@ -9,3 +9,4 @@
 | 00003 | `specs/prds/prd-00003-studio-cal-palette.md` | 操作台三页只换 Cal.com 色板。技术栈、信息架构和交互不动。工程 accepted |
 | 00004 | `specs/prds/prd-00004-image-set.md` | 头图在现有风格里选定，封面之外的图按张数排成故事拆开系列，两者运行时拼成一套图集。 |
 | 00005 | `specs/prds/prd-00005-album-library.md` | 左栏图库管理页：浏览图册、学习参考图成草稿后确认写入、自加可二次确认删除；出厂五本不可删；新 kind 走通用槽。工程 accepted |
+| 00006 | `specs/prds/prd-00006-fuse-reference-images.md` | 生图时融进上传素材：用法句、模板主体空位换人、封面与配图各自勾选；R0 挂在这篇，R1 资料库素材 Tab。工程 accepted |

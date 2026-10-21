@@ -16,7 +16,8 @@ const { createRunner } = runModule;
 const ROOT = path.resolve(__dirname, '..');
 const STATIC_DIR = path.join(ROOT, 'src', 'studio', 'static');
 const DEFAULT_PORT = 8768;
-const MAX_BODY = 1_500_000;
+// 单张素材 ≤8MB，data URL base64 约 4/3，再留一点 JSON 余量
+const MAX_BODY = 12_000_000;
 const RELOAD_DEBOUNCE_MS = 100;
 const RELOAD_SNIPPET = '<script>(function(){var s=new EventSource("/api/dev/reload");s.onmessage=function(){location.reload();};})();</script>';
 const METHODS = new Set([
@@ -24,6 +25,8 @@ const METHODS = new Set([
   'openPost',
   'listPosts',
   'listAlbums',
+  'listLibraryUploadRefs',
+  'addLibraryUploadRef',
   'getAlbumDetail',
   'learnAlbum',
   'commitAlbum',
@@ -40,6 +43,16 @@ const METHODS = new Set([
   'previewImage',
   'previewAlbumSample',
   'revealImage',
+  'addUploadRef',
+  'updateUploadRefUsage',
+  'deleteUploadRef',
+  'setSlotPick',
+  'previewUploadRef',
+  'previewLibraryUploadRef',
+  'draftUploadRefUsage',
+  'saveUploadRefToLibrary',
+  'pickLibraryUploadRef',
+  'deleteLibraryUploadRef',
 ]);
 const LOCAL_HOSTS = new Set(['127.0.0.1', 'localhost', '::1']);
 
@@ -159,6 +172,7 @@ function createStudio(options) {
     promptsDir: path.join(root, 'assets', 'prompts', 'one-post'),
     userAlbumsDir: path.join(root, 'runtime', 'albums'),
     userImageRefsDir: path.join(root, 'runtime', 'image-refs'),
+    userUploadRefsDir: path.join(root, 'runtime', 'materials', 'upload-refs'),
     env,
     revealFile: options.revealFile || revealInFolder,
   });

@@ -51,6 +51,7 @@ module.exports = {
   imageReferencesFor: require('./album/refs').imageReferencesFor,
   TEXT_ONLY_LOCK: require('./album/refs').TEXT_ONLY_LOCK,
   migrateUserAlbumsFromAssets: albumStoreModule.migrateUserAlbumsFromAssets,
+  migrateUserAlbumPacks: albumStoreModule.migrateUserAlbumPacks,
   readAlbumPromptText: catalogModule.readAlbumPromptText,
   draftPublicView: learnModule.draftPublicView,
   fillPrompt: templateModule.fillPrompt,

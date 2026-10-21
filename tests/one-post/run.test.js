@@ -151,7 +151,9 @@ function albumSlots(id) {
 }
 
 function writeAlbum(dir, name) {
-  fs.writeFileSync(path.join(dir, 'albums', `${name}.md`), albumSlots(name));
+  const pack = path.join(dir, 'albums', name);
+  fs.mkdirSync(pack, { recursive: true });
+  fs.writeFileSync(path.join(pack, 'prompt.md'), albumSlots(name));
 }
 
 /** @type {Record<string, { hint: string; label: string; copySchema: string; legacyIds: string[]; constraints?: object }>} */
@@ -208,7 +210,9 @@ function writeAlbumMeta(dir, id) {
   const kind = albumKindOf(id);
   const slug = String(id).split('.')[2] || kind;
   const meta = ALBUM_META[id];
-  fs.writeFileSync(path.join(dir, 'albums', `${id}.json`), `${JSON.stringify({
+  const pack = path.join(dir, 'albums', id);
+  fs.mkdirSync(pack, { recursive: true });
+  fs.writeFileSync(path.join(pack, 'album.json'), `${JSON.stringify({
     id,
     kind,
     slug,
@@ -217,7 +221,7 @@ function writeAlbumMeta(dir, id) {
     copySchema: meta.copySchema,
     legacyIds: meta.legacyIds,
     enabled: true,
-      promptSheetVersion: 2,
+    promptSheetVersion: 2,
     ...(meta.constraints ? { constraints: meta.constraints } : {}),
   }, null, 2)}\n`);
 }
@@ -261,11 +265,20 @@ function writePrompts(dir) {
       '品牌标识参考图。',
     ].join('\n'),
   );
+  fs.writeFileSync(
+    path.join(dir, 'subject-slot.md'),
+    '【主体空位】\n用上传主体换掉模板假人；不要两个主角并排。',
+  );
+  fs.mkdirSync(path.join(dir, 'material-usage'), { recursive: true });
+  fs.writeFileSync(
+    path.join(dir, 'material-usage', 'system.md'),
+    '请返回 JSON：{"usage":"一句用法"}',
+  );
   for (const id of ALL_ALBUMS) {
     writeAlbum(dir, id);
     writeAlbumMeta(dir, id);
     fs.writeFileSync(
-      path.join(dir, 'albums', `${id}.copy-sample.md`),
+      path.join(dir, 'albums', id, 'copy-sample.md'),
       '以下为「仅示例」。禁止照抄示例文案。\n',
     );
   }
@@ -1299,4 +1312,245 @@ test('张数变少后多出来的配图文件还留着', async () => {
   assert.equal(fs.existsSync(path.join(dir, 'gallery-01-1.png')), true);
   assert.equal(fs.existsSync(path.join(dir, 'gallery-02-1.png')), true);
   assert.equal(runner.loadLatest().images.gallery[0].path, 'gallery-01-1.png');
+});
+
+/** 过文件头校验的最小 JPEG（须 ≥12 字节） */
+const TINY_JPEG = Buffer.concat([
+  Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01]),
+  Buffer.alloc(20, 0),
+  Buffer.from([0xff, 0xd9]),
+]);
+
+test('上传参考默认勾全槽；取消勾选后该槽不带；删除清文件不覆盖旧图', async () => {
+  const root = tempDir();
+  const promptsDir = path.join(root, 'prompts');
+  writePrompts(promptsDir);
+  const samplePath = path.join(promptsDir, 'albums', ALBUM_CONCEPTUAL, 'sample.jpg');
+  fs.mkdirSync(path.dirname(samplePath), { recursive: true });
+  fs.writeFileSync(samplePath, TINY_JPEG);
+  /** @type {unknown[]} */
+  const seen = [];
+  const runner = createRunner({
+    postsDir: path.join(root, 'posts'),
+    promptsDir,
+    userUploadRefsDir: path.join(root, 'runtime', 'materials', 'upload-refs'),
+    random: () => 0.5,
+    complete: async (prompt) => responseFor(prompt, 0),
+    generateImage: async (args) => {
+      seen.push(args);
+      fs.mkdirSync(path.dirname(args.outputPath), { recursive: true });
+      fs.writeFileSync(args.outputPath, 'png');
+    },
+  });
+  runner.generateDraft(draftArgs({ galleryCount: 1 }));
+  await untilIdle(runner);
+
+  const emptyUsage = runner.addUploadRef({
+    dataUrl: `data:image/jpeg;base64,${TINY_JPEG.toString('base64')}`,
+    usage: '',
+  });
+  assert.equal(emptyUsage.ok, false);
+
+  const added = runner.addUploadRef({
+    dataUrl: `data:image/jpeg;base64,${TINY_JPEG.toString('base64')}`,
+    usage: '人物照片。按 Hero 放在画面中央，锁脸。',
+  });
+  assert.equal(added.ok, true);
+  const materialId = added.uploadRef.id;
+  assert.deepEqual(added.picks.cover.materialIds, [materialId]);
+  assert.deepEqual(added.picks.gallery[0].materialIds, [materialId]);
+  const postDir = runner.loadLatest().directory;
+  assert.equal(
+    fs.existsSync(path.join(postDir, 'materials', 'upload-refs', added.uploadRef.fileName)),
+    true,
+  );
+
+  assert.equal(runner.generateImages({ slot: 'cover' }).ok, true);
+  await untilIdle(runner);
+  assert.equal(seen.length, 1);
+  const coverArgs = /** @type {{ references?: { role: string; path: string; usage?: string }[]; prompt: string }} */ (seen[0]);
+  assert.equal(coverArgs.references && coverArgs.references.length, 2);
+  assert.equal(coverArgs.references[0].role, 'template');
+  assert.equal(coverArgs.references[1].role, 'upload-ref');
+  assert.equal(coverArgs.references[1].usage, '人物照片。按 Hero 放在画面中央，锁脸。');
+  assert.match(coverArgs.prompt, /第二张是人物照片。按 Hero 放在画面中央，锁脸。/);
+  assert.match(coverArgs.prompt, /必须使用【参考图】中版式模板之后列出的上传参考图/);
+  assert.doesNotMatch(coverArgs.prompt, /【主体空位】/);
+
+  const afterCover = runner.loadLatest();
+  const coverFile = afterCover.images.cover.path;
+  assert.ok(coverFile);
+
+  runner.setSlotPick({ slot: 'gallery', index: 1, materialIds: [], overrides: {} });
+  seen.length = 0;
+  assert.equal(runner.generateImages({ slot: 'gallery', index: 1 }).ok, true);
+  await untilIdle(runner);
+  const galleryArgs = /** @type {{ references?: { role: string; usage?: string }[] }} */ (seen[0]);
+  assert.equal(galleryArgs.references && galleryArgs.references.length, 1);
+  assert.equal(galleryArgs.references[0].role, 'template');
+
+  const still = runner.loadLatest();
+  assert.equal(still.images.cover.path, coverFile);
+  assert.equal(fs.existsSync(path.join(still.directory, coverFile)), true);
+
+  const removed = runner.deleteUploadRef({ id: materialId });
+  assert.equal(removed.ok, true);
+  assert.equal(removed.uploadRefs.length, 0);
+  assert.deepEqual(removed.picks.cover.materialIds, []);
+  assert.equal(fs.existsSync(path.join(still.directory, 'materials', 'upload-refs', added.uploadRef.fileName)), false);
+});
+
+test('纯文字图册带占主体上传参考被拒；角落小标可通过', async () => {
+  const root = tempDir();
+  const promptsDir = path.join(root, 'prompts');
+  writePrompts(promptsDir);
+  const metaPath = path.join(promptsDir, 'albums', ALBUM_MAGAZINE, 'album.json');
+  const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+  meta.hint = '纯文字，无插画，只排版。';
+  fs.writeFileSync(metaPath, `${JSON.stringify(meta, null, 2)}\n`);
+  const { clearAlbumCatalogCache } = require('../../src/prompts/fill');
+  clearAlbumCatalogCache(promptsDir);
+
+  const runner = createRunner({
+    postsDir: path.join(root, 'posts'),
+    promptsDir,
+    random: firstPick,
+    complete: async (prompt) => responseFor(prompt, 0),
+    generateImage: async ({ outputPath }) => {
+      fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+      fs.writeFileSync(outputPath, 'png');
+    },
+  });
+  runner.generateDraft(draftArgs({ galleryCount: 0 }));
+  await untilIdle(runner);
+  assert.equal(runner.loadLatest().prompts.look, ALBUM_MAGAZINE);
+
+  const person = runner.addUploadRef({
+    dataUrl: `data:image/jpeg;base64,${TINY_JPEG.toString('base64')}`,
+    usage: '人物照片。中央。',
+  });
+  assert.equal(person.ok, true);
+  const blocked = runner.generateImages({ slot: 'cover' });
+  assert.equal(blocked.ok, false);
+  assert.match(blocked.message, /纯文字图册/);
+
+  const removed = runner.deleteUploadRef({ id: person.uploadRef.id });
+  assert.equal(removed.ok, true);
+
+  const logo = runner.addUploadRef({
+    dataUrl: `data:image/jpeg;base64,${TINY_JPEG.toString('base64')}`,
+    usage: '品牌标识。角落小标，不占主体。',
+  });
+  assert.equal(logo.ok, true);
+  const allowed = runner.generateImages({ slot: 'cover' });
+  assert.equal(allowed.ok, true);
+  await untilIdle(runner);
+});
+test('资料库可直建上传参考，不依赖当前篇', () => {
+  const root = tempDir();
+  const materialsDir = path.join(root, 'runtime', 'materials', 'upload-refs');
+  const runner = createRunner({
+    postsDir: path.join(root, 'posts'),
+    promptsDir: path.join(root, 'prompts'),
+    userUploadRefsDir: materialsDir,
+    complete: async () => '{}',
+  });
+  // 没有打开任何笔记时，篇内上传应失败，直写库应成功
+  const needPost = runner.addUploadRef({
+    dataUrl: `data:image/jpeg;base64,${TINY_JPEG.toString('base64')}`,
+    usage: '实物照片。放在右下角。',
+  });
+  assert.equal(needPost.ok, false);
+  const emptyUsage = runner.addLibraryUploadRef({
+    dataUrl: `data:image/jpeg;base64,${TINY_JPEG.toString('base64')}`,
+    usage: '',
+  });
+  assert.equal(emptyUsage.ok, false);
+  const badImage = runner.addLibraryUploadRef({
+    dataUrl: 'data:text/plain;base64,aGk=',
+    usage: '实物照片。放在右下角。',
+  });
+  assert.equal(badImage.ok, false);
+  const saved = runner.addLibraryUploadRef({
+    dataUrl: `data:image/jpeg;base64,${TINY_JPEG.toString('base64')}`,
+    usage: '实物照片。放在右下角。',
+  });
+  assert.equal(saved.ok, true);
+  assert.ok(saved.id);
+  const listed = runner.listLibraryUploadRefs();
+  assert.equal(listed.ok, true);
+  assert.equal(listed.uploadRefs.length, 1);
+  assert.equal(listed.uploadRefs[0].id, saved.id);
+  assert.equal(listed.uploadRefs[0].usage, '实物照片。放在右下角。');
+  assert.equal(fs.existsSync(path.join(materialsDir, saved.id, 'meta.json')), true);
+});
+
+test('存进库与从库挑复制用法句，挑入后默认勾全槽', async () => {
+  const root = tempDir();
+  const promptsDir = path.join(root, 'prompts');
+  const materialsDir = path.join(root, 'runtime', 'materials', 'upload-refs');
+  writePrompts(promptsDir);
+  const runner = createRunner({
+    postsDir: path.join(root, 'posts'),
+    promptsDir,
+    userUploadRefsDir: materialsDir,
+    complete: async (prompt) => responseFor(prompt, 0),
+  });
+  runner.generateDraft(draftArgs({ galleryCount: 0 }));
+  await untilIdle(runner);
+  const added = runner.addUploadRef({
+    dataUrl: `data:image/jpeg;base64,${TINY_JPEG.toString('base64')}`,
+    usage: '实物照片。放在右下角。',
+  });
+  assert.equal(added.ok, true);
+  const saved = runner.saveUploadRefToLibrary({ id: added.uploadRef.id });
+  assert.equal(saved.ok, true);
+  const listed = runner.listLibraryUploadRefs();
+  assert.equal(listed.ok, true);
+  assert.equal(listed.uploadRefs.length, 1);
+  assert.equal(listed.uploadRefs[0].usage, '实物照片。放在右下角。');
+
+  runner.startNew();
+  runner.generateDraft(draftArgs({ galleryCount: 0 }));
+  await untilIdle(runner);
+  const picked = runner.pickLibraryUploadRef({ id: saved.id });
+  assert.equal(picked.ok, true);
+  assert.equal(picked.uploadRef.usage, '实物照片。放在右下角。');
+  assert.deepEqual(picked.picks.cover.materialIds, [picked.uploadRef.id]);
+});
+
+test('一篇可囤超过 9 张；每槽勾选第 10 张被拒', async () => {
+  const root = tempDir();
+  const promptsDir = path.join(root, 'prompts');
+  writePrompts(promptsDir);
+  const runner = createRunner({
+    postsDir: path.join(root, 'posts'),
+    promptsDir,
+    complete: async (prompt) => responseFor(prompt, 0),
+  });
+  runner.generateDraft(draftArgs({ galleryCount: 0 }));
+  await untilIdle(runner);
+  const dataUrl = `data:image/jpeg;base64,${TINY_JPEG.toString('base64')}`;
+  /** @type {string[]} */
+  const ids = [];
+  for (let i = 0; i < 10; i += 1) {
+    const added = runner.addUploadRef({
+      dataUrl,
+      usage: `参考 ${i + 1}。放在角落。`,
+    });
+    assert.equal(added.ok, true, `第 ${i + 1} 张应能囤进池`);
+    ids.push(added.uploadRef.id);
+  }
+  assert.equal(runner.loadLatest().uploadRefs.length, 10);
+  const nine = runner.setSlotPick({
+    slot: 'cover',
+    materialIds: ids.slice(0, 9),
+  });
+  assert.equal(nine.ok, true);
+  const ten = runner.setSlotPick({
+    slot: 'cover',
+    materialIds: ids,
+  });
+  assert.equal(ten.ok, false);
+  assert.match(ten.message, /最多勾 9/);
 });

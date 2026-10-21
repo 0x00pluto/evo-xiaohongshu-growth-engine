@@ -132,7 +132,8 @@ function seedFactoryAlbums(dir) {
     } else if (kind === 'scrapbook') {
       promptMd = `${sheetPrompt().replace('{{line}}\n', '{{line}}\n{{noteBlock}}\n')}`;
     }
-    fs.writeFileSync(path.join(dir, 'albums', `${id}.json`), `${JSON.stringify({
+    fs.mkdirSync(path.join(dir, 'albums', id), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'albums', id, 'album.json'), `${JSON.stringify({
       id,
       kind,
       slug: 'seed',
@@ -146,8 +147,8 @@ function seedFactoryAlbums(dir) {
         constraints: { modules: { min: 2, max: 6 }, steps: { min: 3, max: 7 } },
       } : {}),
     }, null, 2)}\n`);
-    fs.writeFileSync(path.join(dir, 'albums', `${id}.md`), promptMd);
-    fs.writeFileSync(path.join(dir, 'albums', `${id}.copy-sample.md`), '仅示例\n');
+    fs.writeFileSync(path.join(dir, 'albums', id, 'prompt.md'), promptMd);
+    fs.writeFileSync(path.join(dir, 'albums', id, 'copy-sample.md'), '仅示例\n');
   }
   clearAlbumCatalogCache(dir);
 }
@@ -221,8 +222,8 @@ test('四件套校验失败不落盘；写入后可删；出厂不可删', () =>
   commitAlbumDraft(userDir, draft, dir);
   clearAlbumCatalogCache(dir, userDir);
   assert.ok(listAlbums(dir, userDir).includes(draft.id));
-  assert.ok(fs.existsSync(path.join(userDir, `${draft.id}.json`)));
-  assert.equal(fs.existsSync(path.join(dir, 'albums', `${draft.id}.json`)), false);
+  assert.ok(fs.existsSync(path.join(userDir, draft.id, 'album.json')));
+  assert.equal(fs.existsSync(path.join(dir, 'albums', draft.id, 'album.json')), false);
   assert.equal(isBuiltinAlbum(draft.id), false);
   assert.equal(isBuiltinAlbum('000001.magazine.seed'), true);
 
@@ -350,13 +351,13 @@ test('runner 学习写入删除：失败零落盘；出厂拒绝', async () => {
   });
   assert.equal(learned.ok, true);
   assert.ok(learned.draft);
-  assert.equal(fs.existsSync(path.join(promptsDir, 'albums', `${learned.draft.id}.json`)), false);
-  assert.equal(fs.existsSync(path.join(userAlbumsDir, `${learned.draft.id}.json`)), false);
+  assert.equal(fs.existsSync(path.join(promptsDir, 'albums', learned.draft.id, 'album.json')), false);
+  assert.equal(fs.existsSync(path.join(userAlbumsDir, learned.draft.id, 'album.json')), false);
 
   const committed = runner.commitAlbum({ draftId: learned.draft.draftId });
   assert.equal(committed.ok, true);
-  assert.ok(fs.existsSync(path.join(userAlbumsDir, `${committed.id}.json`)));
-  assert.equal(fs.existsSync(path.join(promptsDir, 'albums', `${committed.id}.json`)), false);
+  assert.ok(fs.existsSync(path.join(userAlbumsDir, committed.id, 'album.json')));
+  assert.equal(fs.existsSync(path.join(promptsDir, 'albums', committed.id, 'album.json')), false);
 
   const listed = runner.listAlbums();
   assert.ok(listed.albums.some((item) => item.id === committed.id && item.deletable === true));
@@ -367,7 +368,7 @@ test('runner 学习写入删除：失败零落盘；出厂拒绝', async () => {
 
   const deleted = runner.deleteAlbum({ id: committed.id });
   assert.equal(deleted.ok, true);
-  assert.equal(fs.existsSync(path.join(userAlbumsDir, `${committed.id}.json`)), false);
+  assert.equal(fs.existsSync(path.join(userAlbumsDir, committed.id, 'album.json')), false);
 });
 
 test('commit 可带改过的题词；用户册可 update；出厂拒绝', async () => {
@@ -399,11 +400,11 @@ test('commit 可带改过的题词；用户册可 update；出厂拒绝', async 
     promptTemplate: edited,
   });
   assert.equal(committed.ok, true);
-  const mdPath = path.join(userAlbumsDir, `${committed.id}.md`);
+  const mdPath = path.join(userAlbumsDir, committed.id, 'prompt.md');
   assert.match(fs.readFileSync(mdPath, 'utf8'), /#AABBCC/);
   assert.doesNotMatch(fs.readFileSync(mdPath, 'utf8'), /#112233/);
   assert.doesNotMatch(fs.readFileSync(mdPath, 'utf8'), /系列统一规则/);
-  const meta = JSON.parse(fs.readFileSync(path.join(userAlbumsDir, `${committed.id}.json`), 'utf8'));
+  const meta = JSON.parse(fs.readFileSync(path.join(userAlbumsDir, committed.id, 'album.json'), 'utf8'));
   assert.equal(meta.promptSheetVersion, 2);
 
   const detail = runner.getAlbumDetail({ id: committed.id });
