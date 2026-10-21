@@ -691,6 +691,58 @@ test('缺密钥时停在对应步骤，稿面还在', async () => {
   assert.equal(fetched, false);
 });
 
+test('readEnv 在建 runner 时不读，下一轮写稿用新密钥', async () => {
+  const root = tempDir();
+  const promptsDir = path.join(root, 'prompts');
+  const postsDir = path.join(root, 'latest');
+  writePrompts(promptsDir);
+  /** @type {Record<string, string>} */
+  let env = {};
+  let readCalls = 0;
+  /** @type {string[]} */
+  const auths = [];
+  const runner = createRunner({
+    postsDir,
+    promptsDir,
+    random: firstPick,
+    readEnv: () => {
+      readCalls += 1;
+      return env;
+    },
+    fetch: async (_url, options) => {
+      auths.push(String(options && options.headers && options.headers.Authorization || ''));
+      const body = JSON.parse(String(options && options.body || '{}'));
+      const prompt = body.messages && body.messages[0] ? String(body.messages[0].content || '') : '';
+      return {
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: responseFor(prompt, 0) } }],
+        }),
+      };
+    },
+  });
+  assert.equal(readCalls, 0);
+
+  runner.generateDraft(draftArgs());
+  const missing = await untilIdle(runner);
+  assert.match(missing.job.error, /缺少 DEEPSEEK_API_KEY/);
+  assert.ok(readCalls >= 1);
+  assert.deepEqual(auths, []);
+
+  const readsBeforeOk = readCalls;
+  env = {
+    DEEPSEEK_API_KEY: 'fresh-key',
+    DEEPSEEK_BASE_URL: 'https://example.test/v1',
+    DEEPSEEK_MODEL: 'deepseek-chat',
+  };
+  runner.generateDraft(draftArgs());
+  const ok = await untilIdle(runner);
+  assert.equal(ok.draft.title, '标题');
+  assert.ok(readCalls > readsBeforeOk);
+  assert.ok(auths.length >= 1);
+  assert.ok(auths.every((item) => item === 'Bearer fresh-key'));
+});
+
 test('打开这一篇时把中断的生成中改成失败，空态不读它', () => {
   const root = tempDir();
   const postsDir = path.join(root, 'posts');

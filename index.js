@@ -71,7 +71,8 @@ module.exports = {
       promptsDir: path.join(pluginRoot(), 'assets', 'prompts', 'one-post'),
       userAlbumsDir: path.join(dataDir, 'runtime', 'albums'),
       userImageRefsDir: path.join(dataDir, 'runtime', 'image-refs'),
-      env: resolveEnv(ctx),
+      // 设置页保存不重跑 apply；真正发请求时再读 pluginEnv。
+      readEnv: () => resolveEnv(ctx),
       revealFile: revealInFolder,
     });
     ctx.registerService('onePost', {

@@ -7,26 +7,38 @@ const DEFAULT_VISION_MODEL = 'deepseek-flash';
 
 /**
  * @typedef {Record<string, string | undefined>} LlmEnv
+ * @typedef {() => LlmEnv} LlmEnvReader
+ * @typedef {LlmEnv | LlmEnvReader | null | undefined} LlmEnvSource
  * @typedef {(input: string | URL | Request, init?: RequestInit) => Promise<Response>} FetchFn
  * @typedef {{ text: string; dataUrl: string }} VisionInput
  */
 
 /**
- * @param {LlmEnv | null | undefined} env
+ * @param {LlmEnvSource} env
+ * @returns {LlmEnv}
+ */
+function readEnv(env) {
+  if (typeof env === 'function') return env() || {};
+  return env || {};
+}
+
+/**
+ * 第一个参数可以是环境对象，或每次请求再读的函数（设置页保存后不重跑 apply）。
+ * @param {LlmEnvSource} env
  * @param {FetchFn} [fetchImpl]
  */
 function createLlm(env, fetchImpl) {
-  const source = env || {};
   const fetchFn = fetchImpl || globalThis.fetch;
 
   /**
-   * @returns {{ apiKey: string; baseUrl: string }}
+   * @returns {{ apiKey: string; baseUrl: string; source: LlmEnv }}
    */
   function auth() {
+    const source = readEnv(env);
     const apiKey = String(source.DEEPSEEK_API_KEY || '').trim();
     if (!apiKey) throw new Error('缺少 DEEPSEEK_API_KEY');
     const baseUrl = String(source.DEEPSEEK_BASE_URL || DEFAULT_BASE_URL).replace(/\/$/, '');
-    return { apiKey, baseUrl };
+    return { apiKey, baseUrl, source };
   }
 
   /**
@@ -51,7 +63,7 @@ function createLlm(env, fetchImpl) {
    * @returns {Promise<string>}
    */
   async function complete(prompt) {
-    const { apiKey, baseUrl } = auth();
+    const { apiKey, baseUrl, source } = auth();
     const model = String(source.DEEPSEEK_MODEL || DEFAULT_MODEL).trim() || DEFAULT_MODEL;
     const response = await fetchFn(`${baseUrl}/chat/completions`, {
       method: 'POST',
@@ -78,7 +90,7 @@ function createLlm(env, fetchImpl) {
    * @returns {Promise<string>}
    */
   async function completeVision(input) {
-    const { apiKey, baseUrl } = auth();
+    const { apiKey, baseUrl, source } = auth();
     if (!input || typeof input !== 'object') {
       throw new Error('识图参数不完整');
     }

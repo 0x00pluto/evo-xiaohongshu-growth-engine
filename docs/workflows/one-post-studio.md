@@ -29,7 +29,7 @@ node scripts/run-studio.js --open
 
 日常发版只走 [`docs/builtin-workflows/cut-release-tag.md`](../builtin-workflows/cut-release-tag.md)：`evo_agent_pack.json` 与 `plugin.manifest.json` 的 `version` 必须同号（`X.Y.Z`，不含 `v`），tag 为 `v` + 该号。插件中心只读清单；**禁止**只改一边。根上的 `dex-buddy-plugin.pack` 只列入清单、`index.js`、`icon.png`、`src/` 和 `assets/`。`scripts/`、测试、文档和 `.env` 不进这份 zip。这不是 `dex-buddy-plugin-pack.json`，仓库根上有那份旧文件时发布会失败。把仓库和这个 tag 告诉 Dex Buddy 维护者，由他在 Actions 里运行 Publish Plugin。
 
-在 Dex Buddy 里从侧栏底部「设置」选「小红书增长引擎」。文案一组填 DeepSeek 密钥、接口地址和模型，生图一组填 Replicate 令牌，然后点「保存」。仓库里的 `.env` 只给本机命令行用，不进 zip。工作台注入的值优先，`.env` 只补空位。
+在 Dex Buddy 里从侧栏底部「设置」选「小红书增长引擎」。文案一组填 DeepSeek 密钥、接口地址和模型，生图一组填 Replicate 令牌，然后点「保存」。保存后不必重启工作台；下一轮写稿、识图或生图会再读当前已保存的值。仓库里的 `.env` 只给本机命令行用，不进 zip。工作台注入的值优先，`.env` 只补空位。
 
 ## 参数
 

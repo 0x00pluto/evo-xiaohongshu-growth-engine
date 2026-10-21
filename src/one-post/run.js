@@ -87,6 +87,7 @@ const BUSY_MESSAGE = '正在生成，请等这一轮结束';
  *   userAlbumsDir?: string;
  *   userImageRefsDir?: string;
  *   env?: Record<string, string | undefined>;
+ *   readEnv?: () => Record<string, string | undefined>;
  *   fetch?: import('../llm/client').FetchFn;
  *   now?: () => Date;
  *   complete?: (prompt: string) => Promise<string>;
@@ -211,7 +212,10 @@ function createRunner(options) {
   const userImageRefsDir = typeof options.userImageRefsDir === 'string' && options.userImageRefsDir.trim()
     ? path.resolve(options.userImageRefsDir.trim())
     : '';
-  const env = options.env || {};
+  const staticEnv = options.env || {};
+  const readEnv = typeof options.readEnv === 'function'
+    ? options.readEnv
+    : () => staticEnv;
   const fetchImpl = options.fetch;
   const now = options.now || (() => new Date());
   if (userAlbumsDir) {
@@ -222,7 +226,7 @@ function createRunner(options) {
   let currentDir = '';
   /** @type {import('../draft/store').DraftStore | null} */
   let store = null;
-  const llm = createLlm(env, fetchImpl);
+  const llm = createLlm(readEnv, fetchImpl);
   const complete = options.complete || ((/** @type {string} */ prompt) => llm.complete(prompt));
   const completeVision = options.completeVision
     || ((/** @type {{ text: string; dataUrl: string }} */ input) => llm.completeVision(input));
@@ -234,7 +238,7 @@ function createRunner(options) {
     prompt: args.prompt,
     outputPath: args.outputPath,
     references: args.references,
-    env,
+    env: readEnv(),
     fetch: fetchImpl,
   }));
   const revealFile = options.revealFile || (() => {});

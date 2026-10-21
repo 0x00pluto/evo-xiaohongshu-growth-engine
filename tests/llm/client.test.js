@@ -60,3 +60,24 @@ test('识图与写稿模型分开，默认 deepseek-flash', async () => {
   assert.equal(captured.temperature, 0.2);
   assert.equal(captured.messages[0].content[1].image_url.detail, 'original');
 });
+
+test('传入读取函数时每次请求再读密钥', async () => {
+  let key = 'first-key';
+  /** @type {string[]} */
+  const auths = [];
+  const llm = createLlm(() => ({
+    DEEPSEEK_API_KEY: key,
+    DEEPSEEK_BASE_URL: 'https://example.test/v1',
+    DEEPSEEK_MODEL: 'deepseek-chat',
+  }), async (_url, options) => {
+    auths.push(options.headers.Authorization);
+    return {
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: '{"ok":true}' } }] }),
+    };
+  });
+  await llm.complete('第一次');
+  key = 'second-key';
+  await llm.complete('第二次');
+  assert.deepEqual(auths, ['Bearer first-key', 'Bearer second-key']);
+});

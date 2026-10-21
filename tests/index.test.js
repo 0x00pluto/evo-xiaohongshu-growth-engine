@@ -10,9 +10,13 @@ const { apply } = require('../index');
 test('桥把 onePost 的方法登记到宿主', () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'one-post-bridge-'));
   let service;
+  let pluginEnvCalls = 0;
   apply({
     dirs: { data: dataDir },
-    pluginEnv: () => ({ DEEPSEEK_API_KEY: 'host-key' }),
+    pluginEnv: () => {
+      pluginEnvCalls += 1;
+      return { DEEPSEEK_API_KEY: 'host-key' };
+    },
     registerService(name, methods) {
       service = { name, methods };
     },
@@ -27,4 +31,6 @@ test('桥把 onePost 的方法登记到宿主', () => {
   assert.equal(latest.galleryCount, 1);
   assert.equal(latest.draft, null);
   assert.equal(fs.existsSync(path.join(dataDir, 'output', 'one-post', 'posts', 'index.json')), false);
+  // 设置保存不重跑 apply；登记服务与读空态都不该碰 pluginEnv。
+  assert.equal(pluginEnvCalls, 0);
 });
