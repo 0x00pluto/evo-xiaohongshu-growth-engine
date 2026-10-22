@@ -35,14 +35,16 @@ function makeTempPromptsDir() {
   return dir;
 }
 
-test('出厂 image-refs 只有 template 与 logo，没有 product', () => {
+test('出厂 image-refs 有 template、logo、prior，没有 product', () => {
   const text = fs.readFileSync(path.join(factoryPromptsDir, 'image-refs.md'), 'utf8');
   assert.match(text, /^## template\s*$/m);
   assert.match(text, /^## logo\s*$/m);
+  assert.match(text, /^## prior\s*$/m);
   assert.doesNotMatch(text, /^## product\s*$/m);
   const sections = loadRoleSections(factoryPromptsDir);
   assert.equal(sections.has('template'), true);
   assert.equal(sections.has('logo'), true);
+  assert.equal(sections.has('prior'), true);
   assert.equal(sections.has('product'), false);
 });
 

@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { FILES_URL } = require('../../src/image/files');
-const { IMAGE_INPUT, MODEL_URL, generatePng } = require('../../src/image/generate');
+const { IMAGE_INPUT, MODEL_URL, MODEL_URLS, generatePng } = require('../../src/image/generate');
 
 function jsonResponse(body, status = 200) {
   return {
@@ -60,6 +60,8 @@ test('生图只传 3:4 和 medium，并在完成后落成 PNG', async () => {
   });
 
   assert.match(MODEL_URL, /\/models\/openai\/gpt-image-2\.5-flare\/predictions$/);
+  assert.equal(MODEL_URLS.flare, MODEL_URL);
+  assert.match(MODEL_URLS.sunburst, /\/models\/openai\/gpt-image-2\.5-sunburst\/predictions$/);
   const body = JSON.parse(calls[0].options.body);
   assert.equal(body.input.prompt, '一张桌子');
   assert.equal(body.input.aspect_ratio, '3:4');

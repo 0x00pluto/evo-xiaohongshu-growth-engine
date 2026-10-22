@@ -65,12 +65,59 @@
       outline: none;
       border-color: rgba(17, 17, 17, 0.4);
     }
+    /* 资料库学图册：文案从左到右显现 → 轻脉冲前进 → 快消，单句 3.5s */
+    .learn-line {
+      display: inline-block;
+      max-width: 100%;
+      will-change: clip-path, opacity, transform;
+      animation: learn-line-cycle 3.5s ease-in-out forwards;
+    }
+    @keyframes learn-line-cycle {
+      0% {
+        clip-path: inset(0 100% 0 0);
+        opacity: 1;
+        transform: translateX(0);
+      }
+      13% {
+        clip-path: inset(0 0 0 0);
+        opacity: 1;
+        transform: translateX(0);
+      }
+      28% {
+        opacity: 1;
+        transform: translateX(0.15rem);
+      }
+      42% {
+        opacity: 0.72;
+        transform: translateX(0.28rem);
+      }
+      56% {
+        opacity: 1;
+        transform: translateX(0.4rem);
+      }
+      78% {
+        clip-path: inset(0 0 0 0);
+        opacity: 1;
+        transform: translateX(0.55rem);
+      }
+      100% {
+        clip-path: inset(0 0 0 0);
+        opacity: 0;
+        transform: translateX(0.7rem);
+      }
+    }
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after {
         animation-duration: 0.01ms !important;
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
         scroll-behavior: auto !important;
+      }
+      .learn-line {
+        animation: none !important;
+        clip-path: none;
+        opacity: 1;
+        transform: none;
       }
     }
   </style>
@@ -90,22 +137,44 @@
     </div>
     <div class="drawer-side z-20">
       <label class="drawer-overlay" for="studio-drawer" aria-label="关闭菜单"></label>
-      <aside class="flex min-h-full w-64 flex-col gap-6 border-r border-base-300 bg-base-100 p-4">
-        <p class="px-2 text-sm font-medium">小红书增长引擎</p>
+      <aside
+        class="flex min-h-full flex-col gap-6 border-r border-base-300 bg-base-100 p-4 transition-[width] duration-200"
+        :class="navCollapsed ? 'w-64 lg:w-[4.5rem]' : 'w-64'"
+      >
+        <div class="flex items-center gap-1" :class="navCollapsed ? 'lg:justify-center' : 'justify-between'">
+          <p class="px-2 text-sm font-medium" :class="navCollapsed ? 'lg:hidden' : ''">小红书增长引擎</p>
+          <button
+            class="btn btn-ghost btn-sm btn-square hidden shrink-0 lg:inline-flex"
+            type="button"
+            :aria-label="navCollapsed ? '展开侧边栏' : '收起侧边栏'"
+            :aria-expanded="!navCollapsed"
+            @click="toggleNav()"
+          >
+            <iconify-icon
+              :icon="navCollapsed ? 'lucide:panel-left-open' : 'lucide:panel-left-close'"
+              width="18"
+              height="18"
+              aria-hidden="true"
+            ></iconify-icon>
+          </button>
+        </div>
         <ul class="menu w-full gap-1 p-0">
-          <template x-for="item in menu" :key="item.id">
+          <template x-for="item in visibleMenu" :key="item.id">
             <li>
               <button
-                class="justify-between"
                 type="button"
                 :id="'nav-' + item.id"
-                :disabled="!item.ready"
-                :class="page === item.id ? 'menu-active' : ''"
+                :class="[
+                  page === item.id ? 'menu-active' : '',
+                  navCollapsed ? 'lg:justify-center lg:tooltip lg:tooltip-right' : '',
+                ]"
+                :data-tip="navCollapsed ? item.label : undefined"
+                :aria-label="item.label"
                 :aria-current="page === item.id ? 'page' : false"
                 @click="open(item)"
               >
-                <span x-text="item.label"></span>
-                <span class="badge badge-ghost badge-sm" x-show="!item.ready">还没做</span>
+                <iconify-icon :icon="item.icon" width="18" height="18" class="shrink-0" aria-hidden="true"></iconify-icon>
+                <span :class="navCollapsed ? 'lg:hidden' : ''" x-text="item.label"></span>
               </button>
             </li>
           </template>

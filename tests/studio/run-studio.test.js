@@ -21,9 +21,15 @@ test('本机服务的 loadLatest 在空目录返回空态', async () => {
     const html = await page.text();
     assert.match(html, /本机运行操作台/);
     assert.doesNotMatch(html, /EventSource/);
+    assert.doesNotMatch(html, /还没做/);
+    assert.match(html, /iconify-icon/);
+    assert.match(html, /toggleNav/);
     const shellFile = await fetch(`${started.url}shell.js`);
     assert.equal(shellFile.status, 200);
-    assert.match(await shellFile.text(), /生成笔记/);
+    const shellText = await shellFile.text();
+    assert.match(shellText, /生成笔记/);
+    assert.match(shellText, /lucide:notebook-pen/);
+    assert.match(shellText, /xhs-studio-nav-collapsed/);
     const noteFile = await fetch(`${started.url}pages/note.html`);
     assert.equal(noteFile.status, 200);
     const noteHtml = await noteFile.text();
@@ -43,6 +49,20 @@ test('本机服务的 loadLatest 在空目录返回空态', async () => {
     assert.doesNotMatch(noteHtml, /封面上的这句话/);
     assert.doesNotMatch(noteHtml, /做出封面和配图/);
     assert.doesNotMatch(noteHtml, /id="cover-type"/);
+
+    const libraryFile = await fetch(`${started.url}pages/library.html`);
+    assert.equal(libraryFile.status, 200);
+    const libraryHtml = await libraryFile.text();
+    assert.match(libraryHtml, /animations\/image-scan\.json/);
+    assert.match(libraryHtml, /learn-line/);
+    assert.doesNotMatch(libraryHtml, /正在学习参考图，请稍等/);
+    const albumsFile = await fetch(`${started.url}pages/library/albums.js`);
+    assert.equal(albumsFile.status, 200);
+    const albumsText = await albumsFile.text();
+    assert.match(albumsText, /正在端详这张参考图/);
+    assert.match(albumsText, /马上生成你的图册草稿/);
+    const scanFile = await fetch(`${started.url}animations/image-scan.json`);
+    assert.equal(scanFile.status, 200);
 
     const response = await fetch(`${started.url}api/one-post/loadLatest`, {
       method: 'POST',

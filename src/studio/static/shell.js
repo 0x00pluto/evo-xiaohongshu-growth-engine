@@ -61,24 +61,50 @@
     });
   }
 
+  const NAV_COLLAPSED_KEY = 'xhs-studio-nav-collapsed';
+
+  function readNavCollapsed() {
+    try {
+      return window.localStorage.getItem(NAV_COLLAPSED_KEY) === '1';
+    } catch {
+      return false;
+    }
+  }
+
+  function writeNavCollapsed(value) {
+    try {
+      window.localStorage.setItem(NAV_COLLAPSED_KEY, value ? '1' : '0');
+    } catch {
+      // 隐私模式等写不进 localStorage 时仍可当次会话收起。
+    }
+  }
+
   window.shell = function shell() {
     return {
       hostReady: window.studioHost.ready,
       page: '',
       pageError: '',
+      navCollapsed: readNavCollapsed(),
       menu: [
-        { id: 'note', label: '生成笔记', ready: true },
-        { id: 'library', label: '资料库', ready: true },
-        { id: 'topics', label: '选题', ready: false },
-        { id: 'role', label: '角色', ready: false },
-        { id: 'risk', label: '危险词', ready: false },
-        { id: 'results', label: '记下结果', ready: false },
-        { id: 'words', label: '词库', ready: false },
-        { id: 'follow', label: '承接', ready: false },
+        { id: 'note', label: '生成笔记', ready: true, icon: 'lucide:notebook-pen' },
+        { id: 'library', label: '资料库', ready: true, icon: 'lucide:library' },
+        { id: 'topics', label: '选题', ready: false, icon: 'lucide:lightbulb' },
+        { id: 'role', label: '角色', ready: false, icon: 'lucide:user-round' },
+        { id: 'risk', label: '危险词', ready: false, icon: 'lucide:shield-alert' },
+        { id: 'results', label: '记下结果', ready: false, icon: 'lucide:clipboard-check' },
+        { id: 'words', label: '词库', ready: false, icon: 'lucide:book-a' },
+        { id: 'follow', label: '承接', ready: false, icon: 'lucide:handshake' },
       ],
+      get visibleMenu() {
+        return this.menu.filter((entry) => entry.ready);
+      },
       async init() {
         const first = this.menu.find((item) => item.ready);
         if (first) await this.mount(first.id);
+      },
+      toggleNav() {
+        this.navCollapsed = !this.navCollapsed;
+        writeNavCollapsed(this.navCollapsed);
       },
       async open(item) {
         if (!item.ready) return;

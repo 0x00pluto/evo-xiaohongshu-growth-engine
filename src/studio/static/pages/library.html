@@ -79,52 +79,77 @@
       @change="onFileChange($event)"
     />
 
-    <div class="min-h-0 flex-1 overflow-y-auto px-4 py-3 lg:px-6">
-      <p class="mb-3 text-sm text-error" role="alert" x-show="error" x-text="error"></p>
-      <p class="mb-3 text-sm text-base-content/60" role="status" x-show="notice && !error" x-text="notice"></p>
-      <p class="mb-3 text-sm text-base-content/60" x-show="learning">正在学习参考图，请稍等…</p>
+    <div class="relative min-h-0 flex-1">
+      <div class="absolute inset-0 overflow-y-auto px-4 py-3 lg:px-6">
+        <p class="mb-3 text-sm text-error" role="alert" x-show="error" x-text="error"></p>
+        <p class="mb-3 text-sm text-base-content/60" role="status" x-show="notice && !error" x-text="notice"></p>
 
-      <div class="flex flex-col gap-4" x-show="!albums.length && !learning">
-        <div class="rounded-lg bg-base-200 p-4">
-          <p class="text-sm leading-6">还没有图册。交一张参考图，系统会学成一本风格草稿，确认后再写入柜子。</p>
-          <div class="mt-3">
-            <button
-              class="btn btn-neutral btn-sm"
-              type="button"
-              @click="$dispatch('library-open-create')"
-              :disabled="!hostReady || learning || committing"
-            >新建</button>
+        <div class="flex flex-col gap-4" x-show="!albums.length && !learning">
+          <div class="rounded-lg bg-base-200 p-4">
+            <p class="text-sm leading-6">还没有图册。交一张参考图，系统会学成一本风格草稿，确认后再写入柜子。</p>
+            <div class="mt-3">
+              <button
+                class="btn btn-neutral btn-sm"
+                type="button"
+                @click="$dispatch('library-open-create')"
+                :disabled="!hostReady || learning || committing"
+              >新建</button>
+            </div>
           </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2 sm:grid-cols-6" role="list" aria-label="图册" x-show="albums.length">
+          <template x-for="album in albums" :key="album.id">
+            <div class="flex flex-col gap-1" role="listitem">
+              <button
+                class="relative aspect-[3/4] w-full overflow-hidden rounded-lg bg-base-200 text-left"
+                type="button"
+                :aria-label="album.label"
+                :disabled="learning || committing"
+                @click="openDetail(album)"
+              >
+                <img class="absolute inset-0 h-full w-full object-cover" x-show="albumSamplePreview(album)" :src="albumSamplePreview(album)" alt="" />
+                <span class="absolute inset-0 flex items-center justify-center text-[10px] text-base-content/40" x-show="!albumSamplePreview(album)">无样图</span>
+                <span class="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-1.5 pb-1.5 pt-6">
+                  <span class="line-clamp-2 text-xs leading-4 text-white" x-text="album.label"></span>
+                </span>
+              </button>
+              <template x-if="album.deletable">
+                <button
+                  class="btn btn-ghost btn-xs self-start"
+                  type="button"
+                  @click="askDelete(album)"
+                  :disabled="learning || committing || deleting"
+                >删除</button>
+              </template>
+            </div>
+          </template>
         </div>
       </div>
 
-      <div class="grid grid-cols-3 gap-2 sm:grid-cols-6" role="list" aria-label="图册" x-show="albums.length">
-        <template x-for="album in albums" :key="album.id">
-          <div class="flex flex-col gap-1" role="listitem">
-            <button
-              class="relative aspect-[3/4] w-full overflow-hidden rounded-lg bg-base-200 text-left"
-              type="button"
-              :aria-label="album.label"
-              :disabled="learning || committing"
-              @click="openDetail(album)"
-            >
-              <img class="absolute inset-0 h-full w-full object-cover" x-show="albumSamplePreview(album)" :src="albumSamplePreview(album)" alt="" />
-              <span class="absolute inset-0 flex items-center justify-center text-[10px] text-base-content/40" x-show="!albumSamplePreview(album)">无样图</span>
-              <span class="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-1.5 pb-1.5 pt-6">
-                <span class="line-clamp-2 text-xs leading-4 text-white" x-text="album.label"></span>
-              </span>
-            </button>
-            <template x-if="album.deletable">
-              <button
-                class="btn btn-ghost btn-xs self-start"
-                type="button"
-                @click="askDelete(album)"
-                :disabled="learning || committing || deleting"
-              >删除</button>
+      <template x-if="learning">
+        <div
+          class="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-base-100/80"
+          role="status"
+          aria-live="polite"
+          aria-busy="true"
+        >
+          <lottie-player
+            src="animations/image-scan.json"
+            background="transparent"
+            speed="1"
+            style="width: 16rem; height: 16rem"
+            loop
+            autoplay
+            @ready="$el.play()"
+          ></lottie-player>
+          <div class="flex h-7 w-full max-w-md items-center justify-center overflow-hidden px-4">
+            <template x-for="n in [learningLineKey]" :key="n">
+              <p class="learn-line text-center text-base text-base-content" x-text="learningLineText"></p>
             </template>
           </div>
-        </template>
-      </div>
+        </div>
+      </template>
     </div>
 
     <div

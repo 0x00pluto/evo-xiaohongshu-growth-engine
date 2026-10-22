@@ -8,7 +8,14 @@ const path = require('node:path');
 const filesModule = require('./files');
 const { uploadReplicateFile } = filesModule;
 
-const MODEL_URL = 'https://api.replicate.com/v1/models/openai/gpt-image-2.5-flare/predictions';
+/** @type {Readonly<{ flare: string; sunburst: string }>} */
+const MODEL_URLS = {
+  flare: 'https://api.replicate.com/v1/models/openai/gpt-image-2.5-flare/predictions',
+  sunburst: 'https://api.replicate.com/v1/models/openai/gpt-image-2.5-sunburst/predictions',
+};
+
+/** 产品默认仍用 flare（快）；改图保真实验可传 sunburst */
+const MODEL_URL = MODEL_URLS.flare;
 const POLL_INTERVAL_MS = 3000;
 const POLL_DEADLINE_MS = 8 * 60 * 1000;
 
@@ -138,6 +145,7 @@ async function waitForPrediction(prediction, token, fetchFn, sleepImpl) {
  *   env?: ImageEnv | null;
  *   fetch?: FetchFn;
  *   sleep?: SleepFn;
+ *   modelUrl?: string;
  * }} args
  * @returns {Promise<string>}
  */
@@ -148,11 +156,15 @@ async function generatePng({
   env,
   fetch: fetchImpl,
   sleep: sleepImpl,
+  modelUrl: modelUrlArg,
 }) {
   const token = String((env && env.REPLICATE_API_TOKEN) || '').trim();
   if (!token) throw new Error('缺少 REPLICATE_API_TOKEN');
   const text = typeof prompt === 'string' ? prompt.trim() : '';
   if (!text) throw new Error('提示词是空的');
+  const modelUrl = typeof modelUrlArg === 'string' && modelUrlArg.trim()
+    ? modelUrlArg.trim()
+    : MODEL_URL;
   const fetchFn = fetchImpl || globalThis.fetch;
   const references = normalizeReferences(rawReferences);
   /** @type {string[]} */
@@ -173,7 +185,7 @@ async function generatePng({
   if (inputImages.length > 0) {
     input.input_images = inputImages;
   }
-  const created = await fetchFn(MODEL_URL, {
+  const created = await fetchFn(modelUrl, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -196,6 +208,7 @@ async function generatePng({
 module.exports = {
   IMAGE_INPUT,
   MODEL_URL,
+  MODEL_URLS,
   generatePng,
   normalizeReferences,
   outputUrl,

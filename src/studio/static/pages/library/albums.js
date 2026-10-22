@@ -10,6 +10,17 @@ function libraryAlbums() {
   /** @type {{ sampleAt: Function; drawLoupe: Function } | null} */
   let eyedropperSampler = null;
 
+  const LEARNING_LINES = [
+    '正在端详这张参考图…',
+    '提炼配色、构图与字体气质…',
+    '把风格拆成可复用的题词…',
+    '马上生成你的图册草稿…',
+  ];
+  const LEARNING_LINE_MS = 3500;
+
+  /** @type {ReturnType<typeof setInterval> | null} */
+  let learningTimer = null;
+
   return {
     hostReady: window.studioHost.ready,
     albums: [],
@@ -17,6 +28,8 @@ function libraryAlbums() {
     notice: '',
     error: '',
     learning: false,
+    learningLineIndex: 0,
+    learningLineKey: 0,
     committing: false,
     savingDetail: false,
     deleting: false,
@@ -53,6 +66,27 @@ function libraryAlbums() {
 
     emitBusy() {
       this.$dispatch('library-albums-busy', this.learning || this.committing || this.savingDetail);
+    },
+
+    get learningLineText() {
+      return LEARNING_LINES[this.learningLineIndex] || LEARNING_LINES[0];
+    },
+
+    startLearningCopy() {
+      this.stopLearningCopy();
+      this.learningLineIndex = 0;
+      this.learningLineKey += 1;
+      learningTimer = setInterval(() => {
+        this.learningLineIndex = (this.learningLineIndex + 1) % LEARNING_LINES.length;
+        this.learningLineKey += 1;
+      }, LEARNING_LINE_MS);
+    },
+
+    stopLearningCopy() {
+      if (learningTimer != null) {
+        clearInterval(learningTimer);
+        learningTimer = null;
+      }
     },
 
     albumSamplePreview(album) {
@@ -143,7 +177,11 @@ function libraryAlbums() {
     },
 
     async init() {
-      this.$watch('learning', () => this.emitBusy());
+      this.$watch('learning', (on) => {
+        this.emitBusy();
+        if (on) this.startLearningCopy();
+        else this.stopLearningCopy();
+      });
       this.$watch('committing', () => this.emitBusy());
       this.$watch('savingDetail', () => this.emitBusy());
       this.emitBusy();
