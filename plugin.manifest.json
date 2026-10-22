@@ -1,7 +1,7 @@
 {
   "id": "xhs-growth-engine",
   "displayName": "小红书增长引擎",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "type": "ui",
   "description": "一句业务、可选文章，生成一篇可复制去发的小红书图文，含封面和配图。",
   "icon": "icon.png",
