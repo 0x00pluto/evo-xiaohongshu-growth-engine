@@ -8,7 +8,6 @@ const MAX_APPLIED_UPLOAD_REFS = 9;
 const MAX_USAGE_CHARS = 240;
 const NON_SUBJECT_MARKER = '角落小标，不占主体';
 const USAGE_PLACEHOLDER = '人物照片。按 Hero 放在画面中央，锁脸。';
-const TEXT_ONLY_SUBJECT_MESSAGE = '当前是纯文字图册，上传参考不能占主体。请换成有主体的图册，或改用法句写明「角落小标，不占主体」。';
 const APPLY_LIMIT_MESSAGE = `一张图最多勾 ${MAX_APPLIED_UPLOAD_REFS} 张上传参考`;
 
 /**
@@ -278,18 +277,13 @@ function selectedUploadRefs(refs, pick) {
 }
 
 /**
- * 纯文字册勾选占主体时返回人话；通过则返回空串。
- * @param {boolean} textOnly
- * @param {UploadRefItem[]} refs
- * @param {SlotPick} pick
+ * 产品改口：用法句不硬拦。保留函数供旧调用方；恒返回空串。
+ * @param {boolean} [_textOnly]
+ * @param {UploadRefItem[]} [_refs]
+ * @param {SlotPick} [_pick]
  * @returns {string}
  */
-function textOnlyPickBlockReason(textOnly, refs, pick) {
-  if (!textOnly) return '';
-  for (const item of selectedUploadRefs(refs, pick)) {
-    const usage = effectiveUsage(item.id, pick, item);
-    if (occupiesSubject(usage)) return TEXT_ONLY_SUBJECT_MESSAGE;
-  }
+function textOnlyPickBlockReason(_textOnly, _refs, _pick) {
   return '';
 }
 
@@ -317,7 +311,6 @@ module.exports = {
   MAX_USAGE_CHARS,
   NON_SUBJECT_MARKER,
   USAGE_PLACEHOLDER,
-  TEXT_ONLY_SUBJECT_MESSAGE,
   addUploadRefToAllPicks,
   effectiveUsage,
   emptyPicks,

@@ -24,7 +24,7 @@ const uploadRefFiles = require('../upload-refs/files');
 const parseModule = require('../prompts/parse');
 
 const { createLlm } = llmModule;
-const { isTextOnlyAlbum, parseJsonObject } = parseModule;
+const { parseJsonObject } = parseModule;
 const { generatePng } = imageModule;
 const {
   albumHint,
@@ -1034,21 +1034,6 @@ function createRunner(options) {
       store.write(state);
       return { ok: false, message: reason };
     }
-    const look = state.prompts && typeof state.prompts.look === 'string'
-      ? state.prompts.look.trim()
-      : '';
-    const pick = only.slot === 'cover'
-      ? state.picks.cover
-      : (state.picks.gallery[only.index - 1] || uploadRefRules.emptySlotPick());
-    const pickBlocked = uploadRefRules.textOnlyPickBlockReason(
-      isTextOnlyAlbum(look, promptsDir, userAlbumsDir),
-      state.uploadRefs,
-      pick,
-    );
-    if (pickBlocked) {
-      store.write(state);
-      return { ok: false, message: pickBlocked };
-    }
     lock = 'generateImages';
     state.job = {
       running: true,
@@ -1279,12 +1264,6 @@ function createRunner(options) {
     for (const id of pick.materialIds) {
       if (!known.has(id)) return { ok: false, message: '勾选了不存在的上传参考' };
     }
-    const look = state.prompts && typeof state.prompts.look === 'string'
-      ? state.prompts.look.trim()
-      : '';
-    const textOnly = isTextOnlyAlbum(look, promptsDir, userAlbumsDir);
-    const blocked = uploadRefRules.textOnlyPickBlockReason(textOnly, state.uploadRefs, pick);
-    if (blocked) return { ok: false, message: blocked };
     if (only.slot === 'cover') {
       state.picks.cover = pick;
     } else {

@@ -244,8 +244,6 @@ function composeImagePrompt(basePrompt, options) {
     ? options.pick
     : uploadRefRules.emptySlotPick();
   const textOnly = parseModule.isTextOnlyAlbum(look, promptsDir, userAlbumsDir);
-  const blocked = uploadRefRules.textOnlyPickBlockReason(textOnly, uploadRefs, pick);
-  if (blocked) throw new Error(blocked);
 
   const references = imageReferencesFor(look, promptsDir, userAlbumsDir);
   const uploadList = uploadRefReferencesFor(

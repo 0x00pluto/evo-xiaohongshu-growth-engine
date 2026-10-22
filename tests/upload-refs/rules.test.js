@@ -5,7 +5,6 @@ const assert = require('node:assert/strict');
 const {
   MAX_APPLIED_UPLOAD_REFS,
   MAX_UPLOAD_REFS_PER_POST,
-  TEXT_ONLY_SUBJECT_MESSAGE,
   effectiveUsage,
   emptySlotPick,
   occupiesSubject,
@@ -91,25 +90,32 @@ test('池可超过应用上限；每槽勾选与默认勾入封顶 9', () => {
   assert.equal(after.cover.materialIds.includes('id9'), false);
 });
 
-test('纯文字册拒绝占主体上传参考；角落小标可通过', () => {
+test('用法句不硬拦：纯文字册任意用法句均可勾', () => {
   const person = { id: 'p1', fileName: 'm-p1.jpg', usage: '人物照片。中央。' };
-  const logo = {
-    id: 'l1',
-    fileName: 'm-l1.png',
-    usage: '标识。角落小标，不占主体。',
+  const swap = {
+    id: 's1',
+    fileName: 'm-s1.png',
+    usage: '换成我的这个表情',
+  };
+  const asciiComma = {
+    id: 'a1',
+    fileName: 'm-a1.png',
+    usage: '角落小标,不占主体',
   };
   assert.equal(
     textOnlyPickBlockReason(true, [person], { materialIds: ['p1'], overrides: {} }),
-    TEXT_ONLY_SUBJECT_MESSAGE,
-  );
-  assert.equal(
-    textOnlyPickBlockReason(true, [logo], { materialIds: ['l1'], overrides: {} }),
     '',
   );
   assert.equal(
-    textOnlyPickBlockReason(false, [person], { materialIds: ['p1'], overrides: {} }),
+    textOnlyPickBlockReason(true, [swap], { materialIds: ['s1'], overrides: {} }),
     '',
   );
+  assert.equal(
+    textOnlyPickBlockReason(true, [asciiComma], { materialIds: ['a1'], overrides: {} }),
+    '',
+  );
+  assert.equal(occupiesSubject(person.usage), true);
+  assert.equal(occupiesSubject('标识。角落小标，不占主体。'), false);
 });
 
 test('删除上传参考时清掉所有槽位勾选与覆盖句', () => {

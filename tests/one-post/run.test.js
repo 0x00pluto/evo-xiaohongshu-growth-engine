@@ -1400,7 +1400,7 @@ test('上传参考默认勾全槽；取消勾选后该槽不带；删除清文�
   assert.equal(fs.existsSync(path.join(still.directory, 'materials', 'upload-refs', added.uploadRef.fileName)), false);
 });
 
-test('纯文字图册带占主体上传参考被拒；角落小标可通过', async () => {
+test('纯文字图册任意用法句可勾选并走 compose', async () => {
   const root = tempDir();
   const promptsDir = path.join(root, 'prompts');
   writePrompts(promptsDir);
@@ -1411,12 +1411,15 @@ test('纯文字图册带占主体上传参考被拒；角落小标可通过', as
   const { clearAlbumCatalogCache } = require('../../src/prompts/fill');
   clearAlbumCatalogCache(promptsDir);
 
+  /** @type {string[]} */
+  const seenPrompts = [];
   const runner = createRunner({
     postsDir: path.join(root, 'posts'),
     promptsDir,
     random: firstPick,
     complete: async (prompt) => responseFor(prompt, 0),
-    generateImage: async ({ outputPath }) => {
+    generateImage: async ({ prompt, outputPath }) => {
+      seenPrompts.push(String(prompt || ''));
       fs.mkdirSync(path.dirname(outputPath), { recursive: true });
       fs.writeFileSync(outputPath, 'png');
     },
@@ -1427,24 +1430,21 @@ test('纯文字图册带占主体上传参考被拒；角落小标可通过', as
 
   const person = runner.addUploadRef({
     dataUrl: `data:image/jpeg;base64,${TINY_JPEG.toString('base64')}`,
-    usage: '人物照片。中央。',
+    usage: '换成我的这个表情',
   });
   assert.equal(person.ok, true);
-  const blocked = runner.generateImages({ slot: 'cover' });
-  assert.equal(blocked.ok, false);
-  assert.match(blocked.message, /纯文字图册/);
-
-  const removed = runner.deleteUploadRef({ id: person.uploadRef.id });
-  assert.equal(removed.ok, true);
-
-  const logo = runner.addUploadRef({
-    dataUrl: `data:image/jpeg;base64,${TINY_JPEG.toString('base64')}`,
-    usage: '品牌标识。角落小标，不占主体。',
+  const pickOk = runner.setSlotPick({
+    slot: 'cover',
+    materialIds: [person.uploadRef.id],
+    overrides: {},
   });
-  assert.equal(logo.ok, true);
+  assert.equal(pickOk.ok, true);
   const allowed = runner.generateImages({ slot: 'cover' });
   assert.equal(allowed.ok, true);
   await untilIdle(runner);
+  assert.ok(seenPrompts.length >= 1);
+  assert.match(seenPrompts[seenPrompts.length - 1], /纯文字图：只画背景/);
+  assert.match(seenPrompts[seenPrompts.length - 1], /换成我的这个表情/);
 });
 test('资料库可直建上传参考，不依赖当前篇', () => {
   const root = tempDir();

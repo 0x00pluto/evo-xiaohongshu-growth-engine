@@ -305,7 +305,7 @@ stateDiagram-v2
 
 摘要：
 
-1. 篇内上传参考：用法句、按槽勾选、compose 进 `input_images`，纯文字册拦占主体。
+1. 篇内上传参考：用法句、按槽勾选、compose 进 `input_images`；用法句不硬拦（纯文字约束只在题词拼装禁插画句）。
 2. 生图改勾选不废稿面；删除清理文件与 picks。
 3. 资料库「上传参考」Tab：存进库 / 从库挑 / 识图起草 / 库内删除；库路径 `runtime/materials/upload-refs/`。
 4. 产品演进：池最多 48、每槽勾最多 9；新图默认勾全槽；不拼固定「主体空位」长文（用法句 + 硬约束）。
@@ -327,7 +327,7 @@ stateDiagram-v2
 | R0-3 | 覆盖句优先于用法句 | R0 | 通过 | `effectiveUsage`；`tests/upload-refs/rules.test.js` |
 | R0-4 | 样图为 template 后接勾选上传参考；「第 N 张是」+ 有效用法 | R0 | 通过 | `src/prompts/album/refs.js`；`tests/prompts/album-refs.test.js`（不拼主体空位长文，见遗留） |
 | R0-5 | 改用法/勾选不删已生成图 | R0 | 通过 | `run.test.js`「上传参考默认勾全槽…不覆盖旧图」 |
-| R0-6 | 纯文字册拒占主体；「角落小标，不占主体」可勾 | R0 | 通过 | `textOnlyPickBlockReason`；`rules.test.js` / `run.test.js` |
+| R0-6 | （产品改口）用法句不硬拦；纯文字约束在题词拼装禁插画句 | R0 | 通过 | `textOnlyPickBlockReason` 恒空；`TEXT_ONLY_LOCK`；`rules.test.js` / `run.test.js` |
 | R0-7 | 数量与体积可控 | R0 | 通过 | 池 ≤48、每槽应用 ≤9、单张 ≤8MB（JPEG/PNG/WebP）；`rules.js` 常量；UI/API 拦截 |
 | R0-8 | 删除清理文件与各槽 picks | R0 | 通过 | `deleteUploadRef` + `removeUploadRefFromPicks`；测试覆盖 |
 | R1-1 | 资料库上传参考 Tab；存进库落盘 | R1 | 通过 | `library.js` Tab；`saveUploadRefToLibrary`；`runtime/materials/upload-refs/` |
@@ -336,6 +336,7 @@ stateDiagram-v2
 
 ### 未完成与遗留
 
+- PRD 原文 R0-6 / 故事仍写「纯文字册拒占主体」；实现已按产品改口：用法句不审不拦，纯文字只靠 `TEXT_ONLY_LOCK` 拼进生图提示词（2026-10-22）。不重开大 PRD。
 - PRD 原文仍写「这篇的素材 / 一篇最多 3 张 / 默认不勾 / 固定主体空位规则 / Tab 名素材 / `runtime/materials/`」；实现已演进为「上传参考」、池 48、每槽 9、默认勾全槽、不拼主体空位长文、Tab「上传参考」、`runtime/materials/upload-refs/`。建议另开修订或补丁 PRD 对齐文案（不阻塞本次 accepted）。
 - 覆盖句：后端与规则支持；笔记页主路径以改用法句 / 悬停预览为主，槽位级覆盖句 UI 若需完整暴露可后续补。
 - 资料库直建上传参考为交付加项，PRD 未单列故事。
