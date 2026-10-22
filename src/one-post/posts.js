@@ -22,6 +22,7 @@ const ID_PATTERN = /^[0-9]{8}-[0-9]{6}(?:-[0-9]+)?$/;
  *   updatedAt: string;
  *   title: string;
  *   postText: string;
+ *   hasCover: boolean;
  * }} ListedPost
  */
 
@@ -188,14 +189,20 @@ function importLegacy(postsDir, promptsDir, userAlbumsDir) {
  */
 function listPosts(postsDir, promptsDir, userAlbumsDir) {
   const posts = readIndex(postsDir).posts.map((item) => {
-    const state = createStore(path.join(postsDir, item.id), { promptsDir, userAlbumsDir }).read();
+    const postDir = path.join(postsDir, item.id);
+    const state = createStore(postDir, { promptsDir, userAlbumsDir }).read();
     const draftTitle = state.draft && String(state.draft.title || '').trim();
+    const coverPath = state.images && state.images.cover && state.images.cover.path
+      ? String(state.images.cover.path)
+      : '';
+    const hasCover = Boolean(coverPath && fs.existsSync(path.join(postDir, coverPath)));
     return {
       id: item.id,
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,
       title: draftTitle || item.title || titleOf(state),
       postText: formatPost(state.draft),
+      hasCover,
     };
   });
   posts.sort((left, right) => String(right.createdAt).localeCompare(String(left.createdAt)));
@@ -211,10 +218,21 @@ function hasPost(postsDir, id) {
   return ID_PATTERN.test(id) && readIndex(postsDir).posts.some((item) => item.id === id);
 }
 
+/**
+ * @param {string} postsDir
+ * @param {string} id
+ * @returns {PostIndexItem | null}
+ */
+function indexEntry(postsDir, id) {
+  if (!ID_PATTERN.test(id)) return null;
+  return readIndex(postsDir).posts.find((item) => item.id === id) || null;
+}
+
 module.exports = {
   allocatePost,
   hasPost,
   importLegacy,
+  indexEntry,
   listPosts,
   touchPost,
 };

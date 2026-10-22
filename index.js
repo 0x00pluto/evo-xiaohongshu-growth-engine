@@ -204,6 +204,18 @@ module.exports = {
       /**
        * @param {unknown} payload
        */
+      previewPostCover(payload) {
+        return runner.previewPostCover(asObject(payload));
+      },
+      /**
+       * @param {unknown} payload
+       */
+      previewHistoryPost(payload) {
+        return runner.previewHistoryPost(asObject(payload));
+      },
+      /**
+       * @param {unknown} payload
+       */
       previewAlbumSample(payload) {
         return runner.previewAlbumSample(asObject(payload));
       },

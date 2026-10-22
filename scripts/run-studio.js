@@ -45,6 +45,8 @@ const METHODS = new Set([
   'generateImages',
   'retryImage',
   'previewImage',
+  'previewPostCover',
+  'previewHistoryPost',
   'previewAlbumSample',
   'revealImage',
   'addUploadRef',

@@ -891,6 +891,86 @@ test('已有 latest 在历史为空时导入一次，打开页面仍是空态', 
   assert.equal(again.listPosts().posts.length, 1);
 });
 
+test('历史列表标 hasCover，previewPostCover 按篇读图且不切换当前稿', () => {
+  const root = tempDir();
+  const postsDir = path.join(root, 'posts');
+  const id = '20261022-120000';
+  const postDir = path.join(postsDir, id);
+  fs.mkdirSync(postDir, { recursive: true });
+  fs.writeFileSync(path.join(postDir, 'draft.json'), `${JSON.stringify({
+    business: '带封面',
+    galleryCount: 0,
+    draft: face,
+    images: {
+      cover: { status: '成功', path: 'cover-1.png', selected: 1, versions: [{ path: 'cover-1.png', revisedAt: 1 }] },
+      gallery: [],
+    },
+  }, null, 2)}\n`);
+  fs.writeFileSync(path.join(postDir, 'cover-1.png'), 'cover-bytes');
+  fs.writeFileSync(path.join(postsDir, 'index.json'), `${JSON.stringify({
+    posts: [{ id, createdAt: '2026-10-22T12:00:00.000Z', updatedAt: '2026-10-22T12:00:00.000Z', title: '标题' }],
+  }, null, 2)}\n`);
+  const runner = createRunner({
+    postsDir,
+    promptsDir: tempDir(),
+    complete: async () => '{}',
+  });
+  const listed = runner.listPosts();
+  assert.equal(listed.posts.length, 1);
+  assert.equal(listed.posts[0].hasCover, true);
+  const before = runner.loadLatest();
+  assert.equal(before.id, '');
+  const preview = runner.previewPostCover({ id });
+  assert.equal(preview.ok, true);
+  assert.match(preview.dataUrl, /^data:image\/png;base64,/);
+  const after = runner.loadLatest();
+  assert.equal(after.id, '');
+  assert.equal(runner.previewPostCover({ id: 'missing' }).ok, false);
+});
+
+test('previewHistoryPost 返回文案与图序，不切换当前稿', () => {
+  const root = tempDir();
+  const postsDir = path.join(root, 'posts');
+  const id = '20261022-130000';
+  const postDir = path.join(postsDir, id);
+  fs.mkdirSync(postDir, { recursive: true });
+  fs.writeFileSync(path.join(postDir, 'draft.json'), `${JSON.stringify({
+    business: '详情',
+    galleryCount: 1,
+    draft: face,
+    images: {
+      cover: { status: '成功', path: 'cover-1.png', selected: 1, versions: [{ path: 'cover-1.png', revisedAt: 1 }] },
+      gallery: [
+        { status: '成功', path: 'gallery-01-1.png', selected: 1, versions: [{ path: 'gallery-01-1.png', revisedAt: 1 }] },
+      ],
+    },
+  }, null, 2)}\n`);
+  fs.writeFileSync(path.join(postDir, 'cover-1.png'), 'cover-bytes');
+  fs.writeFileSync(path.join(postDir, 'gallery-01-1.png'), 'gallery-bytes');
+  fs.writeFileSync(path.join(postsDir, 'index.json'), `${JSON.stringify({
+    posts: [{ id, createdAt: '2026-10-22T13:00:00.000Z', updatedAt: '2026-10-22T13:00:00.000Z', title: '标题' }],
+  }, null, 2)}\n`);
+  const runner = createRunner({
+    postsDir,
+    promptsDir: tempDir(),
+    complete: async () => '{}',
+  });
+  assert.equal(runner.loadLatest().id, '');
+  const detail = runner.previewHistoryPost({ id });
+  assert.equal(detail.ok, true);
+  assert.equal(detail.title, '标题');
+  assert.equal(detail.body, '正文');
+  assert.deepEqual(detail.topics, ['甲', '乙', '丙']);
+  assert.equal(detail.postText.startsWith('标题'), true);
+  assert.equal(detail.createdAt, '2026-10-22T13:00:00.000Z');
+  assert.equal(detail.images.length, 2);
+  assert.equal(detail.images[0].key, 'cover');
+  assert.equal(detail.images[1].key, 'gallery-1');
+  assert.match(detail.images[0].dataUrl, /^data:image\/png;base64,/);
+  assert.equal(runner.loadLatest().id, '');
+  assert.equal(runner.previewHistoryPost({ id: 'missing' }).ok, false);
+});
+
 test('连续生成两篇，空态不打开历史第一篇', async () => {
   const root = tempDir();
   const promptsDir = path.join(root, 'prompts');

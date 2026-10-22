@@ -71,6 +71,7 @@ const {
 const { createStore, emptyState, nextImageFile } = storeModule;
 const {
   basisFrom,
+  formatPost,
   validateDraftFace,
   validateGalleryCount,
   validateInputs,
@@ -80,6 +81,7 @@ const {
   allocatePost,
   hasPost,
   importLegacy,
+  indexEntry,
   listPosts,
   touchPost,
 } = postsModule;
@@ -1186,6 +1188,77 @@ function createRunner(options) {
   }
 
   /**
+   * 按篇读选用封面，不切换当前稿。
+   * @param {Record<string, unknown>} payload
+   */
+  function previewPostCover(payload) {
+    const source = payload && typeof payload === 'object' ? payload : {};
+    const id = typeof source.id === 'string' ? source.id : '';
+    if (!hasPost(postsDir, id)) return { ok: false, message: '没有这一篇' };
+    const postDir = path.join(postsDir, id);
+    const state = createStore(postDir, { promptsDir, userAlbumsDir }).read();
+    const file = state.images && state.images.cover && state.images.cover.path
+      ? String(state.images.cover.path)
+      : '';
+    if (!file) return { ok: false, message: '没有这张图' };
+    const abs = path.join(postDir, file);
+    if (!fs.existsSync(abs)) return { ok: false, message: '图片不在' };
+    const bytes = fs.readFileSync(abs);
+    return { ok: true, dataUrl: `data:image/png;base64,${bytes.toString('base64')}` };
+  }
+
+  /**
+   * 历史详情：文案 + 选用图，不切换当前稿。
+   * @param {Record<string, unknown>} payload
+   */
+  function previewHistoryPost(payload) {
+    const source = payload && typeof payload === 'object' ? payload : {};
+    const id = typeof source.id === 'string' ? source.id : '';
+    if (!hasPost(postsDir, id)) return { ok: false, message: '没有这一篇' };
+    const postDir = path.join(postsDir, id);
+    const state = createStore(postDir, { promptsDir, userAlbumsDir }).read();
+    const draft = state.draft;
+    const title = draft && typeof draft.title === 'string' ? draft.title.trim() : '';
+    const body = draft && typeof draft.body === 'string' ? draft.body.trim() : '';
+    const topics = draft && Array.isArray(draft.topics)
+      ? draft.topics.map((topic) => String(topic))
+      : [];
+    const meta = indexEntry(postsDir, id);
+    /** @type {{ key: string; dataUrl: string }[]} */
+    const images = [];
+    /**
+     * @param {string} key
+     * @param {string} file
+     */
+    const pushImage = (key, file) => {
+      if (!file) return;
+      const abs = path.join(postDir, file);
+      if (!fs.existsSync(abs)) return;
+      const bytes = fs.readFileSync(abs);
+      images.push({ key, dataUrl: `data:image/png;base64,${bytes.toString('base64')}` });
+    };
+    if (state.images && state.images.cover && state.images.cover.path) {
+      pushImage('cover', String(state.images.cover.path));
+    }
+    const gallery = state.images && Array.isArray(state.images.gallery) ? state.images.gallery : [];
+    for (let index = 0; index < gallery.length; index += 1) {
+      const slot = gallery[index];
+      if (!slot || !slot.path) continue;
+      pushImage(`gallery-${index + 1}`, String(slot.path));
+    }
+    return {
+      ok: true,
+      id,
+      title,
+      body,
+      topics,
+      postText: formatPost(draft),
+      createdAt: meta && meta.createdAt ? meta.createdAt : '',
+      images,
+    };
+  }
+
+  /**
    * @param {Record<string, unknown>} payload
    */
   function revealImage(payload) {
@@ -1586,7 +1659,9 @@ function createRunner(options) {
     openPost,
     pickLibraryUploadRef,
     previewAlbumSample,
+    previewHistoryPost,
     previewImage,
+    previewPostCover,
     previewLibraryUploadRef,
     previewUploadRef,
     revealImage,
