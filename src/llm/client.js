@@ -59,7 +59,39 @@ function createLlm(env, fetchImpl) {
   }
 
   /**
-   * @param {string} prompt
+   * @typedef {{ system: string; user: string }} ChatMessages
+   */
+
+  /**
+   * @param {string | ChatMessages} prompt
+   * @returns {Array<{ role: string; content: string }>}
+   */
+  function toMessages(prompt) {
+    if (typeof prompt === 'string') {
+      return [{ role: 'user', content: prompt }];
+    }
+    if (
+      prompt
+      && typeof prompt === 'object'
+      && typeof prompt.system === 'string'
+      && typeof prompt.user === 'string'
+    ) {
+      const system = prompt.system.trim();
+      const user = prompt.user.trim();
+      if (!system || !user) {
+        throw new Error('模型提示词不完整');
+      }
+      return [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ];
+    }
+    throw new Error('模型提示词格式不对');
+  }
+
+  /**
+   * 入参可为单段 user 字符串，或成稿用的 `{ system, user }`。
+   * @param {string | ChatMessages} prompt
    * @returns {Promise<string>}
    */
   async function complete(prompt) {
@@ -73,7 +105,7 @@ function createLlm(env, fetchImpl) {
       },
       body: JSON.stringify({
         model,
-        messages: [{ role: 'user', content: prompt }],
+        messages: toMessages(prompt),
         response_format: { type: 'json_object' },
         temperature: 0.7,
       }),

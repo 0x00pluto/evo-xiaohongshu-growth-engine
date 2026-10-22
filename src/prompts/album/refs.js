@@ -13,7 +13,7 @@ const uploadRefRules = require('../../upload-refs/rules');
 /** @type {typeof import('../../upload-refs/files')} */
 const uploadRefFiles = require('../../upload-refs/files');
 
-const IMAGE_REFS_REL = 'image-refs.md';
+const IMAGE_REFS_REL = 'article-image/image-refs.md';
 const TEXT_ONLY_LOCK = '纯文字图：只画背景、文案和题词已写明的固定装饰，禁止人物、物体、场景和概念插画。';
 /** 有上传参考时追加，避免模型只跟版式模板忽略后面的图 */
 const UPLOAD_REFS_MUST_USE = '必须使用【参考图】中版式模板之后列出的上传参考图，不得因版式模板忽略它们。';

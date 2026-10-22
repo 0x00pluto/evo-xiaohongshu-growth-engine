@@ -4,7 +4,6 @@ function libraryUploadRefs() {
     uploadRefs: [],
     previews: {},
     error: '',
-    notice: '',
     deleting: false,
     deleteOpen: false,
     deleteTarget: null,
@@ -156,7 +155,7 @@ function libraryUploadRefs() {
           return;
         }
         this.closeUpload(true);
-        this.notice = '已写入资料库';
+        this.$dispatch('library-toast', '已写入资料库');
         await this.refresh();
       } finally {
         this.uploadBusy = false;
@@ -219,7 +218,7 @@ function libraryUploadRefs() {
         if (this.detailTarget && this.detailTarget.id === deletedId) {
           this.closeDetail();
         }
-        this.notice = '已从库里拿走';
+        this.$dispatch('library-toast', '已从库里拿走');
         await this.refresh();
       } finally {
         this.deleting = false;

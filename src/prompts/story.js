@@ -26,7 +26,7 @@ function storyPromptName(type) {
   if (!isStoryType(type)) {
     throw new Error('故事类型不在允许列表');
   }
-  return `lines/${type}.md`;
+  return `article-image/lines/${type}.md`;
 }
 
 /**

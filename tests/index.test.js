@@ -23,7 +23,9 @@ test('桥把 onePost 的方法登记到宿主', () => {
   });
   assert.equal(service.name, 'onePost');
   for (const method of [
-    'loadLatest', 'listPosts', 'listAlbums', 'listLibraryUploadRefs', 'addLibraryUploadRef', 'getAlbumDetail',
+    'loadLatest', 'listPosts', 'listAlbums', 'listLibraryUploadRefs', 'addLibraryUploadRef',
+    'listLibraryArticleSamples', 'getLibraryArticleSample', 'saveLibraryArticleSample',
+    'deleteLibraryArticleSample', 'getAlbumDetail',
     'learnAlbum', 'commitAlbum', 'updateAlbumPrompt', 'discardAlbum', 'deleteAlbum',
     'openPost', 'startNew', 'saveEditor', 'generateDraft', 'generatePrompts',
     'chooseImage', 'generateImages', 'retryImage', 'previewImage', 'previewAlbumSample',

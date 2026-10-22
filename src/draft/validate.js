@@ -2,10 +2,14 @@
 'use strict';
 
 const ARTICLE_LIMIT = 8000;
+const REFERENCES_LIMIT = 5;
+const TITLE_LIMIT = 20;
 
 const EMPTY_BUSINESS = '先用一句话说你要发什么。';
 const ARTICLE_TOO_LONG = '贴进来的原文太长了，先删到 8000 字以内。';
+const REFERENCES_TOO_MANY = `参考资料最多 ${REFERENCES_LIMIT} 条。`;
 const BAD_GALLERY_COUNT = '配图张数要在 0 到 9 之间。';
+const TITLE_TOO_LONG = '标题超过 20 字了';
 
 /**
  * @typedef {{ title: string; body: string; topics: string[]; coverLine: string }} DraftFace
@@ -23,7 +27,8 @@ const BAD_GALLERY_COUNT = '配图张数要在 0 到 9 之间。';
  * @typedef {{
  *   ok: true;
  *   business: string;
- *   article: string;
+ *   sampleBody: string;
+ *   references: string[];
  *   galleryCount: number;
  * } | { ok: false; field: string; message: string }} InputsResult
  */
@@ -34,6 +39,20 @@ const BAD_GALLERY_COUNT = '配图张数要在 0 到 9 之间。';
  */
 function charLength(text) {
   return Array.from(text).length;
+}
+
+/**
+ * 小红书计字：半角两个算一个，全角算一个，半角落单时向上取整。
+ * @param {unknown} text
+ * @returns {number}
+ */
+function xhsCharCount(text) {
+  let units = 0;
+  for (const ch of Array.from(String(text || ''))) {
+    const code = ch.codePointAt(0);
+    units += code != null && code <= 0xff ? 1 : 2;
+  }
+  return Math.ceil(units / 2);
 }
 
 /**
@@ -52,22 +71,47 @@ function validateGalleryCount(value) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {string[]}
+ */
+function normalizeReferencesInput(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => (typeof item === 'string' ? item : String(item)));
+}
+
+/**
  * @param {unknown} payload
  * @returns {InputsResult}
  */
 function validateInputs(payload) {
   const source = payload && typeof payload === 'object' ? /** @type {Record<string, unknown>} */ (payload) : {};
   const business = typeof source.business === 'string' ? source.business.trim() : '';
-  const article = typeof source.article === 'string' ? source.article.trim() : '';
+  // 兼容旧入参 article：尚未迁完的调用方仍可传 article。
+  let sampleBody = '';
+  if (typeof source.sampleBody === 'string') {
+    sampleBody = source.sampleBody.trim();
+  } else if (typeof source.article === 'string') {
+    sampleBody = source.article.trim();
+  }
+  const references = normalizeReferencesInput(source.references);
   if (!business) {
     return { ok: false, field: 'business', message: EMPTY_BUSINESS };
   }
-  if (charLength(article) > ARTICLE_LIMIT) {
-    return { ok: false, field: 'article', message: ARTICLE_TOO_LONG };
+  if (charLength(sampleBody) > ARTICLE_LIMIT) {
+    return { ok: false, field: 'sampleBody', message: ARTICLE_TOO_LONG };
+  }
+  if (references.length > REFERENCES_LIMIT) {
+    return { ok: false, field: 'references', message: REFERENCES_TOO_MANY };
   }
   const count = validateGalleryCount(source.galleryCount);
   if (!count.ok) return count;
-  return { ok: true, business, article, galleryCount: count.galleryCount };
+  return {
+    ok: true,
+    business,
+    sampleBody,
+    references,
+    galleryCount: count.galleryCount,
+  };
 }
 
 /**
@@ -78,6 +122,7 @@ function validateDraftFace(draft) {
   if (!draft || typeof draft !== 'object') return '标题是空的';
   const face = /** @type {Record<string, unknown>} */ (draft);
   if (typeof face.title !== 'string' || !face.title.trim()) return '标题是空的';
+  // 标题超 TITLE_LIMIT 不拦：成稿可填入，页上计数变红，由用户自删。
   if (typeof face.body !== 'string' || !face.body.trim()) return '正文是空的';
   if (!Array.isArray(face.topics) || face.topics.length < 3 || face.topics.length > 5) {
     return '话题要有 3 到 5 个';
@@ -171,6 +216,10 @@ module.exports = {
   ARTICLE_TOO_LONG,
   BAD_GALLERY_COUNT,
   EMPTY_BUSINESS,
+  REFERENCES_LIMIT,
+  REFERENCES_TOO_MANY,
+  TITLE_LIMIT,
+  TITLE_TOO_LONG,
   basisEqual,
   basisFrom,
   charLength,
@@ -180,4 +229,5 @@ module.exports = {
   validateDraftFace,
   validateGalleryCount,
   validateInputs,
+  xhsCharCount,
 };

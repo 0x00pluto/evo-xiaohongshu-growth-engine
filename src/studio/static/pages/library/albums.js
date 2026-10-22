@@ -25,7 +25,6 @@ function libraryAlbums() {
     hostReady: window.studioHost.ready,
     albums: [],
     albumSamples: {},
-    notice: '',
     error: '',
     learning: false,
     learningLineIndex: 0,
@@ -217,7 +216,6 @@ function libraryAlbums() {
 
     async openDetail(album) {
       if (!album || !album.id || this.learning || this.committing || this.savingDetail) return;
-      this.notice = '';
       this.error = '';
       const detail = await this.call('getAlbumDetail', { id: album.id });
       if (!detail || detail.ok === false) {
@@ -287,7 +285,7 @@ function libraryAlbums() {
         this.detailSavedPrompt = String(this.detailPrompt || '');
         this.detail.promptTemplate = this.detailSavedPrompt;
         this.syncPromptEditor('detail');
-        this.notice = '已保存题词';
+        this.$dispatch('library-toast', '已保存题词');
       } finally {
         this.savingDetail = false;
       }
@@ -310,7 +308,6 @@ function libraryAlbums() {
       const file = input && input.files && input.files[0];
       if (!file) return;
       this.error = '';
-      this.notice = '';
       if (!/^image\/(jpeg|png|webp)$/i.test(file.type) && !/\.(jpe?g|png|webp)$/i.test(file.name || '')) {
         this.error = '只支持 JPEG、PNG、WebP 参考图';
         return;
@@ -374,7 +371,7 @@ function libraryAlbums() {
         this.draftOpen = false;
         this.draft = null;
         this.draftPrompt = '';
-        this.notice = '已写入图库';
+        this.$dispatch('library-toast', '已写入图库');
         await this.refresh();
       } finally {
         this.committing = false;
@@ -388,7 +385,7 @@ function libraryAlbums() {
       this.draftOpen = false;
       this.draft = null;
       this.draftPrompt = '';
-      this.notice = '已放弃草稿';
+      this.$dispatch('library-toast', '已放弃草稿');
     },
 
     /**
@@ -520,7 +517,7 @@ function libraryAlbums() {
         this.detailSample = '';
         this.detailPrompt = '';
         this.detailSavedPrompt = '';
-        this.notice = '已删除这本图册';
+        this.$dispatch('library-toast', '已删除这本图册');
         const nextSamples = { ...this.albumSamples };
         delete nextSamples[id];
         this.albumSamples = nextSamples;

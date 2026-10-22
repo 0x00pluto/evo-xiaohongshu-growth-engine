@@ -13,6 +13,8 @@ const renderModule = require('./album/render');
 const albumStoreModule = require('./album/store');
 /** @type {typeof import('./article')} */
 const articleModule = require('./article');
+/** @type {typeof import('./article-combo')} */
+const articleComboModule = require('./article-combo');
 /** @type {typeof import('./parse')} */
 const parseModule = require('./parse');
 /** @type {typeof import('./story')} */
@@ -25,6 +27,10 @@ module.exports = {
   ALBUM_KIND_SET: catalogModule.ALBUM_KIND_SET,
   ARTICLE_FILES: articleModule.ARTICLE_FILES,
   ARTICLE_TYPES: articleModule.ARTICLE_TYPES,
+  PERSONA_FILES: articleModule.PERSONA_FILES,
+  PERSONA_TYPES: articleModule.PERSONA_TYPES,
+  RECOMMENDED_GOALS_BY_PERSONA: articleComboModule.RECOMMENDED_GOALS_BY_PERSONA,
+  isRecommendedCombo: articleComboModule.isRecommendedCombo,
   STORY_TYPES: storyModule.STORY_TYPES,
   STORY_TYPE_SET: storyModule.STORY_TYPE_SET,
   albumHint: catalogModule.albumHint,
@@ -34,12 +40,15 @@ module.exports = {
   albumSampleFile: catalogModule.albumSampleFile,
   albumSamplePath: catalogModule.albumSamplePath,
   articlePromptName: articleModule.articlePromptName,
+  isPersonaType: articleModule.isPersonaType,
+  personaPromptName: articleModule.personaPromptName,
   assignContrastSlots: storyModule.assignContrastSlots,
   assignGalleryRoles: storyModule.assignGalleryRoles,
   assignStoryRoles: storyModule.assignStoryRoles,
   assertPromptPlaceholders: learnModule.assertPromptPlaceholders,
   assertPromptSheet: learnModule.assertPromptSheet,
   buildAlbumDraft: learnModule.buildAlbumDraft,
+  buildDraftMessages: articleModule.buildDraftMessages,
   buildDraftPrompt: articleModule.buildDraftPrompt,
   clearAlbumCatalogCache: catalogModule.clearAlbumCatalogCache,
   commitAlbumDraft: albumStoreModule.commitAlbumDraft,

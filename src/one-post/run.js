@@ -20,6 +20,8 @@ const postsModule = require('./posts');
 const uploadRefRules = require('../upload-refs/rules');
 /** @type {typeof import('../upload-refs/files')} */
 const uploadRefFiles = require('../upload-refs/files');
+/** @type {typeof import('../article-samples/store')} */
+const articleSamplesStore = require('../article-samples/store');
 /** @type {typeof import('../prompts/parse')} */
 const parseModule = require('../prompts/parse');
 
@@ -36,7 +38,7 @@ const {
   assignGalleryRoles,
   assignStoryRoles,
   buildAlbumDraft,
-  buildDraftPrompt,
+  buildDraftMessages,
   commitAlbumDraft,
   copySchema,
   deleteAlbumFiles,
@@ -48,6 +50,7 @@ const {
   composeImagePrompt,
   isAlbum,
   isArticleType,
+  isPersonaType,
   isBuiltinAlbum,
   loadAlbumCatalog,
   migrateUserAlbumPacks,
@@ -95,12 +98,13 @@ const BUSY_MESSAGE = '正在生成，请等这一轮结束';
  *   userAlbumsDir?: string;
  *   userImageRefsDir?: string;
  *   userUploadRefsDir?: string;
+ *   userArticleSamplesDir?: string;
  *   userMaterialsDir?: string;
  *   env?: Record<string, string | undefined>;
  *   readEnv?: () => Record<string, string | undefined>;
  *   fetch?: import('../llm/client').FetchFn;
  *   now?: () => Date;
- *   complete?: (prompt: string) => Promise<string>;
+ *   complete?: (prompt: string | { system: string; user: string }) => Promise<string>;
  *   completeVision?: (input: { text: string; dataUrl: string }) => Promise<string>;
  *   generateImage?: (args: {
  *     prompt: string;
@@ -234,6 +238,10 @@ function createRunner(options) {
     }
     return '';
   })();
+  const userArticleSamplesDir = typeof options.userArticleSamplesDir === 'string'
+    && options.userArticleSamplesDir.trim()
+    ? path.resolve(options.userArticleSamplesDir.trim())
+    : '';
   const staticEnv = options.env || {};
   const readEnv = typeof options.readEnv === 'function'
     ? options.readEnv
@@ -253,7 +261,8 @@ function createRunner(options) {
   /** @type {import('../draft/store').DraftStore | null} */
   let store = null;
   const llm = createLlm(readEnv, fetchImpl);
-  const complete = options.complete || ((/** @type {string} */ prompt) => llm.complete(prompt));
+  const complete = options.complete
+    || ((/** @type {string | { system: string; user: string }} */ prompt) => llm.complete(prompt));
   const completeVision = options.completeVision
     || ((/** @type {{ text: string; dataUrl: string }} */ input) => llm.completeVision(input));
   const generateImage = options.generateImage || ((/** @type {{
@@ -360,7 +369,7 @@ function createRunner(options) {
    */
   async function completeScenes(displayLines, sceneVars, look) {
     const need = displayLines.length;
-    const basePrompt = fillPrompt(readPromptFile(promptsDir, 'scenes.md'), sceneVars);
+    const basePrompt = fillPrompt(readPromptFile(promptsDir, 'article-image/scenes.md'), sceneVars);
     /** @type {unknown} */
     let lastErr;
     for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -388,7 +397,7 @@ function createRunner(options) {
     const look = typeof albumLook === 'string' && isAlbum(albumLook, promptsDir, userAlbumsDir)
       ? albumLook
       : pickAlbum(promptsDir, random, userAlbumsDir);
-    const tone = readPromptFile(promptsDir, 'tone.md');
+    const tone = readPromptFile(promptsDir, 'article-image/tone.md');
     const shared = {
       title: face.title,
       body: face.body,
@@ -481,18 +490,27 @@ function createRunner(options) {
   }
 
   /**
-   * @param {{ business: string; article: string; galleryCount: number; articleType: string }} checked
+   * @param {{
+   *   business: string;
+   *   sampleBody: string;
+   *   references: string[];
+   *   galleryCount: number;
+   *   articleType: string;
+   *   persona: string;
+   * }} checked
    */
   async function runGenerateDraft(checked) {
     try {
       if (!store) throw new Error('没有这一篇');
-      const draftPrompt = buildDraftPrompt(promptsDir, checked.articleType, {
+      const draftMessages = buildDraftMessages(promptsDir, checked.articleType, {
         business: checked.business,
-        article: checked.article,
+        persona: checked.persona,
+        sampleBody: checked.sampleBody,
+        references: checked.references,
       });
       let face;
       try {
-        face = parseDraftText(await complete(draftPrompt));
+        face = parseDraftText(await complete(draftMessages));
       } catch (err) {
         markJobFailed(errorMessage(err, '成稿失败'));
         return;
@@ -500,6 +518,7 @@ function createRunner(options) {
       const drafted = store.read();
       drafted.draft = face;
       drafted.articleType = checked.articleType;
+      drafted.persona = checked.persona;
       drafted.prompts.stale = false;
       drafted.job = { running: true, step: '提示词', error: '' };
       store.write(drafted);
@@ -728,7 +747,22 @@ function createRunner(options) {
     const state = store.read();
     const source = payload && typeof payload === 'object' ? payload : {};
     if (typeof source.business === 'string') state.business = source.business;
-    if (typeof source.article === 'string') state.article = source.article;
+    if (typeof source.sampleTitle === 'string') state.sampleTitle = source.sampleTitle;
+    if (typeof source.sampleBody === 'string') {
+      state.sampleBody = source.sampleBody;
+    } else if (typeof source.article === 'string') {
+      // 兼容旧前端仍写 article 的短暂过渡。
+      state.sampleBody = source.article;
+    }
+    if (Array.isArray(source.references)) {
+      state.references = source.references.map((item) => String(item));
+    }
+    if (typeof source.articleType === 'string') {
+      state.articleType = isArticleType(source.articleType) ? source.articleType : '涨粉';
+    }
+    if (typeof source.persona === 'string') {
+      state.persona = isPersonaType(source.persona) ? source.persona : '素人';
+    }
     if (typeof source.coverLineSpecified === 'string') {
       state.coverLineSpecified = source.coverLineSpecified.trim();
     }
@@ -751,7 +785,11 @@ function createRunner(options) {
     if (!checked.ok) return checked;
     const articleType = payload && payload.articleType;
     if (!isArticleType(articleType)) {
-      return { ok: false, message: '文章类型不在允许列表', field: 'articleType' };
+      return { ok: false, message: '文章目的不在允许列表', field: 'articleType' };
+    }
+    const persona = payload && payload.persona;
+    if (!isPersonaType(persona)) {
+      return { ok: false, message: '人设不在允许列表', field: 'persona' };
     }
     if (lock) return busy();
     if (!store) usePost(allocatePost(postsDir, now()));
@@ -759,15 +797,20 @@ function createRunner(options) {
     lock = 'generateDraft';
     const state = store.read();
     state.business = checked.business;
-    state.article = checked.article;
+    state.sampleBody = checked.sampleBody;
+    state.references = checked.references;
+    if (typeof payload.sampleTitle === 'string') {
+      state.sampleTitle = payload.sampleTitle;
+    }
     state.articleType = articleType;
+    state.persona = persona;
     state.galleryCount = checked.galleryCount;
     if (typeof payload.coverLineSpecified === 'string') {
       state.coverLineSpecified = payload.coverLineSpecified.trim();
     }
     state.job = { running: true, step: '成稿', error: '' };
     store.write(state);
-    runGenerateDraft({ ...checked, articleType }).finally(() => {
+    runGenerateDraft({ ...checked, articleType, persona }).finally(() => {
       lock = null;
     });
     return { ok: true, accepted: true, id: currentId };
@@ -1466,12 +1509,65 @@ function createRunner(options) {
     }
   }
 
+  function listLibraryArticleSamples() {
+    if (!userArticleSamplesDir) return { ok: true, samples: [] };
+    return {
+      ok: true,
+      samples: articleSamplesStore.listArticleSamples(userArticleSamplesDir).map((item) => (
+        articleSamplesStore.publicListItem(item)
+      )),
+    };
+  }
+
+  /**
+   * @param {Record<string, unknown>} payload
+   */
+  function getLibraryArticleSample(payload) {
+    if (!userArticleSamplesDir) return { ok: false, message: '缺少范文库目录' };
+    const id = typeof payload.id === 'string' ? payload.id.trim() : '';
+    const meta = articleSamplesStore.readArticleSample(userArticleSamplesDir, id);
+    if (!meta) return { ok: false, message: '库里没有这篇范文' };
+    return { ok: true, sample: meta };
+  }
+
+  /**
+   * @param {Record<string, unknown>} payload
+   */
+  function saveLibraryArticleSample(payload) {
+    if (!userArticleSamplesDir) return { ok: false, message: '缺少范文库目录' };
+    try {
+      const saved = articleSamplesStore.saveArticleSample(userArticleSamplesDir, {
+        id: typeof payload.id === 'string' ? payload.id : '',
+        title: payload.title,
+        body: payload.body,
+      });
+      return { ok: true, sample: articleSamplesStore.publicListItem(saved) };
+    } catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : '保存失败' };
+    }
+  }
+
+  /**
+   * @param {Record<string, unknown>} payload
+   */
+  function deleteLibraryArticleSample(payload) {
+    if (!userArticleSamplesDir) return { ok: false, message: '缺少范文库目录' };
+    try {
+      const id = typeof payload.id === 'string' ? payload.id : '';
+      articleSamplesStore.deleteArticleSample(userArticleSamplesDir, id);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : '删除失败' };
+    }
+  }
+
   return {
     addLibraryUploadRef,
     addUploadRef,
     chooseImage,
     commitAlbum,
     deleteAlbum,
+    deleteLibraryArticleSample,
     deleteLibraryUploadRef,
     deleteUploadRef,
     discardAlbum,
@@ -1480,8 +1576,10 @@ function createRunner(options) {
     generateImages,
     generatePrompts,
     getAlbumDetail,
+    getLibraryArticleSample,
     learnAlbum,
     listAlbums,
+    listLibraryArticleSamples,
     listLibraryUploadRefs,
     listPosts: catalog,
     loadLatest,
@@ -1494,6 +1592,7 @@ function createRunner(options) {
     revealImage,
     retryImage,
     saveEditor,
+    saveLibraryArticleSample,
     saveUploadRefToLibrary,
     setSlotPick,
     startNew,

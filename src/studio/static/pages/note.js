@@ -1,9 +1,101 @@
 function notePage() {
+  /** 与 src/prompts/article-combo.js 同源；静态页无打包 import，须保持同步 */
+  const RECOMMENDED_GOALS_BY_PERSONA = {
+    素人: ['种草', '搜索'],
+    KOC: ['种草', '涨粉', '搜索'],
+    达人: ['种草', '涨粉', '曝光', '搜索'],
+    官号: ['引流', '曝光', '搜索', '转化'],
+    创始人: ['种草', '引流', '涨粉', '曝光', '转化'],
+    店主: ['引流', '搜索', '转化'],
+    员工: ['种草', '引流', '搜索', '转化'],
+  };
+
+  const PERSONA_HELP = {
+    素人: '真实体验口吻，像身边朋友随手分享，少官腔。',
+    KOC: '有一点垂直经验的真实用户，能讲清对比与取舍。',
+    达人: '领域熟练者，结构清晰、有方法或清单感。',
+    官号: '品牌/机构官方口径，稳、可信、信息完整。',
+    创始人: '以当事人身份讲判断与故事，带温度也带立场。',
+    店主: '一线卖货视角，讲库存、价格、到店/下单路径。',
+    员工: '一线服务或交付视角，讲真实接待与答疑。',
+  };
+
+  const GOAL_HELP = {
+    种草: '让人想试、想买：共鸣 + 具体好处，轻推行动。',
+    引流: '把人引到私信/外链/群：说清下一步怎么联系。',
+    涨粉: '让人想关注你：人设记忆点 + 持续看下去的理由。',
+    曝光: '拉开覆盖面：话题更宽、钩子更强、适合传播。',
+    搜索: '覆盖查询意图：标题与正文对准用户会搜的词。',
+    转化: '推动下单或报名：卖点、价格/名额、行动指令清楚。',
+  };
+
+  /** 与 docs/references/xhs-prompt-taxonomy.md 对齐；标签在 comboBriefHtml 里加粗 */
+  const PERSONA_BRIEF = {
+    素人: {
+      identity: '普通用户，低粉，不是博主。',
+      tone: '第一人称，口语化，可以吐槽、带情绪。给人的感觉是「我在用，顺便告诉你」，不是「我特意来推荐」。',
+    },
+    KOC: {
+      identity: '某个领域有经验的普通博主，半专业。',
+      tone: '像朋友，但有自己的判断；可用 emoji 帮排版。',
+    },
+    达人: {
+      identity: '测评师、从业者等专业博主。',
+      tone: '理性、敢下结论，术语要翻成白话。',
+    },
+    官号: {
+      identity: '代表品牌或机构，要有统一人格。',
+      tone: '调性统一，不发空洞口号，要讲具体场景。',
+    },
+    创始人: {
+      identity: '品牌创始人/主理人，真人出镜。',
+      tone: '真实、有观点，可客观点评竞品但不能贬低。',
+    },
+    店主: {
+      identity: '本地门店老板。',
+      tone: '讲亮点、环境、单品与人均，不留站外联系方式。',
+    },
+    员工: {
+      identity: '一线服务或交付同事。',
+      tone: '像帮客户办事，讲真实接待、答疑与落地细节。',
+    },
+  };
+
+  const GOAL_BRIEF = {
+    种草: '建立信任，让读者产生想试、想买的欲望。',
+    引流: '把有意向的人引到站内入口（私信、群聊、店铺、留资）。',
+    涨粉: '让人收藏、评论、关注，愿意持续看你。',
+    曝光: '让读者知道这个品牌是谁、和别人有什么不同。',
+    搜索: '靠长尾关键词获得长期的搜索流量。',
+    转化: '面向正在做购买决定的用户，推动下单或报名。',
+  };
+
+  const REFERENCES_MAX = 5;
+
   return {
     business: '',
-    article: '',
-    articleType: '素人',
-    articleOpen: false,
+    sampleTitle: '',
+    sampleBody: '',
+    references: [],
+    articleType: '涨粉',
+    persona: '素人',
+    personaOptions: ['素人', 'KOC', '达人', '官号', '创始人', '店主', '员工'],
+    goalOptions: ['种草', '引流', '涨粉', '曝光', '搜索', '转化'],
+    sampleOpen: false,
+    pickSampleOpen: false,
+    pickSampleError: '',
+    pickSampleBusy: false,
+    libraryArticleSamples: [],
+    createSampleOpen: false,
+    createSamplePaste: '',
+    createSampleError: '',
+    createSampleBusy: false,
+    referenceHoverOpen: false,
+    referenceHoverText: '',
+    referenceHoverStyle: '',
+    referenceEditorOpen: false,
+    referenceEditorIndex: -1,
+    referenceEditorText: '',
     galleryCount: 1,
     draft: null,
     prompts: {
@@ -19,7 +111,7 @@ function notePage() {
     },
     images: { cover: { status: '空', path: '', selected: 0, revisedAt: 0, versions: [] }, gallery: [] },
     job: { running: false, step: '', error: '' },
-    errors: { business: '', article: '', galleryCount: '' },
+    errors: { business: '', sampleBody: '', references: '', galleryCount: '' },
     notice: '',
     copied: '',
     copiedTimer: null,
@@ -75,8 +167,220 @@ function notePage() {
     usagePlaceholder: '人物照片。按 Hero 放在画面中央，锁脸。',
 
     hostReady: window.studioHost.ready,
-    get articleLength() {
-      return Array.from(String(this.article || '').trim()).length;
+    get sampleLength() {
+      return Array.from(String(this.sampleBody || '').trim()).length;
+    },
+    isRecommendedCombo(persona, goal) {
+      const goals = RECOMMENDED_GOALS_BY_PERSONA[persona];
+      return Array.isArray(goals) && goals.includes(goal);
+    },
+    goalOptionLabel(goal) {
+      return this.isRecommendedCombo(this.persona, goal) ? `★ ${goal}` : goal;
+    },
+    personaHelp(name) {
+      return PERSONA_HELP[name] || '';
+    },
+    goalHelp(name) {
+      return GOAL_HELP[name] || '';
+    },
+    comboBriefHtml() {
+      const persona = PERSONA_BRIEF[this.persona];
+      const goal = GOAL_BRIEF[this.articleType] || '';
+      if (!persona || !goal) return '';
+      const label = (text) => `<span class="font-medium text-base-content">${text}</span>`;
+      return `${label('身份：')}${persona.identity}${label('语气：')}${persona.tone}${label('目标：')}${goal}`;
+    },
+    addReference() {
+      if (this.job.running) return;
+      if (this.references.length >= REFERENCES_MAX) {
+        this.errors.references = `参考资料最多 ${REFERENCES_MAX} 条。`;
+        return;
+      }
+      this.errors.references = '';
+      this.references = [...this.references, ''];
+      this.persist();
+      this.openReferenceEditor(this.references.length - 1);
+    },
+    removeReference(index) {
+      if (this.job.running) return;
+      const next = this.references.slice();
+      next.splice(index, 1);
+      this.references = next;
+      this.errors.references = '';
+      this.persist();
+    },
+    showReferenceHover(index, event) {
+      const text = String(this.references[index] || '').trim();
+      this.referenceHoverText = text;
+      const rect = event && event.currentTarget && event.currentTarget.getBoundingClientRect
+        ? event.currentTarget.getBoundingClientRect()
+        : null;
+      if (rect) {
+        const cardWidth = 208;
+        const gap = 8;
+        const cardHeight = Math.min(160, 40 + Math.ceil((text || '（空）').length / 14) * 20);
+        let left = rect.left + (rect.width / 2) - (cardWidth / 2);
+        left = Math.max(8, Math.min(left, window.innerWidth - cardWidth - 8));
+        let top = rect.top - cardHeight - gap;
+        if (top < 8) top = Math.min(rect.bottom + gap, window.innerHeight - cardHeight - 8);
+        this.referenceHoverStyle = `left:${left}px;top:${Math.max(8, top)}px;`;
+      } else {
+        this.referenceHoverStyle = '';
+      }
+      this.referenceHoverOpen = true;
+    },
+    hideReferenceHover() {
+      this.referenceHoverOpen = false;
+      this.referenceHoverText = '';
+      this.referenceHoverStyle = '';
+    },
+    openReferenceEditor(index) {
+      if (this.job.running) return;
+      const i = Number(index);
+      if (!Number.isInteger(i) || i < 0 || i >= this.references.length) return;
+      this.hideReferenceHover();
+      this.referenceEditorIndex = i;
+      this.referenceEditorText = String(this.references[i] || '');
+      this.referenceEditorOpen = true;
+    },
+    closeReferenceEditor() {
+      this.referenceEditorOpen = false;
+      this.referenceEditorIndex = -1;
+      this.referenceEditorText = '';
+    },
+    confirmReferenceEditor() {
+      const i = this.referenceEditorIndex;
+      if (!Number.isInteger(i) || i < 0 || i >= this.references.length) {
+        this.closeReferenceEditor();
+        return;
+      }
+      const next = this.references.slice();
+      next[i] = String(this.referenceEditorText || '');
+      this.references = next;
+      this.errors.references = '';
+      this.persist();
+      this.closeReferenceEditor();
+    },
+    deleteReferenceFromEditor() {
+      const i = this.referenceEditorIndex;
+      this.closeReferenceEditor();
+      if (Number.isInteger(i) && i >= 0) this.removeReference(i);
+    },
+    splitPasteToSample(paste) {
+      const raw = String(paste || '').replace(/\r\n/g, '\n').trim();
+      if (!raw) return { title: '', body: '' };
+      const nl = raw.indexOf('\n');
+      if (nl < 0) {
+        const title = Array.from(raw).slice(0, 20).join('');
+        return { title, body: raw };
+      }
+      const title = raw.slice(0, nl).trim();
+      const body = raw.slice(nl + 1).trim();
+      return {
+        title: title || Array.from(body).slice(0, 20).join(''),
+        body: body || title,
+      };
+    },
+    sampleSummary() {
+      if (!this.sampleLength && !String(this.sampleTitle || '').trim()) return '未填写';
+      const title = String(this.sampleTitle || '').trim();
+      return title || `${this.sampleLength} 字`;
+    },
+    get canGenerateDraft() {
+      return Boolean(this.hostReady && !this.job.running && String(this.business || '').trim());
+    },
+    clearSample() {
+      if (this.job.running) return;
+      this.sampleTitle = '';
+      this.sampleBody = '';
+      this.sampleOpen = false;
+      this.errors.sampleBody = '';
+      this.persist();
+    },
+    async openPickSample() {
+      if (!this.hostReady || this.job.running) return;
+      this.pickSampleError = '';
+      this.pickSampleBusy = false;
+      this.pickSampleOpen = true;
+      const data = await this.call('listLibraryArticleSamples');
+      if (!data || data.ok === false) {
+        this.libraryArticleSamples = [];
+        this.pickSampleError = (data && data.message) || '读库失败';
+        return;
+      }
+      this.libraryArticleSamples = Array.isArray(data.samples) ? data.samples : [];
+    },
+    closePickSample() {
+      if (this.pickSampleBusy) return;
+      this.pickSampleOpen = false;
+      this.pickSampleError = '';
+      this.libraryArticleSamples = [];
+    },
+    async confirmPickSample(item) {
+      if (!item || this.pickSampleBusy || this.job.running) return;
+      this.pickSampleBusy = true;
+      this.pickSampleError = '';
+      try {
+        const data = await this.call('getLibraryArticleSample', { id: item.id });
+        if (!data || data.ok === false || !data.sample) {
+          this.pickSampleError = (data && data.message) || '读范文失败';
+          return;
+        }
+        this.sampleTitle = String(data.sample.title || item.title || '').trim();
+        this.sampleBody = String(data.sample.body || '').trim();
+        this.errors.sampleBody = '';
+        this.sampleOpen = false;
+        this.pickSampleOpen = false;
+        await this.persist();
+      } finally {
+        this.pickSampleBusy = false;
+      }
+    },
+    openCreateSample() {
+      if (!this.hostReady || this.job.running) return;
+      this.createSamplePaste = '';
+      this.createSampleError = '';
+      this.createSampleBusy = false;
+      this.createSampleOpen = true;
+    },
+    closeCreateSample() {
+      if (this.createSampleBusy) return;
+      this.createSampleOpen = false;
+      this.createSamplePaste = '';
+      this.createSampleError = '';
+    },
+    async confirmCreateSample() {
+      if (this.createSampleBusy || this.job.running) return;
+      const { title, body } = this.splitPasteToSample(this.createSamplePaste);
+      if (!title) {
+        this.createSampleError = '请粘贴全文，第一行当标题';
+        return;
+      }
+      if (!body) {
+        this.createSampleError = '请粘贴正文（第一行后的内容）';
+        return;
+      }
+      if (Array.from(body).length > 8000) {
+        this.createSampleError = '贴进来的原文太长了，先删到 8000 字以内。';
+        return;
+      }
+      this.createSampleBusy = true;
+      this.createSampleError = '';
+      try {
+        const result = await this.call('saveLibraryArticleSample', { title, body });
+        if (!result || result.ok === false) {
+          this.createSampleError = (result && result.message) || '保存失败';
+          return;
+        }
+        this.sampleTitle = title;
+        this.sampleBody = body;
+        this.errors.sampleBody = '';
+        this.sampleOpen = false;
+        this.createSampleOpen = false;
+        await this.persist();
+      } finally {
+        this.createSampleBusy = false;
+      }
     },
     // 表单里的张数是下一次「写成笔记」要用的。笔记上的槽位跟上次写成的结果走。
     committedGalleryCount() {
@@ -278,17 +582,20 @@ function notePage() {
       });
     },
     validateForm() {
-      this.errors = { business: '', article: '', galleryCount: '' };
+      this.errors = { business: '', sampleBody: '', references: '', galleryCount: '' };
       if (!String(this.business || '').trim()) this.errors.business = '先用一句话说你要发什么。';
-      if (this.articleLength > 8000) this.errors.article = '贴进来的原文太长了，先删到 8000 字以内。';
+      if (this.sampleLength > 8000) this.errors.sampleBody = '贴进来的原文太长了，先删到 8000 字以内。';
+      if (this.references.length > REFERENCES_MAX) {
+        this.errors.references = `参考资料最多 ${REFERENCES_MAX} 条。`;
+      }
       const count = Number(this.galleryCount);
       if (!Number.isInteger(count) || count < 0 || count > 9) {
         this.errors.galleryCount = '配图张数要在 0 到 9 之间。';
       }
-      const first = ['business', 'article', 'galleryCount'].find((field) => this.errors[field]);
+      const first = ['business', 'sampleBody', 'references', 'galleryCount'].find((field) => this.errors[field]);
       if (!first) return true;
-      if (first === 'article') this.articleOpen = true;
-      this.focusField(first);
+      if (first === 'sampleBody') this.sampleOpen = true;
+      this.focusField(first === 'sampleBody' ? 'sampleBody' : first);
       return false;
     },
     call(method, payload) {
@@ -297,10 +604,26 @@ function notePage() {
     applyServer(data) {
       const next = data || {};
       this.business = typeof next.business === 'string' ? next.business : '';
-      this.article = typeof next.article === 'string' ? next.article : '';
-      this.articleType = next.articleType === '种草' || next.articleType === '引流' || next.articleType === '素人'
-        ? next.articleType
-        : '素人';
+      this.sampleTitle = typeof next.sampleTitle === 'string' ? next.sampleTitle : '';
+      if (typeof next.sampleBody === 'string') {
+        this.sampleBody = next.sampleBody;
+      } else if (typeof next.article === 'string') {
+        this.sampleBody = next.article;
+      } else {
+        this.sampleBody = '';
+      }
+      this.references = Array.isArray(next.references)
+        ? next.references.map((item) => String(item))
+        : [];
+      if (next.articleType === '素人') {
+        this.articleType = '涨粉';
+        this.persona = '素人';
+      } else {
+        const goals = ['种草', '引流', '涨粉', '曝光', '搜索', '转化'];
+        const personas = ['素人', 'KOC', '达人', '官号', '创始人', '店主', '员工'];
+        this.articleType = goals.includes(next.articleType) ? next.articleType : '涨粉';
+        this.persona = personas.includes(next.persona) ? next.persona : '素人';
+      }
       this.galleryCount = next.galleryCount == null ? 1 : next.galleryCount;
       this.draft = next.draft || null;
       this.prompts = next.prompts || {
@@ -428,8 +751,9 @@ function notePage() {
       await this.refresh();
     },
     resetBrief() {
-      this.articleType = '素人';
-      this.articleOpen = this.articleLength > 0;
+      this.articleType = '涨粉';
+      this.persona = '素人';
+      this.sampleOpen = false;
     },
     async loadPreviews() {
       const next = { ...this.previews };
@@ -508,7 +832,11 @@ function notePage() {
     editorPayload() {
       return {
         business: this.business,
-        article: this.article,
+        sampleTitle: this.sampleTitle,
+        sampleBody: this.sampleBody,
+        references: this.references,
+        articleType: this.articleType,
+        persona: this.persona,
         galleryCount: this.galleryCount,
         draft: this.draft,
         prompts: {
@@ -531,8 +859,8 @@ function notePage() {
       if (!result || result.ok !== false) return false;
       if (result.field && Object.prototype.hasOwnProperty.call(this.errors, result.field)) {
         this.errors[result.field] = result.message;
-        if (result.field === 'article') this.articleOpen = true;
-        this.focusField(result.field);
+        if (result.field === 'sampleBody') this.sampleOpen = true;
+        this.focusField(result.field === 'sampleBody' ? 'sampleBody' : result.field);
       } else {
         this.notice = result.message || '没有完成';
       }
@@ -544,8 +872,11 @@ function notePage() {
       if (!this.validateForm()) return;
       const result = await this.call('generateDraft', {
         business: this.business,
-        article: this.article,
+        sampleTitle: this.sampleTitle,
+        sampleBody: this.sampleBody,
+        references: this.references,
         articleType: this.articleType,
+        persona: this.persona,
         galleryCount: this.galleryCount,
       });
       if (this.noteRejection(result)) return;
@@ -651,7 +982,7 @@ function notePage() {
         return;
       }
       this.previews = {};
-      this.errors = { business: '', article: '', galleryCount: '' };
+      this.errors = { business: '', sampleBody: '', references: '', galleryCount: '' };
       this.clearCopied();
       this.applyServer(fresh);
       this.resetBrief();
@@ -666,7 +997,7 @@ function notePage() {
         return;
       }
       this.previews = {};
-      this.errors = { business: '', article: '', galleryCount: '' };
+      this.errors = { business: '', sampleBody: '', references: '', galleryCount: '' };
       this.clearCopied();
       this.applyServer(result);
       this.resetBrief();

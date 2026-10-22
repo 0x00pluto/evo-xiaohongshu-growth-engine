@@ -18,8 +18,9 @@ const factoryPromptsDir = path.join(__dirname, '../../assets/prompts/one-post');
  */
 function makeTempPromptsDir() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'xhs-image-refs-'));
+  fs.mkdirSync(path.join(dir, 'article-image'), { recursive: true });
   fs.writeFileSync(
-    path.join(dir, 'image-refs.md'),
+    path.join(dir, 'article-image', 'image-refs.md'),
     [
       '# 出厂',
       '',
@@ -36,7 +37,7 @@ function makeTempPromptsDir() {
 }
 
 test('出厂 image-refs 有 template、logo、prior，没有 product', () => {
-  const text = fs.readFileSync(path.join(factoryPromptsDir, 'image-refs.md'), 'utf8');
+  const text = fs.readFileSync(path.join(factoryPromptsDir, 'article-image', 'image-refs.md'), 'utf8');
   assert.match(text, /^## template\s*$/m);
   assert.match(text, /^## logo\s*$/m);
   assert.match(text, /^## prior\s*$/m);
@@ -112,7 +113,7 @@ test('合并 runtime/image-refs：新角色能拼上，同名覆盖出厂，无�
 test('上传参考用用法句拼第 N 张，不拼主体空位规则', () => {
   const dir = makeTempPromptsDir();
   fs.writeFileSync(
-    path.join(dir, 'subject-slot.md'),
+    path.join(dir, 'article-image', 'subject-slot.md'),
     '【主体空位】\n用上传主体换掉模板假人。',
   );
   const samplePath = path.join(dir, 'sample.jpg');

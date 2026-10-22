@@ -16,7 +16,7 @@
     <p id="job-error" class="text-sm text-error" role="alert" x-show="job.error && !job.running" x-text="job.error"></p>
     <p id="notice" class="text-sm text-error" role="alert" x-show="notice" x-text="notice"></p>
 
-  <section class="relative mx-auto flex w-full max-w-2xl flex-col gap-4 border border-base-300 p-4" x-show="phase === 'materials'" aria-label="要发什么">
+  <section class="relative mx-auto flex w-full max-w-2xl flex-col gap-3 border border-base-300 p-4" x-show="phase === 'materials'" aria-label="要发什么">
     <div
       class="absolute inset-0 z-30 flex flex-col items-center justify-center gap-2 bg-base-100/80"
       x-show="job.running"
@@ -34,31 +34,63 @@
       ></lottie-player>
       <p class="text-sm" x-text="stepText(job.step)"></p>
     </div>
-    <fieldset class="flex flex-col gap-2">
-      <legend class="text-sm font-medium">文章类型</legend>
-      <div class="grid grid-cols-3 gap-2" role="radiogroup" aria-label="文章类型">
-        <label class="btn btn-sm" :class="articleType === '种草' ? 'btn-primary' : 'btn-ghost border border-base-300'">
-          <input class="sr-only" type="radio" name="article-type" value="种草" x-model="articleType" :disabled="job.running" />
-          种草
-        </label>
-        <label class="btn btn-sm" :class="articleType === '引流' ? 'btn-primary' : 'btn-ghost border border-base-300'">
-          <input class="sr-only" type="radio" name="article-type" value="引流" x-model="articleType" :disabled="job.running" />
-          引流
-        </label>
-        <label class="btn btn-sm" :class="articleType === '素人' ? 'btn-primary' : 'btn-ghost border border-base-300'">
-          <input class="sr-only" type="radio" name="article-type" value="素人" x-model="articleType" :disabled="job.running" checked />
-          素人
-        </label>
+    <div class="grid grid-cols-2 gap-3">
+      <div class="flex min-w-0 flex-col gap-1">
+        <div class="flex items-center gap-1">
+          <label class="text-sm font-medium" for="persona">人设</label>
+          <span
+            class="tooltip tooltip-right"
+            :data-tip="personaHelp(persona)"
+          >
+            <iconify-icon icon="lucide:circle-help" width="14" height="14" class="text-base-content/50" aria-hidden="true"></iconify-icon>
+            <span class="sr-only" x-text="personaHelp(persona)"></span>
+          </span>
+        </div>
+        <select
+          id="persona"
+          class="select select-bordered select-sm w-full"
+          x-model="persona"
+          :disabled="job.running"
+          @change="persist()"
+        >
+          <template x-for="name in personaOptions" :key="name">
+            <option :value="name" :title="personaHelp(name)" x-text="name"></option>
+          </template>
+        </select>
       </div>
-    </fieldset>
+      <div class="flex min-w-0 flex-col gap-1">
+        <div class="flex items-center gap-1">
+          <label class="text-sm font-medium" for="article-type">目的</label>
+          <span
+            class="tooltip tooltip-left"
+            :data-tip="goalHelp(articleType)"
+          >
+            <iconify-icon icon="lucide:circle-help" width="14" height="14" class="text-base-content/50" aria-hidden="true"></iconify-icon>
+            <span class="sr-only" x-text="goalHelp(articleType)"></span>
+          </span>
+        </div>
+        <select
+          id="article-type"
+          class="select select-bordered select-sm w-full"
+          x-model="articleType"
+          :disabled="job.running"
+          @change="persist()"
+        >
+          <template x-for="name in goalOptions" :key="name">
+            <option :value="name" :title="goalHelp(name)" x-text="goalOptionLabel(name)"></option>
+          </template>
+        </select>
+      </div>
+    </div>
+    <p id="combo-brief" class="text-sm leading-6 text-base-content/60" x-html="comboBriefHtml()"></p>
     <div class="flex flex-col gap-1">
       <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <label class="text-sm font-medium" for="business">这篇想讲什么</label>
-        <p id="business-hint" class="text-sm">用一句话说。卖什么、给谁看。</p>
+        <p id="business-hint" class="text-sm text-base-content/60">用一句话说。卖什么、给谁看。</p>
       </div>
       <textarea
         id="business"
-        class="textarea w-full resize-none wrap"
+        class="textarea textarea-sm w-full resize-none wrap"
         rows="2"
         x-ref="business"
         x-model="business"
@@ -69,6 +101,86 @@
         @blur="persist()"
       ></textarea>
       <p id="business-error" class="text-sm text-error" role="alert" x-show="errors.business" x-text="errors.business"></p>
+    </div>
+    <div class="flex flex-col gap-2">
+      <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <span class="text-sm font-medium">参考资料</span>
+          <p class="text-sm text-base-content/60">事实材料。点文档看详情，最多 5 条，可空。</p>
+        </div>
+        <p class="text-sm text-base-content/60" x-show="references.length >= 4" x-text="'已加 ' + references.length + '/5'"></p>
+      </div>
+      <div class="flex flex-wrap gap-2" role="list" aria-label="参考资料">
+        <template x-for="(item, index) in references" :key="'ref-' + index">
+          <div
+            class="group relative"
+            role="listitem"
+            @mouseenter="showReferenceHover(index, $event)"
+            @mouseleave="hideReferenceHover()"
+          >
+            <button
+              class="relative flex h-14 w-14 items-center justify-center rounded-md border border-base-300 bg-base-200 active:scale-95"
+              type="button"
+              :id="'reference-' + index"
+              :aria-label="'参考资料第 ' + (index + 1) + ' 条，点击编辑'"
+              :disabled="job.running"
+              @click="openReferenceEditor(index)"
+            >
+              <iconify-icon icon="lucide:file-text" width="22" height="22" class="text-base-content/70" aria-hidden="true"></iconify-icon>
+              <span class="absolute left-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-base-content text-[10px] font-semibold leading-none tabular-nums text-base-100 shadow" x-text="index + 1"></span>
+            </button>
+          </div>
+        </template>
+        <button
+          id="add-reference"
+          class="flex h-14 w-14 items-center justify-center rounded-md border border-dashed border-base-300 bg-base-100 text-xl leading-none text-base-content/50 active:scale-95"
+          type="button"
+          aria-label="加一条参考"
+          @click="addReference()"
+          :disabled="job.running || references.length >= 5"
+        >+</button>
+      </div>
+      <div
+        class="pointer-events-none fixed z-50 w-52 overflow-hidden rounded-lg border border-base-300 bg-base-100 shadow-lg"
+        x-show="referenceHoverOpen"
+        x-cloak
+        :style="referenceHoverStyle"
+      >
+        <p class="max-h-32 overflow-auto whitespace-pre-wrap break-words p-2 text-sm leading-5" x-text="referenceHoverText || '（空）'"></p>
+      </div>
+      <p id="references-error" class="text-sm text-error" role="alert" x-show="errors.references" x-text="errors.references"></p>
+    </div>
+    <div class="flex flex-col gap-2">
+      <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <div class="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+          <span class="text-sm font-medium">范文</span>
+          <p id="sample-hint" class="text-sm text-base-content/60">可选。从库挑一篇仿写，抓住重点，不复述原文结构。</p>
+        </div>
+        <div id="sample-actions" class="flex shrink-0 flex-wrap justify-end gap-2">
+          <template x-if="!sampleTitle && !sampleLength">
+            <div class="flex flex-wrap gap-2">
+              <button id="pick-sample" class="btn btn-ghost btn-sm" type="button" @click="openPickSample()" :disabled="!hostReady || job.running">从库挑</button>
+              <button id="create-sample" class="btn btn-ghost btn-sm" type="button" @click="openCreateSample()" :disabled="!hostReady || job.running">新建</button>
+            </div>
+          </template>
+          <template x-if="sampleTitle || sampleLength">
+            <div class="flex flex-wrap gap-2">
+              <button id="clear-sample" class="btn btn-ghost btn-sm" type="button" @click="clearSample()" :disabled="job.running">清除</button>
+              <button id="swap-sample" class="btn btn-ghost btn-sm" type="button" @click="openPickSample()" :disabled="!hostReady || job.running">换一篇</button>
+            </div>
+          </template>
+        </div>
+      </div>
+      <div class="border border-base-300" x-show="sampleTitle || sampleLength" x-cloak>
+        <button id="toggle-sample" class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm font-medium" type="button" :aria-expanded="sampleOpen ? 'true' : 'false'" aria-controls="sample-panel" @click="sampleOpen = !sampleOpen">
+          <span class="font-normal text-base-content/70" x-text="sampleSummary()"></span>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" class="shrink-0" :class="sampleOpen ? 'rotate-180' : ''"><path d="m6 9 6 6 6-6"></path></svg>
+        </button>
+        <div id="sample-panel" class="flex flex-col gap-2 border-t border-base-300 px-3 py-3" x-show="sampleOpen" x-cloak>
+          <div class="max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-md bg-base-200 p-2 text-sm leading-6" x-text="sampleBody"></div>
+        </div>
+      </div>
+      <p id="sample-error" class="text-sm text-error" role="alert" x-show="errors.sampleBody" x-text="errors.sampleBody"></p>
     </div>
     <div class="flex flex-col gap-1">
       <div class="flex flex-wrap items-center gap-3">
@@ -94,33 +206,6 @@
         </div>
       </div>
       <p id="gallery-error" class="text-sm text-error" role="alert" x-show="errors.galleryCount" x-text="errors.galleryCount"></p>
-    </div>
-    <div class="border border-base-300">
-      <button id="toggle-article" class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm font-medium" type="button" :aria-expanded="articleOpen ? 'true' : 'false'" aria-controls="article-panel" @click="articleOpen = !articleOpen">
-        <span>按范文仿写</span>
-        <span class="flex items-center gap-2 font-normal">
-          <span x-text="articleLength ? articleLength + ' 字' : '未填写'"></span>
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" :class="articleOpen ? 'rotate-180' : ''"><path d="m6 9 6 6 6-6"></path></svg>
-        </span>
-      </button>
-      <div id="article-panel" class="flex flex-col gap-1 border-t border-base-300 px-3 py-3" x-show="articleOpen" x-cloak>
-        <p id="article-hint" class="text-sm">按这篇的结构来写，不原样照搬。</p>
-        <textarea
-          id="article"
-          class="textarea h-32 w-full resize-none wrap"
-          x-ref="article"
-          x-model="article"
-          :readonly="job.running"
-          :aria-invalid="errors.article ? 'true' : 'false'"
-          aria-describedby="article-hint article-error"
-          @input="clearError('article')"
-          @blur="persist()"
-        ></textarea>
-        <p id="article-error" class="text-sm text-error" role="alert" x-show="errors.article" x-text="errors.article"></p>
-      </div>
-    </div>
-    <div class="flex justify-end">
-      <button id="generate-draft" class="btn btn-primary" type="button" @click="onGenerateDraft()" :disabled="!hostReady || job.running">写成笔记</button>
     </div>
   </section>
 
@@ -466,6 +551,11 @@
     </template>
   </section>
   </div>
+  <div class="shrink-0 border-t border-base-300 bg-base-100 px-4 py-3 lg:px-6" x-show="phase === 'materials'" x-cloak>
+    <div class="mx-auto flex w-full max-w-2xl justify-center">
+      <button id="generate-draft" class="btn btn-primary" type="button" @click="onGenerateDraft()" :disabled="!canGenerateDraft">写成笔记</button>
+    </div>
+  </div>
   <div class="shrink-0 border-t border-base-300 bg-base-100 px-4 py-3 lg:px-6" x-show="phase === 'copy' && draft" x-cloak>
     <div class="mx-auto flex w-full max-w-5xl justify-center">
       <button id="copy-post" class="btn btn-primary" type="button" @click="onCopyPost()" :disabled="!postText()">复制这篇</button>
@@ -576,6 +666,40 @@
   </div>
 
   <div
+    id="reference-editor-modal"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+    x-show="referenceEditorOpen"
+    x-cloak
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="reference-editor-title"
+    @keydown.escape.window="referenceEditorOpen && closeReferenceEditor()"
+  >
+    <button class="absolute inset-0 cursor-default" type="button" aria-label="关闭" @click="closeReferenceEditor()"></button>
+    <div class="relative z-10 flex w-full max-w-lg flex-col gap-3 rounded-lg border border-base-300 bg-base-100 p-4 shadow-lg" @click.stop>
+      <div class="flex items-start justify-between gap-2">
+        <h3 id="reference-editor-title" class="text-base font-medium" x-text="'参考资料第 ' + (referenceEditorIndex + 1) + ' 条'"></h3>
+        <button class="btn btn-ghost btn-square btn-sm shrink-0" type="button" aria-label="关闭" @click="closeReferenceEditor()">×</button>
+      </div>
+      <textarea
+        id="reference-editor-text"
+        class="textarea min-h-32 w-full resize-none wrap"
+        x-model="referenceEditorText"
+        :disabled="job.running"
+        aria-label="参考资料正文"
+        placeholder="课程信息、日期、卖点等事实。"
+      ></textarea>
+      <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+        <button class="btn btn-error btn-sm" type="button" @click="deleteReferenceFromEditor()" :disabled="job.running">删除</button>
+        <div class="flex gap-2">
+          <button class="btn btn-ghost btn-sm" type="button" @click="closeReferenceEditor()">取消</button>
+          <button class="btn btn-primary btn-sm" type="button" @click="confirmReferenceEditor()" :disabled="job.running">完成</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div
     id="upload-ref-editor-modal"
     class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
     x-show="uploadRefEditorOpen"
@@ -652,6 +776,79 @@
           <button class="btn btn-ghost btn-sm" type="button" @click="closeSaveToLibrary()" :disabled="saveToLibraryBusy">放弃</button>
           <button class="btn btn-primary btn-sm" type="button" @click="confirmSaveToLibrary()" :disabled="saveToLibraryBusy || !String(saveToLibraryUsage || '').trim()">确认入库</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div
+    id="sample-pick-library-modal"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+    x-show="pickSampleOpen"
+    x-cloak
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="sample-pick-library-title"
+    @keydown.escape.window="pickSampleOpen && closePickSample()"
+  >
+    <button class="absolute inset-0 cursor-default" type="button" aria-label="关闭" @click="closePickSample()"></button>
+    <div class="relative z-10 flex max-h-[calc(100dvh-2rem)] w-full max-w-3xl flex-col gap-3 overflow-hidden rounded-lg border border-base-300 bg-base-100 p-4 shadow-lg" @click.stop>
+      <div class="flex items-center justify-between gap-2">
+        <h3 id="sample-pick-library-title" class="text-base font-medium">从库挑一篇范文</h3>
+        <button class="btn btn-ghost btn-square btn-sm" type="button" aria-label="关闭" @click="closePickSample()">×</button>
+      </div>
+      <p class="text-sm text-base-content/60" x-show="!libraryArticleSamples.length && !pickSampleError">资料库还没有范文。可先「新建到库」。</p>
+      <p class="text-sm text-error" role="alert" x-show="pickSampleError" x-text="pickSampleError"></p>
+      <div class="min-h-0 flex-1 overflow-y-auto">
+        <div class="grid grid-cols-3 gap-2 sm:grid-cols-6">
+          <template x-for="item in libraryArticleSamples" :key="item.id">
+            <button
+              class="relative aspect-[3/4] w-full overflow-hidden rounded-lg bg-base-200 text-left active:scale-95"
+              type="button"
+              :aria-label="'选用范文：' + item.title"
+              :disabled="pickSampleBusy"
+              @click="confirmPickSample(item)"
+            >
+              <div class="absolute inset-0 overflow-hidden p-1.5 pb-8">
+                <p class="h-full overflow-hidden whitespace-pre-wrap break-words text-[10px] leading-[14px] text-base-content/70" x-text="item.preview || '（无预览）'"></p>
+              </div>
+              <span class="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-1.5 pb-1.5 pt-6">
+                <span class="line-clamp-2 text-xs leading-4 text-white" x-text="item.title"></span>
+              </span>
+            </button>
+          </template>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div
+    id="sample-create-modal"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+    x-show="createSampleOpen"
+    x-cloak
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="sample-create-title"
+    @keydown.escape.window="createSampleOpen && closeCreateSample()"
+  >
+    <button class="absolute inset-0 cursor-default" type="button" aria-label="关闭" @click="closeCreateSample()"></button>
+    <div class="relative z-10 flex w-full max-w-lg flex-col gap-3 rounded-lg border border-base-300 bg-base-100 p-4 shadow-lg" @click.stop>
+      <div class="flex items-start justify-between gap-2">
+        <h3 id="sample-create-title" class="text-base font-medium">新建范文到库</h3>
+        <button class="btn btn-ghost btn-square btn-sm shrink-0" type="button" aria-label="关闭" @click="closeCreateSample()">×</button>
+      </div>
+      <label class="text-sm" for="sample-create-paste">整篇粘贴（第一行当标题，其余当正文）</label>
+      <textarea
+        id="sample-create-paste"
+        class="textarea min-h-48 w-full resize-none whitespace-pre-wrap wrap"
+        x-model="createSamplePaste"
+        :disabled="createSampleBusy"
+        placeholder="标题写在第一行&#10;下面贴正文…"
+      ></textarea>
+      <p class="text-sm text-error" role="alert" x-show="createSampleError" x-text="createSampleError"></p>
+      <div class="flex justify-end gap-2">
+        <button class="btn btn-ghost btn-sm" type="button" @click="closeCreateSample()" :disabled="createSampleBusy">取消</button>
+        <button class="btn btn-primary btn-sm" type="button" @click="confirmCreateSample()" :disabled="createSampleBusy">确认入库并选用</button>
       </div>
     </div>
   </div>

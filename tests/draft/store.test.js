@@ -58,6 +58,63 @@ test('旧稿没有 uploadRefs / picks 时读成空列表', () => {
   assert.deepEqual(state.uploadRefs, []);
   assert.deepEqual(state.picks.cover.materialIds, []);
   assert.equal(state.picks.gallery.length, 1);
+  assert.equal(state.sampleBody, '');
+  assert.deepEqual(state.references, []);
+  assert.equal(state.articleType, '涨粉');
+  assert.equal(state.persona, '素人');
+});
+
+test('旧稿非空 article 迁成 sampleBody，写回不再落 article', () => {
+  const latestDir = fs.mkdtempSync(path.join(os.tmpdir(), 'one-post-store-sample-'));
+  fs.mkdirSync(latestDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(latestDir, 'draft.json'),
+    `${JSON.stringify({
+      business: '测',
+      article: '旧文章正文',
+      articleType: '种草',
+      galleryCount: 1,
+      draft: null,
+      prompts: { cover: '', storyType: '', look: '', gallery: [], galleryLines: [], galleryRoles: [], style: '', stale: false, basis: null },
+      images: { cover: { status: '空', path: '', selected: 0, revisedAt: 0, versions: [] }, gallery: [] },
+      job: { running: false, step: '', error: '' },
+    }, null, 2)}\n`,
+  );
+  const store = createStore(latestDir);
+  const state = store.read();
+  assert.equal(state.sampleBody, '旧文章正文');
+  assert.equal(Object.prototype.hasOwnProperty.call(state, 'article'), false);
+  store.write(state);
+  const raw = JSON.parse(fs.readFileSync(path.join(latestDir, 'draft.json'), 'utf8'));
+  assert.equal(raw.sampleBody, '旧文章正文');
+  assert.equal(Object.prototype.hasOwnProperty.call(raw, 'article'), false);
+});
+
+test('已有 sampleBody 时忽略旧 article', () => {
+  const latestDir = fs.mkdtempSync(path.join(os.tmpdir(), 'one-post-store-sample2-'));
+  fs.mkdirSync(latestDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(latestDir, 'draft.json'),
+    `${JSON.stringify({
+      business: '测',
+      article: '旧文章',
+      sampleBody: '',
+      sampleTitle: '标题',
+      references: ['事实一'],
+      articleType: '素人',
+      galleryCount: 1,
+      draft: null,
+      prompts: { cover: '', storyType: '', look: '', gallery: [], galleryLines: [], galleryRoles: [], style: '', stale: false, basis: null },
+      images: { cover: { status: '空', path: '', selected: 0, revisedAt: 0, versions: [] }, gallery: [] },
+      job: { running: false, step: '', error: '' },
+    }, null, 2)}\n`,
+  );
+  const state = createStore(latestDir).read();
+  assert.equal(state.sampleBody, '');
+  assert.equal(state.sampleTitle, '标题');
+  assert.deepEqual(state.references, ['事实一']);
+  assert.equal(state.articleType, '涨粉');
+  assert.equal(state.persona, '素人');
 });
 
 test('读写时保留用户图册 look，需带上 userAlbumsDir', () => {

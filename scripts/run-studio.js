@@ -27,6 +27,10 @@ const METHODS = new Set([
   'listAlbums',
   'listLibraryUploadRefs',
   'addLibraryUploadRef',
+  'listLibraryArticleSamples',
+  'getLibraryArticleSample',
+  'saveLibraryArticleSample',
+  'deleteLibraryArticleSample',
   'getAlbumDetail',
   'learnAlbum',
   'commitAlbum',
@@ -173,6 +177,7 @@ function createStudio(options) {
     userAlbumsDir: path.join(root, 'runtime', 'albums'),
     userImageRefsDir: path.join(root, 'runtime', 'image-refs'),
     userUploadRefsDir: path.join(root, 'runtime', 'materials', 'upload-refs'),
+    userArticleSamplesDir: path.join(root, 'runtime', 'materials', 'article-samples'),
     env,
     revealFile: options.revealFile || revealInFolder,
   });

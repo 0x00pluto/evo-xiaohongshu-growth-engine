@@ -7,6 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 const {
   ARTICLE_TYPES,
+  PERSONA_TYPES,
   STORY_TYPES,
   TEXT_ONLY_SCENE,
   albumHint,
@@ -15,6 +16,7 @@ const {
   albumSamplePath,
   assignGalleryRoles,
   assignStoryRoles,
+  buildDraftMessages,
   buildDraftPrompt,
   clearAlbumCatalogCache,
   copySchema,
@@ -39,12 +41,54 @@ const promptsDir = path.join(__dirname, '../../assets/prompts/one-post');
 const ALBUMS = listAlbums(promptsDir);
 
 test('成稿和图册提示词能装填，长提示词不在 src 里', () => {
-  const draft = buildDraftPrompt(promptsDir, '素人', {
+  const draft = buildDraftPrompt(promptsDir, '涨粉', {
     business: '卖给上班的人',
-    article: '',
+    persona: '素人',
+    sampleBody: '',
+    references: [],
   });
-  const tone = readPromptFile(promptsDir, 'tone.md');
-  const plan = fillPrompt(readPromptFile(promptsDir, 'lines/process.md'), {
+  assert.match(draft, /无范文，采用该目的基本写法/);
+  assert.match(draft, /人设：素人/);
+  assert.match(draft, /目的是涨粉/);
+  assert.match(draft, /业务一句/);
+  assert.doesNotMatch(draft, /参考资料（事实材料）/);
+  assert.doesNotMatch(draft, /以下是参考文章/);
+  assert.doesNotMatch(draft, /不要写成引流/);
+
+  const withSample = buildDraftPrompt(promptsDir, '种草', {
+    business: '卖给上班的人',
+    persona: '官号',
+    sampleBody: '这是一篇参考笔记正文。',
+    references: ['  9 月 5 日开课  ', '', '早鸟价 99'],
+  });
+  assert.match(withSample, /人设：官号/);
+  assert.match(withSample, /目的是种草/);
+  assert.match(withSample, /以下是参考文章/);
+  assert.match(withSample, /不要复述原文结构/);
+  assert.match(withSample, /这是一篇参考笔记正文/);
+  assert.match(withSample, /参考资料（事实材料）/);
+  assert.match(withSample, /1\. 9 月 5 日开课/);
+  assert.match(withSample, /2\. 早鸟价 99/);
+  assert.doesNotMatch(withSample, /无范文，采用该目的基本写法/);
+  const messages = buildDraftMessages(promptsDir, '引流', {
+    business: '卖给上班的人',
+    persona: '素人',
+    sampleBody: '这是一篇参考笔记正文。',
+    references: ['早鸟价 99'],
+  });
+  assert.match(messages.system, /你是小红书图文编辑/);
+  assert.match(messages.system, /人设：素人/);
+  assert.match(messages.system, /目的是引流/);
+  assert.match(messages.system, /小红书计字/);
+  assert.match(messages.system, /emoji 只当结构标记/);
+  assert.doesNotMatch(messages.system, /不要写成引流/);
+  assert.doesNotMatch(messages.system, /以下是参考文章|业务一句/);
+  assert.match(messages.user, /以下是参考文章/);
+  assert.match(messages.user, /不要复述原文结构/);
+  assert.match(messages.user, /业务一句/);
+  assert.doesNotMatch(messages.user, /你是小红书图文编辑/);
+  const tone = readPromptFile(promptsDir, 'article-image/tone.md');
+  const plan = fillPrompt(readPromptFile(promptsDir, 'article-image/lines/process.md'), {
     title: '标题',
     body: '正文',
     topics: '甲、乙、丙',
@@ -57,7 +101,7 @@ test('成稿和图册提示词能装填，长提示词不在 src 里', () => {
   assert.match(plan, /仅示例/);
   assert.match(plan, /禁止照抄/);
   assert.match(plan, /"line"/);
-  const scenesPrompt = fillPrompt(readPromptFile(promptsDir, 'scenes.md'), {
+  const scenesPrompt = fillPrompt(readPromptFile(promptsDir, 'article-image/scenes.md'), {
     title: '标题',
     body: '正文',
     topics: '甲、乙、丙',
@@ -80,7 +124,31 @@ test('成稿和图册提示词能装填，长提示词不在 src 里', () => {
     '几何块托起一个箭头',
     { theme: '女性自我成长', mainTitle: '女生旺自己', subTitle: '60个方法' },
   );
-  assert.match(draft, /开头钩子/);
+  assert.match(draft, /故事型|观点型/);
+  const expertSeo = buildDraftPrompt(promptsDir, '搜索', {
+    business: '油皮粉底',
+    persona: '达人',
+    sampleBody: '',
+    references: [],
+  });
+  assert.match(expertSeo, /人设：达人/);
+  assert.match(expertSeo, /目的是搜索占位/);
+  const shopConvert = buildDraftPrompt(promptsDir, '转化', {
+    business: '门店套餐',
+    persona: '店主',
+    sampleBody: '',
+    references: [],
+  });
+  assert.match(shopConvert, /人设：店主/);
+  assert.match(shopConvert, /目的是转化/);
+  const staffAwareness = buildDraftPrompt(promptsDir, '曝光', {
+    business: '品牌联名',
+    persona: '员工',
+    sampleBody: '',
+    references: [],
+  });
+  assert.match(staffAwareness, /人设：员工/);
+  assert.match(staffAwareness, /目的是品牌曝光/);
   assert.match(plan, /1 opening\n2 point\n3 summary/);
   assert.match(plan, /大字报一行/);
   assert.match(scenesPrompt, /分这一句/);
@@ -217,7 +285,8 @@ test('成稿和图册提示词能装填，长提示词不在 src 里', () => {
 });
 
 test('代码随机抽故事类型和图册，不靠模型选题', () => {
-  assert.deepEqual([...ARTICLE_TYPES], ['种草', '引流', '素人']);
+  assert.deepEqual([...ARTICLE_TYPES], ['种草', '引流', '涨粉', '曝光', '搜索', '转化']);
+  assert.deepEqual([...PERSONA_TYPES], ['素人', 'KOC', '达人', '官号', '创始人', '店主', '员工']);
   assert.deepEqual(STORY_TYPES, ['process', 'contrast']);
   const factory = [
     '000001.magazine.dazibao',
@@ -301,8 +370,9 @@ test('纯文字图册允许相同画面句，并收成固定空指令', () => {
   }, null, 2)}\n`);
   fs.writeFileSync(path.join(dir, 'albums', id, 'prompt.md'), sheet);
   fs.writeFileSync(path.join(dir, 'albums', id, 'copy-sample.md'), '仅示例\n');
+  fs.mkdirSync(path.join(dir, 'article-image'), { recursive: true });
   fs.writeFileSync(
-    path.join(dir, 'image-refs.md'),
+    path.join(dir, 'article-image', 'image-refs.md'),
     [
       '## template',
       '',

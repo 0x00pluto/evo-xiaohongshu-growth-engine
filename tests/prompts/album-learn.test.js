@@ -78,9 +78,10 @@ function seedFactoryAlbums(dir) {
     path.join(ROOT_PROMPTS, 'learn-album', 'system.md'),
     path.join(dir, 'learn-album', 'system.md'),
   );
+  fs.mkdirSync(path.join(dir, 'article-image'), { recursive: true });
   fs.copyFileSync(
-    path.join(ROOT_PROMPTS, 'image-refs.md'),
-    path.join(dir, 'image-refs.md'),
+    path.join(ROOT_PROMPTS, 'article-image', 'image-refs.md'),
+    path.join(dir, 'article-image', 'image-refs.md'),
   );
   const kinds = ['magazine', 'scrapbook', 'conceptual', 'card', 'infographic'];
   const lineSchema = '每一项对象字段：\n- line：须准确上图的一句中文（非空）\n返回形状：{"frames":[{"line":"..."}]}';

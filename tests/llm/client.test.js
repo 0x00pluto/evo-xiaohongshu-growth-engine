@@ -38,6 +38,25 @@ test('文案请求走 Chat Completions 并要求 JSON 对象', async () => {
   assert.deepEqual(body.response_format, { type: 'json_object' });
 });
 
+test('成稿可走 system + user 两条 messages', async () => {
+  let captured;
+  const llm = createLlm({
+    DEEPSEEK_API_KEY: 'test-key',
+    DEEPSEEK_BASE_URL: 'https://example.test/v1',
+  }, async (_url, options) => {
+    captured = JSON.parse(options.body);
+    return {
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: '{"title":"甲"}' } }] }),
+    };
+  });
+  await llm.complete({ system: '你是编辑', user: '写一篇种草' });
+  assert.deepEqual(captured.messages, [
+    { role: 'system', content: '你是编辑' },
+    { role: 'user', content: '写一篇种草' },
+  ]);
+});
+
 test('识图与写稿模型分开，默认 deepseek-flash', async () => {
   let captured;
   const llm = createLlm({

@@ -72,6 +72,7 @@ module.exports = {
       userAlbumsDir: path.join(dataDir, 'runtime', 'albums'),
       userImageRefsDir: path.join(dataDir, 'runtime', 'image-refs'),
       userUploadRefsDir: path.join(dataDir, 'runtime', 'materials', 'upload-refs'),
+      userArticleSamplesDir: path.join(dataDir, 'runtime', 'materials', 'article-samples'),
       // 设置页保存不重跑 apply；真正发请求时再读 pluginEnv。
       readEnv: () => resolveEnv(ctx),
       revealFile: revealInFolder,
@@ -85,6 +86,27 @@ module.exports = {
       },
       listLibraryUploadRefs() {
         return runner.listLibraryUploadRefs();
+      },
+      listLibraryArticleSamples() {
+        return runner.listLibraryArticleSamples();
+      },
+      /**
+       * @param {unknown} payload
+       */
+      getLibraryArticleSample(payload) {
+        return runner.getLibraryArticleSample(asObject(payload));
+      },
+      /**
+       * @param {unknown} payload
+       */
+      saveLibraryArticleSample(payload) {
+        return runner.saveLibraryArticleSample(asObject(payload));
+      },
+      /**
+       * @param {unknown} payload
+       */
+      deleteLibraryArticleSample(payload) {
+        return runner.deleteLibraryArticleSample(asObject(payload));
       },
       /**
        * @param {unknown} payload

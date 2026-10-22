@@ -4,7 +4,15 @@
   x-init="init()"
   @library-open-create.window="openCreateMenu()"
   @library-albums-busy.window="onAlbumsBusy($event.detail)"
+  @library-toast.window="onLibraryToast($event.detail)"
 >
+  <template x-if="toast">
+    <div class="toast toast-top toast-center z-[70]">
+      <div class="alert bg-base-100 text-base-content shadow" role="status">
+        <span x-text="toast"></span>
+      </div>
+    </div>
+  </template>
   <div class="flex shrink-0 flex-col gap-2 border-b border-base-300 px-4 py-2.5 lg:px-6">
     <div class="flex items-center justify-between gap-3">
       <h1 class="text-base font-medium">资料库</h1>
@@ -43,6 +51,12 @@
             role="menuitem"
             @click="onCreateUploadRefs()"
           >上传参考</button>
+          <button
+            class="flex w-full items-center px-3 py-2 text-left text-sm hover:bg-base-200"
+            type="button"
+            role="menuitem"
+            @click="onCreateArticleSamples()"
+          >范文</button>
         </div>
       </div>
     </div>
@@ -82,7 +96,6 @@
     <div class="relative min-h-0 flex-1">
       <div class="absolute inset-0 overflow-y-auto px-4 py-3 lg:px-6">
         <p class="mb-3 text-sm text-error" role="alert" x-show="error" x-text="error"></p>
-        <p class="mb-3 text-sm text-base-content/60" role="status" x-show="notice && !error" x-text="notice"></p>
 
         <div class="flex flex-col gap-4" x-show="!albums.length && !learning">
           <div class="rounded-lg bg-base-200 p-4">
@@ -368,7 +381,6 @@
 
     <div class="min-h-0 flex-1 overflow-y-auto px-4 py-3 lg:px-6">
       <p class="mb-3 text-sm text-error" role="alert" x-show="error" x-text="error"></p>
-      <p class="mb-3 text-sm text-base-content/60" role="status" x-show="notice && !error" x-text="notice"></p>
 
       <div class="flex flex-col gap-4" x-show="!uploadRefs.length">
         <div class="rounded-lg bg-base-200 p-4">
@@ -482,6 +494,157 @@
         <h3 id="library-upload-ref-delete-title" class="text-base font-medium">删除这条上传参考？</h3>
         <p class="mt-2 text-sm leading-6 text-base-content/70">
           将从资料库删掉「<span class="break-words" x-text="deleteTarget && deleteTarget.usage"></span>」。不可撤销。已拷进某篇笔记的副本不受影响。
+        </p>
+        <div class="mt-4 flex justify-end gap-2">
+          <button class="btn btn-ghost btn-sm" type="button" @click="cancelDelete()" :disabled="deleting">取消</button>
+          <button class="btn btn-error btn-sm" type="button" @click="confirmDelete()" :disabled="deleting">删除</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div
+    class="flex min-h-0 min-w-0 flex-1 flex-col"
+    x-show="activeTab === 'article-samples'"
+    x-data="libraryArticleSamples()"
+    x-init="init()"
+    role="tabpanel"
+    aria-labelledby="library-tab-article-samples"
+    @library-create-article-sample.window="onCreateArticleSample()"
+  >
+    <div class="min-h-0 flex-1 overflow-y-auto px-4 py-3 lg:px-6">
+      <p class="mb-3 text-sm text-error" role="alert" x-show="error" x-text="error"></p>
+
+      <div class="flex flex-col gap-4" x-show="!samples.length">
+        <div class="rounded-lg bg-base-200 p-4">
+          <p class="text-sm leading-6">还没有范文。用右上「新建 → 范文」存一篇常用笔记正文，以后写稿时可以对照粘贴。</p>
+          <div class="mt-3">
+            <button
+              class="btn btn-neutral btn-sm"
+              type="button"
+              @click="onCreateArticleSample()"
+              :disabled="!hostReady || busy || deleting"
+            >新建</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-3 gap-2 sm:grid-cols-6" role="list" aria-label="范文" x-show="samples.length">
+        <template x-for="item in samples" :key="item.id">
+          <button
+            class="relative aspect-[3/4] w-full overflow-hidden rounded-lg bg-base-200 text-left"
+            type="button"
+            role="listitem"
+            :aria-label="item.title"
+            @click="openDetail(item)"
+          >
+            <div class="absolute inset-0 overflow-hidden p-1.5 pb-8">
+              <p class="h-full overflow-hidden whitespace-pre-wrap break-words text-[10px] leading-[14px] text-base-content/70" x-text="item.preview || '（无预览）'"></p>
+            </div>
+            <span class="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-1.5 pb-1.5 pt-6">
+              <span class="line-clamp-2 text-xs leading-4 text-white" x-text="item.title"></span>
+            </span>
+          </button>
+        </template>
+      </div>
+    </div>
+
+    <div
+      id="library-article-sample-editor-modal"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      x-show="editorOpen"
+      x-cloak
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="library-article-sample-editor-title"
+      @keydown.escape.window="editorOpen && closeEditor()"
+    >
+      <button class="absolute inset-0 cursor-default" type="button" aria-label="取消" @click="closeEditor()"></button>
+      <div class="relative z-10 flex w-full max-w-lg flex-col gap-3 rounded-lg border border-base-300 bg-base-100 p-4 shadow-lg" @click.stop>
+        <h3 id="library-article-sample-editor-title" class="text-base font-medium" x-text="editorId ? '改这篇范文' : '新建范文'"></h3>
+        <label class="text-sm" for="library-article-sample-paste">整篇粘贴（第一行当标题，其余当正文）</label>
+        <textarea
+          id="library-article-sample-paste"
+          class="textarea min-h-48 w-full resize-none whitespace-pre-wrap wrap"
+          x-model="editorPaste"
+          :disabled="busy"
+          placeholder="标题写在第一行&#10;下面贴正文…"
+        ></textarea>
+        <p class="text-sm text-error" role="alert" x-show="editorError" x-text="editorError"></p>
+        <div class="flex justify-end gap-2">
+          <button class="btn btn-ghost btn-sm" type="button" @click="closeEditor()" :disabled="busy">放弃</button>
+          <button class="btn btn-primary btn-sm" type="button" @click="confirmEditor()" :disabled="busy">确认入库</button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="library-article-sample-detail-modal"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      x-show="detailOpen"
+      x-cloak
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="library-article-sample-detail-title"
+      @keydown.escape.window="!deleteOpen && !unsavedOpen && !editorOpen && detailOpen && closeDetail()"
+    >
+      <button class="absolute inset-0 cursor-default" type="button" aria-label="关闭" @click="closeDetail()"></button>
+      <div class="relative z-10 flex h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col gap-3 overflow-hidden rounded-lg border border-base-300 bg-base-100 p-4 shadow-lg" @click.stop>
+        <div class="flex shrink-0 items-start justify-between gap-2">
+          <h3 id="library-article-sample-detail-title" class="min-w-0 flex-1 text-base font-medium" x-text="detailTarget && detailTarget.title"></h3>
+          <button class="btn btn-ghost btn-square btn-sm shrink-0" type="button" aria-label="关闭" @click="closeDetail()" :disabled="savingDetail">×</button>
+        </div>
+        <textarea
+          id="library-article-sample-detail-body"
+          class="textarea min-h-0 w-full flex-1 resize-none whitespace-pre-wrap wrap text-sm leading-6"
+          x-model="detailBody"
+          :disabled="savingDetail || deleting"
+          aria-label="范文正文"
+        ></textarea>
+        <p class="shrink-0 text-sm text-error" role="alert" x-show="detailError" x-text="detailError"></p>
+        <div class="flex shrink-0 justify-end gap-2 pt-2">
+          <button class="btn btn-error btn-sm" type="button" @click="askDeleteFromDetail()" :disabled="deleting || savingDetail || detailDirty()">删除</button>
+          <button class="btn btn-primary btn-sm" type="button" @click="saveDetail()" :disabled="savingDetail || !detailDirty()">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="library-article-sample-unsaved-modal"
+      class="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4"
+      x-show="unsavedOpen"
+      x-cloak
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="library-article-sample-unsaved-title"
+      @keydown.escape.window="unsavedOpen && cancelUnsavedClose()"
+    >
+      <button class="absolute inset-0 cursor-default" type="button" aria-label="取消" @click="cancelUnsavedClose()"></button>
+      <div class="relative z-10 w-full max-w-sm rounded-lg border border-base-300 bg-base-100 p-4 shadow-lg" @click.stop>
+        <h3 id="library-article-sample-unsaved-title" class="text-base font-medium">有未保存的修改</h3>
+        <p class="mt-2 text-sm leading-6 text-base-content/70">关闭后改动会丢掉。要先保存吗？</p>
+        <div class="mt-4 flex justify-end gap-2">
+          <button class="btn btn-ghost btn-sm" type="button" @click="cancelUnsavedClose()">继续编辑</button>
+          <button class="btn btn-neutral btn-sm" type="button" @click="confirmUnsavedClose()">仍要关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="library-article-sample-delete-modal"
+      class="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4"
+      x-show="deleteOpen"
+      x-cloak
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="library-article-sample-delete-title"
+      @keydown.escape.window="cancelDelete()"
+    >
+      <button class="absolute inset-0 cursor-default" type="button" aria-label="取消" @click="cancelDelete()"></button>
+      <div class="relative z-10 w-full max-w-sm rounded-lg border border-base-300 bg-base-100 p-4 shadow-lg" @click.stop>
+        <h3 id="library-article-sample-delete-title" class="text-base font-medium">删除这篇范文？</h3>
+        <p class="mt-2 text-sm leading-6 text-base-content/70">
+          将从资料库删掉「<span class="break-words" x-text="deleteTarget && deleteTarget.title"></span>」。不可撤销。已贴进某篇笔记的副本不受影响。
         </p>
         <div class="mt-4 flex justify-end gap-2">
           <button class="btn btn-ghost btn-sm" type="button" @click="cancelDelete()" :disabled="deleting">取消</button>

@@ -35,8 +35,11 @@ const STATUSES = new Set(['空', '生成中', '成功', '失败', '作废']);
  * }} PromptsState
  * @typedef {{
  *   business: string;
- *   article: string;
+ *   sampleTitle: string;
+ *   sampleBody: string;
+ *   references: string[];
  *   articleType: string;
+ *   persona: string;
  *   coverLineSpecified: string;
  *   galleryCount: number;
  *   draft: import('./validate').DraftFace | null;
@@ -112,8 +115,11 @@ function emptySlot() {
 function emptyState() {
   return {
     business: '',
-    article: '',
-    articleType: '素人',
+    sampleTitle: '',
+    sampleBody: '',
+    references: [],
+    articleType: '涨粉',
+    persona: '素人',
     coverLineSpecified: '',
     galleryCount: 1,
     draft: null,
@@ -139,9 +145,30 @@ function emptyState() {
  * @param {unknown} value
  * @returns {string}
  */
-function normalizeArticleType(value) {
-  if (value === '种草' || value === '引流' || value === '素人') return value;
+function normalizePersona(value) {
+  if (
+    value === '素人' || value === 'KOC' || value === '达人' || value === '官号'
+    || value === '创始人' || value === '店主' || value === '员工'
+  ) {
+    return value;
+  }
   return '素人';
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function normalizeArticleType(value) {
+  // 旧稿「素人」是类型；现拆成目的「涨粉」+ 人设「素人」。
+  if (value === '素人') return '涨粉';
+  if (
+    value === '种草' || value === '引流' || value === '涨粉'
+    || value === '曝光' || value === '搜索' || value === '转化'
+  ) {
+    return value;
+  }
+  return '涨粉';
 }
 
 /**
@@ -276,8 +303,24 @@ function normalize(raw, promptsDir, userAlbumsDir) {
   const base = emptyState();
   const source = raw && typeof raw === 'object' ? /** @type {Record<string, unknown>} */ (raw) : {};
   base.business = typeof source.business === 'string' ? source.business : '';
-  base.article = typeof source.article === 'string' ? source.article : '';
+  base.sampleTitle = typeof source.sampleTitle === 'string' ? source.sampleTitle : '';
+  if (typeof source.sampleBody === 'string') {
+    base.sampleBody = source.sampleBody;
+  } else if (typeof source.article === 'string' && source.article.trim()) {
+    // 旧稿 article 迁成范文正文快照；写回时不再落 article。
+    base.sampleBody = source.article;
+  } else {
+    base.sampleBody = '';
+  }
+  base.references = Array.isArray(source.references)
+    ? source.references.map((item) => String(item))
+    : [];
   base.articleType = normalizeArticleType(source.articleType);
+  if (source.articleType === '素人' && (source.persona == null || source.persona === '')) {
+    base.persona = '素人';
+  } else {
+    base.persona = normalizePersona(source.persona);
+  }
   base.coverLineSpecified = typeof source.coverLineSpecified === 'string' ? source.coverLineSpecified : '';
   const count = Number(source.galleryCount);
   base.galleryCount = Number.isInteger(count) && count >= 0 && count <= 9 ? count : 1;
