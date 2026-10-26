@@ -5,19 +5,43 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { FILES_URL } = require('../../src/image/files');
-const { IMAGE_INPUT, MODEL_URL, MODEL_URLS, generatePng } = require('../../src/image/generate');
+const { IMAGE_ASPECT_RATIO, IMAGE_MODELS, generatePng } = require('../../src/image/generate');
 
-function jsonResponse(body, status = 200) {
+/**
+ * @param {{ enough?: boolean }} [opts]
+ */
+function fakeModels(opts) {
+  const enough = !opts || opts.enough !== false;
+  /** @type {Array<{ op: string; input?: unknown; body?: unknown; options?: unknown }>} */
+  const calls = [];
   return {
-    ok: status >= 200 && status < 300,
-    status,
-    json: async () => body,
-    arrayBuffer: async () => new ArrayBuffer(0),
+    calls,
+    billing: {
+      quote: async (body) => {
+        calls.push({ op: 'quote', body });
+        const model = body && typeof body === 'object' && /** @type {{ model?: unknown }} */ (body).model;
+        return {
+          kind: 'image',
+          estimate: '0.2000',
+          enough,
+          balance: enough ? '10.0000' : '0.0000',
+          model: typeof model === 'string' ? model : IMAGE_MODELS.standard,
+        };
+      },
+    },
+    images: {
+      generate: async (input, options) => {
+        calls.push({ op: 'image', input, options });
+        const outputPath = input && input.outputPath;
+        fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+        fs.writeFileSync(outputPath, Buffer.from([137, 80, 78, 71]));
+        return { status: 'succeeded', output: outputPath, model: input.model };
+      },
+    },
   };
 }
 
-test('没有 Replicate 密钥时不发请求', async () => {
+test('没有 Dex Buddy 钥匙时不发请求', async () => {
   let called = false;
   await assert.rejects(() => generatePng({
     prompt: '一张桌子',
@@ -27,99 +51,71 @@ test('没有 Replicate 密钥时不发请求', async () => {
       called = true;
       throw new Error('不应请求');
     },
-  }), /缺少 REPLICATE_API_TOKEN/);
+  }), /DEX_BUDDY_API_KEY/);
   assert.equal(called, false);
 });
 
-test('生图只传 3:4 和 medium，并在完成后落成 PNG', async () => {
+test('生图只传 3:4 和标准档，并在完成后落成 PNG', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'one-post-image-'));
   const outputPath = path.join(dir, 'cover.png');
-  const calls = [];
+  const models = fakeModels();
   await generatePng({
     prompt: '一张桌子',
     outputPath,
-    env: { REPLICATE_API_TOKEN: 'token' },
-    sleep: async () => {},
-    fetch: async (url, options) => {
-      calls.push({ url: String(url), options });
-      if (String(url) === MODEL_URL) {
-        return jsonResponse({
-          status: 'processing',
-          urls: { get: 'https://api.replicate.com/v1/predictions/p1' },
-        });
-      }
-      if (String(url).endsWith('/predictions/p1')) {
-        return jsonResponse({ status: 'succeeded', output: ['https://cdn.example/cover.png'] });
-      }
-      return {
-        ok: true,
-        status: 200,
-        arrayBuffer: async () => Uint8Array.from([137, 80, 78, 71]).buffer,
-      };
-    },
+    models,
   });
-
-  assert.match(MODEL_URL, /\/models\/openai\/gpt-image-2\.5-flare\/predictions$/);
-  assert.equal(MODEL_URLS.flare, MODEL_URL);
-  assert.match(MODEL_URLS.sunburst, /\/models\/openai\/gpt-image-2\.5-sunburst\/predictions$/);
-  const body = JSON.parse(calls[0].options.body);
-  assert.equal(body.input.prompt, '一张桌子');
-  assert.equal(body.input.aspect_ratio, '3:4');
-  assert.equal(body.input.quality, 'medium');
-  assert.equal(body.input.output_format, 'png');
-  assert.equal(body.input.number_of_images, 1);
-  assert.equal(Object.prototype.hasOwnProperty.call(body.input, 'input_images'), false);
-  assert.deepEqual({
-    aspect_ratio: body.input.aspect_ratio,
-    quality: body.input.quality,
-    output_format: body.input.output_format,
-    number_of_images: body.input.number_of_images,
-  }, IMAGE_INPUT);
+  const image = models.calls.find((item) => item.op === 'image');
+  assert.ok(image);
+  const input = /** @type {{ model: string; input: Record<string, unknown>; outputPath: string }} */ (image.input);
+  assert.equal(input.model, IMAGE_MODELS.standard);
+  assert.equal(input.input.prompt, '一张桌子');
+  assert.equal(input.input.aspect_ratio, IMAGE_ASPECT_RATIO);
+  assert.equal(input.input.quality, undefined);
+  assert.equal(input.input.output_format, undefined);
+  assert.equal(input.input.number_of_images, undefined);
+  assert.equal(Object.prototype.hasOwnProperty.call(input.input, 'input_images'), false);
   assert.equal(fs.readFileSync(outputPath).length, 4);
 });
 
-test('有参考图时先 Files 上传再把 URL 填进 input_images', async () => {
+test('专业档用 image-pro', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'one-post-image-pro-'));
+  const outputPath = path.join(dir, 'cover.png');
+  const models = fakeModels();
+  await generatePng({
+    prompt: '一张桌子',
+    outputPath,
+    models,
+    model: IMAGE_MODELS.pro,
+  });
+  const image = models.calls.find((item) => item.op === 'image');
+  assert.equal(/** @type {{ model: string }} */ (image.input).model, IMAGE_MODELS.pro);
+});
+
+test('参考图用本机路径放进 input_images', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'one-post-image-ref-'));
   const samplePath = path.join(dir, 'template.jpg');
   fs.writeFileSync(samplePath, Buffer.from([0xff, 0xd8, 0xff, 0xd9]));
   const outputPath = path.join(dir, 'cover.png');
-  const fileUrl = `${FILES_URL}/file-abc`;
-  const calls = [];
+  const models = fakeModels();
   await generatePng({
     prompt: '照模板换文案',
     outputPath,
     references: [{ role: 'template', path: samplePath }],
-    env: { REPLICATE_API_TOKEN: 'token' },
-    sleep: async () => {},
-    fetch: async (url, options) => {
-      calls.push({ url: String(url), options });
-      if (String(url) === FILES_URL) {
-        assert.equal(options.method, 'POST');
-        assert.ok(options.body instanceof FormData);
-        assert.equal(options.headers.Authorization, 'Bearer token');
-        assert.equal(options.headers['Content-Type'], undefined);
-        return jsonResponse({
-          id: 'file-abc',
-          urls: { get: fileUrl },
-        });
-      }
-      if (String(url) === MODEL_URL) {
-        return jsonResponse({
-          status: 'succeeded',
-          output: ['https://cdn.example/cover.png'],
-        });
-      }
-      return {
-        ok: true,
-        status: 200,
-        arrayBuffer: async () => Uint8Array.from([137, 80, 78, 71]).buffer,
-      };
-    },
+    models,
+    idempotencyKey: 'post-1:cover',
   });
+  const image = models.calls.find((item) => item.op === 'image');
+  const input = /** @type {{ input: { input_images: string[] } }} */ (image.input);
+  assert.deepEqual(input.input.input_images, [samplePath]);
+  assert.deepEqual(image.options, { idempotencyKey: 'post-1:cover' });
+});
 
-  assert.equal(calls[0].url, FILES_URL);
-  const predBody = JSON.parse(calls[1].options.body);
-  assert.deepEqual(predBody.input.input_images, [fileUrl]);
-  assert.doesNotMatch(predBody.input.input_images[0], /^data:/);
-  assert.equal(fs.readFileSync(outputPath).length, 4);
+test('报价不够时不调用 generate', async () => {
+  const models = fakeModels({ enough: false });
+  await assert.rejects(() => generatePng({
+    prompt: '一张桌子',
+    outputPath: path.join(os.tmpdir(), 'skip.png'),
+    models,
+  }), /INSUFFICIENT_CREDITS/);
+  assert.equal(models.calls.some((item) => item.op === 'image'), false);
 });

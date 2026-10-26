@@ -10,15 +10,13 @@ const { fillMissingFromDotEnv } = require('../../src/one-post/env');
 test('仓库 .env 只补空位', () => {
   const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'one-post-env-')), '.env');
   fs.writeFileSync(file, [
-    'DEEPSEEK_API_KEY=from-file',
-    'REPLICATE_API_TOKEN=from-file-too',
-    'DEEPSEEK_MODEL=from-file-model',
+    'DEX_BUDDY_API_KEY=from-file',
+    'DEX_GATEWAY_BASE_URL=https://example.test',
   ].join('\n'));
   const env = fillMissingFromDotEnv({
-    DEEPSEEK_API_KEY: 'from-host',
-    REPLICATE_API_TOKEN: '',
+    DEX_BUDDY_API_KEY: 'from-host',
+    DEX_GATEWAY_BASE_URL: '',
   }, file);
-  assert.equal(env.DEEPSEEK_API_KEY, 'from-host');
-  assert.equal(env.REPLICATE_API_TOKEN, 'from-file-too');
-  assert.equal(env.DEEPSEEK_MODEL, 'from-file-model');
+  assert.equal(env.DEX_BUDDY_API_KEY, 'from-host');
+  assert.equal(env.DEX_GATEWAY_BASE_URL, 'https://example.test');
 });

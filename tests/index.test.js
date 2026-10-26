@@ -15,7 +15,7 @@ test('桥把 onePost 的方法登记到宿主', () => {
     dirs: { data: dataDir },
     pluginEnv: () => {
       pluginEnvCalls += 1;
-      return { DEEPSEEK_API_KEY: 'host-key' };
+      return { DEX_BUDDY_API_KEY: 'host-key' };
     },
     registerService(name, methods) {
       service = { name, methods };
@@ -30,7 +30,7 @@ test('桥把 onePost 的方法登记到宿主', () => {
     'openPost', 'startNew', 'saveEditor', 'generateDraft', 'generatePrompts',
     'chooseImage', 'generateImages', 'retryImage', 'previewImage', 'previewPostCover', 'previewHistoryPost',
     'previewAlbumSample',
-    'revealImage', 'addUploadRef', 'updateUploadRefUsage', 'deleteUploadRef', 'setSlotPick',
+    'revealImage', 'revealPost', 'addUploadRef', 'updateUploadRefUsage', 'deleteUploadRef', 'setSlotPick',
     'previewUploadRef', 'previewLibraryUploadRef', 'draftUploadRefUsage', 'saveUploadRefToLibrary',
     'pickLibraryUploadRef', 'deleteLibraryUploadRef',
   ]) {

@@ -1,6 +1,7 @@
 // @ts-check
 'use strict';
 
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -25,9 +26,13 @@ const articleSamplesStore = require('../article-samples/store');
 /** @type {typeof import('../prompts/parse')} */
 const parseModule = require('../prompts/parse');
 
+/** @type {typeof import('./model-error')} */
+const modelErrorModule = require('./model-error');
+
 const { createLlm } = llmModule;
 const { parseJsonObject } = parseModule;
 const { generatePng } = imageModule;
+const { formatModelError } = modelErrorModule;
 const {
   albumHint,
   albumSampleFile,
@@ -104,14 +109,18 @@ const BUSY_MESSAGE = '正在生成，请等这一轮结束';
  *   userMaterialsDir?: string;
  *   env?: Record<string, string | undefined>;
  *   readEnv?: () => Record<string, string | undefined>;
+ *   ctx?: unknown;
+ *   models?: unknown;
  *   fetch?: import('../llm/client').FetchFn;
  *   now?: () => Date;
- *   complete?: (prompt: string | { system: string; user: string }) => Promise<string>;
- *   completeVision?: (input: { text: string; dataUrl: string }) => Promise<string>;
+ *   complete?: (prompt: string | { system: string; user: string }, options?: { idempotencyKey?: string }) => Promise<string>;
+ *   completeVision?: (input: { text: string; dataUrl: string }, options?: { idempotencyKey?: string }) => Promise<string>;
  *   generateImage?: (args: {
  *     prompt: string;
  *     outputPath: string;
  *     references?: import('../image/generate').ImageReference[];
+ *     idempotencyKey?: string;
+ *     model?: string;
  *   }) => Promise<string>;
  *   revealFile?: (absPath: string) => void;
  *   random?: () => number;
@@ -124,11 +133,7 @@ const BUSY_MESSAGE = '正在生成，请等这一轮结束';
  * @returns {string}
  */
 function errorMessage(err, fallback) {
-  if (err && typeof err === 'object' && 'message' in err) {
-    const message = /** @type {{ message?: unknown }} */ (err).message;
-    if (typeof message === 'string' && message) return message;
-  }
-  return fallback;
+  return formatModelError(err, fallback);
 }
 
 /**
@@ -262,22 +267,39 @@ function createRunner(options) {
   let currentDir = '';
   /** @type {import('../draft/store').DraftStore | null} */
   let store = null;
-  const llm = createLlm(readEnv, fetchImpl);
+  const llm = createLlm({
+    env: readEnv,
+    ctx: options.ctx,
+    models: options.models ? /** @type {import('../llm/client').HostModels} */ (options.models) : undefined,
+    fetch: fetchImpl,
+  });
   const complete = options.complete
-    || ((/** @type {string | { system: string; user: string }} */ prompt) => llm.complete(prompt));
+    || ((/** @type {string | { system: string; user: string }} */ prompt, callOptions) => (
+      llm.complete(prompt, callOptions)
+    ));
   const completeVision = options.completeVision
-    || ((/** @type {{ text: string; dataUrl: string }} */ input) => llm.completeVision(input));
+    || ((/** @type {{ text: string; dataUrl: string }} */ input, callOptions) => (
+      llm.completeVision(input, callOptions)
+    ));
   const generateImage = options.generateImage || ((/** @type {{
     prompt: string;
     outputPath: string;
     references?: import('../image/generate').ImageReference[];
+    idempotencyKey?: string;
+    model?: string;
   }} */ args) => generatePng({
     prompt: args.prompt,
     outputPath: args.outputPath,
     references: args.references,
-    env: readEnv(),
+    env: readEnv,
+    ctx: options.ctx,
+    models: options.models ? /** @type {import('../image/generate').HostImageModels} */ (options.models) : undefined,
     fetch: fetchImpl,
+    model: args.model,
+    idempotencyKey: args.idempotencyKey,
   }));
+  /** @type {Map<string, number>} */
+  const visionAttempts = new Map();
   const revealFile = options.revealFile || (() => {});
   const random = options.random || Math.random;
   /** @type {string | null} */
@@ -305,8 +327,10 @@ function createRunner(options) {
     return { ok: true, ...emptyState(), directory: '', id: '' };
   }
 
+  // 锁占用时把当前篇带回去，页面重挂才能接上等待层。
   function busy() {
-    return { ok: false, message: BUSY_MESSAGE };
+    if (!store) return { ok: false, message: BUSY_MESSAGE };
+    return { ...loadLatest(), ok: false, message: BUSY_MESSAGE };
   }
 
   /**
@@ -330,6 +354,85 @@ function createRunner(options) {
     state.prompts.stale = false;
     state.job = { running: false, step: '', error: message || '没有完成' };
     store.write(state);
+  }
+
+  /**
+   * @param {string} id
+   * @param {string} step
+   * @param {number} attempts
+   * @returns {string}
+   */
+  function stepKey(id, step, attempts) {
+    const base = `${id}:${step}`;
+    return Number.isInteger(attempts) && attempts > 0 ? `${base}:retry-${attempts}` : base;
+  }
+
+  /**
+   * @returns {import('../draft/store').BillingAttempts}
+   */
+  function emptyBilling() {
+    return { copy: 0, promptsPlan: 0, promptsScenes: 0 };
+  }
+
+  /**
+   * @param {import('../draft/store').DraftState} state
+   * @param {'copy' | 'promptsPlan' | 'promptsScenes'} field
+   * @returns {number}
+   */
+  function readBilling(state, field) {
+    const billing = state.billing || emptyBilling();
+    const n = Number(billing[field]);
+    return Number.isInteger(n) && n > 0 ? n : 0;
+  }
+
+  /**
+   * @param {'copy' | 'promptsPlan' | 'promptsScenes'} field
+   */
+  function bumpBilling(field) {
+    if (!store) return;
+    const state = store.read();
+    const billing = { ...emptyBilling(), ...(state.billing || {}) };
+    billing[field] = readBilling(state, field) + 1;
+    state.billing = billing;
+    store.write(state);
+  }
+
+  /**
+   * @param {string | { system: string; user: string }} prompt
+   * @param {'copy' | 'promptsPlan' | 'promptsScenes'} field
+   * @param {string} step
+   * @returns {Promise<string>}
+   */
+  async function completeWithStep(prompt, field, step) {
+    const attempts = store ? readBilling(store.read(), field) : 0;
+    const key = stepKey(currentId, step, attempts);
+    try {
+      const text = await complete(prompt, { idempotencyKey: key });
+      bumpBilling(field);
+      return text;
+    } catch (err) {
+      bumpBilling(field);
+      throw err;
+    }
+  }
+
+  /**
+   * @param {string} prefix
+   * @param {string} dataUrl
+   * @returns {{ step: string; key: string }}
+   */
+  function visionStepKey(prefix, dataUrl) {
+    const hash = crypto.createHash('sha256').update(String(dataUrl || '')).digest('hex').slice(0, 16);
+    const step = `${prefix}:${hash}:vision`;
+    const n = visionAttempts.get(step) || 0;
+    return { step, key: n > 0 ? `${step}:retry-${n}` : step };
+  }
+
+  /**
+   * @param {string} step
+   */
+  function rememberVisionFailure(step) {
+    visionAttempts.set(step, (visionAttempts.get(step) || 0) + 1);
   }
 
   /**
@@ -379,7 +482,13 @@ function createRunner(options) {
         ? basePrompt
         : `${basePrompt}\n\n上一轮返回了 ${sceneLengthFromError(lastErr, need)} 条，必须正好 ${need} 条，且每一条画面都不能相同，只返回 JSON。`;
       try {
-        return parseScenesText(await complete(prompt), displayLines, look, promptsDir, userAlbumsDir);
+        return parseScenesText(
+          await completeWithStep(prompt, 'promptsScenes', 'prompts:scenes'),
+          displayLines,
+          look,
+          promptsDir,
+          userAlbumsDir,
+        );
       } catch (err) {
         lastErr = err;
         if (attempt === 0 && isSceneRetryableError(err)) continue;
@@ -406,15 +515,16 @@ function createRunner(options) {
       topics: face.topics.join('、'),
     };
     const slots = storyType === 'contrast' ? assignContrastSlots(galleryCount) : assignStoryRoles(galleryCount);
+    const planPrompt = fillPrompt(readPromptFile(promptsDir, storyPromptName(storyType)), {
+      ...shared,
+      tone,
+      albumHint: albumHint(promptsDir, look, userAlbumsDir),
+      copySchema: copySchema(look, promptsDir, userAlbumsDir),
+      imageCount: String(galleryCount + 1),
+      slots: formatGallerySlots(slots),
+    });
     const planned = parsePlanText(
-      await complete(fillPrompt(readPromptFile(promptsDir, storyPromptName(storyType)), {
-        ...shared,
-        tone,
-        albumHint: albumHint(promptsDir, look, userAlbumsDir),
-        copySchema: copySchema(look, promptsDir, userAlbumsDir),
-        imageCount: String(galleryCount + 1),
-        slots: formatGallerySlots(slots),
-      })),
+      await completeWithStep(planPrompt, 'promptsPlan', 'prompts:plan'),
       galleryCount,
       face.body,
       look,
@@ -512,7 +622,7 @@ function createRunner(options) {
       });
       let face;
       try {
-        face = parseDraftText(await complete(draftMessages));
+        face = parseDraftText(await completeWithStep(draftMessages, 'copy', 'copy'));
       } catch (err) {
         markJobFailed(errorMessage(err, '成稿失败'));
         return;
@@ -582,6 +692,7 @@ function createRunner(options) {
       selected: 0,
       revisedAt: 0,
       versions: [],
+      attempts: 0,
     };
   }
 
@@ -603,6 +714,7 @@ function createRunner(options) {
       selected: 0,
       revisedAt: 0,
       versions: [],
+      attempts: 0,
     });
     gallery[index - 1] = next;
     state.images.gallery = gallery;
@@ -637,6 +749,9 @@ function createRunner(options) {
       for (const job of selected) {
         const current = store.read();
         const previous = readImageSlot(current, job.slot, job.index);
+        const attempts = Number.isInteger(previous.attempts) ? previous.attempts : 0;
+        const stepName = job.slot === 'cover' ? 'cover' : `gallery-${String(job.index).padStart(2, '0')}`;
+        const key = stepKey(currentId, stepName, attempts);
         const file = nextImageFile(job.slot, job.index, previous.versions);
         setImageSlot(current, job.slot, job.index, { ...previous, status: '生成中' });
         current.job = { running: true, step: job.label, error: '' };
@@ -658,6 +773,7 @@ function createRunner(options) {
           await generateImage({
             prompt: composed.prompt,
             outputPath,
+            idempotencyKey: key,
             ...(composed.references.length > 0 ? { references: composed.references } : {}),
           });
           const done = store.read();
@@ -670,6 +786,7 @@ function createRunner(options) {
             selected: versions.length,
             revisedAt,
             versions,
+            attempts: attempts + 1,
           });
           done.job = { running: true, step: job.label, error: '' };
           store.write(done);
@@ -682,6 +799,7 @@ function createRunner(options) {
           setImageSlot(failedState, job.slot, job.index, {
             ...base,
             status: base.versions.length > 0 ? '成功' : '失败',
+            attempts: attempts + 1,
           });
           failedState.job = { running: true, step: job.label, error: '' };
           store.write(failedState);
@@ -780,23 +898,17 @@ function createRunner(options) {
   }
 
   /**
+   * @param {ReturnType<typeof validateInputs> & { ok: true }} checked
    * @param {Record<string, unknown>} payload
+   * @param {string} articleType
+   * @param {string} persona
    */
-  function generateDraft(payload) {
-    const checked = validateInputs(payload);
-    if (!checked.ok) return checked;
-    const articleType = payload && payload.articleType;
-    if (!isArticleType(articleType)) {
-      return { ok: false, message: '文章目的不在允许列表', field: 'articleType' };
-    }
-    const persona = payload && payload.persona;
-    if (!isPersonaType(persona)) {
-      return { ok: false, message: '人设不在允许列表', field: 'persona' };
-    }
-    if (lock) return busy();
+  function acceptGenerateDraft(checked, payload, articleType, persona) {
     if (!store) usePost(allocatePost(postsDir, now()));
-    if (!store) return { ok: false, message: '没有这一篇' };
-    lock = 'generateDraft';
+    if (!store) {
+      lock = null;
+      return { ok: false, message: '没有这一篇' };
+    }
     const state = store.read();
     state.business = checked.business;
     state.sampleBody = checked.sampleBody;
@@ -816,6 +928,25 @@ function createRunner(options) {
       lock = null;
     });
     return { ok: true, accepted: true, id: currentId };
+  }
+
+  /**
+   * @param {Record<string, unknown>} payload
+   */
+  function generateDraft(payload) {
+    const checked = validateInputs(payload);
+    if (!checked.ok) return checked;
+    const articleType = payload && payload.articleType;
+    if (!isArticleType(articleType)) {
+      return { ok: false, message: '文章目的不在允许列表', field: 'articleType' };
+    }
+    const persona = payload && payload.persona;
+    if (!isPersonaType(persona)) {
+      return { ok: false, message: '人设不在允许列表', field: 'persona' };
+    }
+    if (lock) return busy();
+    lock = 'generateDraft';
+    return acceptGenerateDraft(checked, payload, articleType, persona);
   }
 
   /**
@@ -902,16 +1033,18 @@ function createRunner(options) {
       return { ok: false, message: err instanceof Error ? err.message : '参考图不合格' };
     }
     lock = 'learnAlbum';
+    const vis = visionStepKey('album-learn', image.dataUrl);
     try {
       const system = readLearnSystemPrompt(promptsDir);
-      const raw = await completeVision({ text: system, dataUrl: image.dataUrl });
+      const raw = await completeVision({ text: system, dataUrl: image.dataUrl }, { idempotencyKey: vis.key });
       albumDraftSeq += 1;
       const draftId = `draft-${albumDraftSeq}`;
       const draft = buildAlbumDraft(promptsDir, raw, image, draftId, userAlbumsDir);
       albumDraft = draft;
       return { ok: true, draft: draftPublicView(draft) };
     } catch (err) {
-      return { ok: false, message: err instanceof Error ? err.message : '学习失败' };
+      rememberVisionFailure(vis.step);
+      return { ok: false, message: formatModelError(err, '学习失败') };
     } finally {
       lock = null;
     }
@@ -1064,6 +1197,27 @@ function createRunner(options) {
   }
 
   /**
+   * @param {ImageOnly} only
+   */
+  function acceptGenerateImages(only) {
+    if (!store) {
+      lock = null;
+      return { ok: false, message: '没有这一篇' };
+    }
+    const state = store.read();
+    state.job = {
+      running: true,
+      step: only.slot === 'cover' ? '封面' : `配图 ${only.index}`,
+      error: '',
+    };
+    store.write(state);
+    runImages(only).finally(() => {
+      lock = null;
+    });
+    return { ok: true, accepted: true };
+  }
+
+  /**
    * @param {Record<string, unknown>} payload
    */
   function generateImages(payload) {
@@ -1079,17 +1233,9 @@ function createRunner(options) {
       store.write(state);
       return { ok: false, message: reason };
     }
-    lock = 'generateImages';
-    state.job = {
-      running: true,
-      step: only.slot === 'cover' ? '封面' : `配图 ${only.index}`,
-      error: '',
-    };
     store.write(state);
-    runImages(only).finally(() => {
-      lock = null;
-    });
-    return { ok: true, accepted: true };
+    lock = 'generateImages';
+    return acceptGenerateImages(only);
   }
 
   /**
@@ -1117,10 +1263,7 @@ function createRunner(options) {
     lock = 'retryImage';
     /** @type {ImageOnly} */
     const only = slot === 'cover' ? { slot: 'cover', index: 0 } : { slot: 'gallery', index };
-    runImages(only).finally(() => {
-      lock = null;
-    });
-    return { ok: true, accepted: true };
+    return acceptGenerateImages(only);
   }
 
   /**
@@ -1277,8 +1420,42 @@ function createRunner(options) {
   }
 
   /**
+   * 按篇打开访达到第一张选用图，不切换当前稿。
    * @param {Record<string, unknown>} payload
    */
+  function revealPost(payload) {
+    const source = payload && typeof payload === 'object' ? payload : {};
+    const id = typeof source.id === 'string' ? source.id : '';
+    if (!hasPost(postsDir, id)) return { ok: false, message: '没有这一篇' };
+    const postDir = path.join(postsDir, id);
+    const state = createStore(postDir, { promptsDir, userAlbumsDir }).read();
+    /** @type {string[]} */
+    const files = [];
+    if (state.images && state.images.cover && state.images.cover.path) {
+      files.push(String(state.images.cover.path));
+    }
+    const gallery = state.images && Array.isArray(state.images.gallery) ? state.images.gallery : [];
+    for (const slot of gallery) {
+      if (!slot || !slot.path) continue;
+      files.push(String(slot.path));
+    }
+    let abs = '';
+    for (const file of files) {
+      const candidate = path.join(postDir, file);
+      if (fs.existsSync(candidate)) {
+        abs = candidate;
+        break;
+      }
+    }
+    if (!abs) return { ok: false, message: '没有这张图' };
+    try {
+      revealFile(abs);
+    } catch {
+      return { ok: true, path: abs };
+    }
+    return { ok: true, path: abs };
+  }
+
   /**
    * @param {Record<string, unknown>} payload
    */
@@ -1449,9 +1626,10 @@ function createRunner(options) {
       return { ok: false, message: err instanceof Error ? err.message : '上传参考图不合格' };
     }
     lock = 'draftUploadRefUsage';
+    const vis = visionStepKey('upload-ref', image.dataUrl);
     try {
       const system = uploadRefFiles.readUploadRefUsageSystemPrompt(promptsDir);
-      const raw = await completeVision({ text: system, dataUrl: image.dataUrl });
+      const raw = await completeVision({ text: system, dataUrl: image.dataUrl }, { idempotencyKey: vis.key });
       const data = parseJsonObject(raw);
       const usageCheck = uploadRefRules.validateUsage(
         typeof data.usage === 'string' ? data.usage : '',
@@ -1461,7 +1639,8 @@ function createRunner(options) {
       }
       return { ok: true, usage: usageCheck.usage };
     } catch (err) {
-      return { ok: false, message: err instanceof Error ? err.message : '识图失败' };
+      rememberVisionFailure(vis.step);
+      return { ok: false, message: formatModelError(err, '识图失败') };
     } finally {
       lock = null;
     }
@@ -1665,6 +1844,7 @@ function createRunner(options) {
     previewLibraryUploadRef,
     previewUploadRef,
     revealImage,
+    revealPost,
     retryImage,
     saveEditor,
     saveLibraryArticleSample,

@@ -21,7 +21,13 @@ const STATUSES = new Set(['空', '生成中', '成功', '失败', '作废']);
  *   selected: number;
  *   revisedAt: number;
  *   versions: ImageVersion[];
+ *   attempts: number;
  * }} ImageSlot
+ * @typedef {{
+ *   copy: number;
+ *   promptsPlan: number;
+ *   promptsScenes: number;
+ * }} BillingAttempts
  * @typedef {{
  *   cover: string;
  *   storyType: string;
@@ -47,6 +53,7 @@ const STATUSES = new Set(['空', '生成中', '成功', '失败', '作废']);
  *   images: { cover: ImageSlot; gallery: ImageSlot[] };
  *   uploadRefs: import('../upload-refs/rules').UploadRefItem[];
  *   picks: import('../upload-refs/rules').PicksState;
+ *   billing: BillingAttempts;
  *   job: { running: boolean; step: string; error: string };
  * }} DraftState
  * @typedef {{
@@ -106,7 +113,7 @@ function nextImageFile(slot, index, versions) {
  * @returns {ImageSlot}
  */
 function emptySlot() {
-  return { status: '空', path: '', selected: 0, revisedAt: 0, versions: [] };
+  return { status: '空', path: '', selected: 0, revisedAt: 0, versions: [], attempts: 0 };
 }
 
 /**
@@ -137,6 +144,7 @@ function emptyState() {
     images: { cover: emptySlot(), gallery: [] },
     uploadRefs: [],
     picks: emptyPicks(1),
+    billing: { copy: 0, promptsPlan: 0, promptsScenes: 0 },
     job: { running: false, step: '', error: '' },
   };
 }
@@ -244,12 +252,38 @@ function normalizeSlot(slot) {
     selected = found >= 0 ? found + 1 : (versions.length > 0 ? versions.length : 0);
   }
   const chosen = selected > 0 ? versions[selected - 1] : null;
+  const attempts = Number(source && source.attempts);
   return {
     status,
     path: chosen ? chosen.path : '',
     selected,
     revisedAt: chosen ? chosen.revisedAt : 0,
     versions,
+    attempts: Number.isInteger(attempts) && attempts >= 0 ? attempts : 0,
+  };
+}
+
+/**
+ * @param {unknown} value
+ * @returns {number}
+ */
+function normalizeCount(value) {
+  const n = Number(value);
+  return Number.isInteger(n) && n >= 0 ? n : 0;
+}
+
+/**
+ * @param {unknown} raw
+ * @returns {BillingAttempts}
+ */
+function normalizeBilling(raw) {
+  const source = raw && typeof raw === 'object' && !Array.isArray(raw)
+    ? /** @type {Record<string, unknown>} */ (raw)
+    : {};
+  return {
+    copy: normalizeCount(source.copy),
+    promptsPlan: normalizeCount(source.promptsPlan),
+    promptsScenes: normalizeCount(source.promptsScenes),
   };
 }
 
@@ -357,6 +391,7 @@ function normalize(raw, promptsDir, userAlbumsDir) {
   };
   base.uploadRefs = readUploadRefsFromDraft(source);
   base.picks = normalizePicks(source.picks, base.galleryCount);
+  base.billing = normalizeBilling(source.billing);
   const job = source.job && typeof source.job === 'object'
     ? /** @type {Record<string, unknown>} */ (source.job)
     : {};

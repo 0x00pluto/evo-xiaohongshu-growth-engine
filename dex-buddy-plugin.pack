@@ -2,5 +2,6 @@
 plugin.manifest.json
 index.js
 icon.png
+lib/
 src/
 assets/

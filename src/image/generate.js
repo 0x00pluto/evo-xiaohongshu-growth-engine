@@ -1,73 +1,48 @@
 // @ts-check
 'use strict';
 
-const fs = require('node:fs');
-const path = require('node:path');
+/** @type {typeof import('../../lib/dex-models')} */
+const dexModels = require('../../lib/dex-models');
+const { bindModels, DexModelsError } = dexModels;
 
-/** @type {typeof import('./files')} */
-const filesModule = require('./files');
-const { uploadReplicateFile } = filesModule;
-
-/** @type {Readonly<{ flare: string; sunburst: string }>} */
-const MODEL_URLS = {
-  flare: 'https://api.replicate.com/v1/models/openai/gpt-image-2.5-flare/predictions',
-  sunburst: 'https://api.replicate.com/v1/models/openai/gpt-image-2.5-sunburst/predictions',
+/** @type {Readonly<{ standard: string; pro: string }>} */
+const IMAGE_MODELS = {
+  standard: 'dexbuddy/image-standard',
+  pro: 'dexbuddy/image-pro',
 };
 
-/** 产品默认仍用 flare（快）；改图保真实验可传 sunburst */
-const MODEL_URL = MODEL_URLS.flare;
-const POLL_INTERVAL_MS = 3000;
-const POLL_DEADLINE_MS = 8 * 60 * 1000;
-
-const IMAGE_INPUT = {
-  aspect_ratio: '3:4',
-  quality: 'medium',
-  output_format: 'png',
-  number_of_images: 1,
-};
+const IMAGE_ASPECT_RATIO = '3:4';
 
 /**
  * @typedef {Record<string, string | undefined>} ImageEnv
+ * @typedef {() => ImageEnv} ImageEnvReader
  * @typedef {(input: string | URL | Request, init?: RequestInit) => Promise<Response>} FetchFn
- * @typedef {(ms: number) => Promise<void>} SleepFn
  * @typedef {{ role: string; path: string }} ImageReference
  * @typedef {{
- *   status?: string;
- *   error?: unknown;
- *   output?: unknown;
- *   urls?: { get?: string };
- * }} Prediction
+ *   list?: () => Promise<unknown>;
+ *   billing: { quote: (body: unknown, options?: { idempotencyKey?: string }) => Promise<unknown> };
+ *   images: { generate: (input: unknown, options?: { idempotencyKey?: string }) => Promise<unknown> };
+ * }} HostImageModels
+ * @typedef {{
+ *   prompt: unknown;
+ *   outputPath: string;
+ *   references?: unknown;
+ *   env?: ImageEnv | ImageEnvReader | null;
+ *   ctx?: unknown;
+ *   models?: HostImageModels | null;
+ *   fetch?: FetchFn;
+ *   model?: string;
+ *   idempotencyKey?: string;
+ * }} GenerateArgs
  */
 
 /**
- * @param {number} ms
- * @returns {Promise<void>}
+ * @param {ImageEnv | ImageEnvReader | null | undefined} env
+ * @returns {ImageEnv}
  */
-function sleep(ms) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-}
-
-/**
- * @param {unknown} output
- * @returns {string}
- */
-function outputUrl(output) {
-  if (typeof output === 'string' && output.startsWith('http')) return output;
-  if (Array.isArray(output)) {
-    for (const item of output) {
-      const url = outputUrl(item);
-      if (url) return url;
-    }
-    return '';
-  }
-  if (output && typeof output === 'object') {
-    const record = /** @type {Record<string, unknown>} */ (output);
-    if (typeof record.url === 'string') return record.url;
-    if (typeof record.href === 'string') return record.href;
-  }
-  return '';
+function readEnv(env) {
+  if (typeof env === 'function') return env() || {};
+  return env || {};
 }
 
 /**
@@ -90,63 +65,64 @@ function normalizeReferences(raw) {
 }
 
 /**
- * @param {Response} response
- * @returns {Promise<Prediction>}
+ * @param {unknown} model
+ * @returns {string}
  */
-async function readPrediction(response) {
-  if (!response.ok) {
-    let detail = '';
-    try {
-      const body = await response.json();
-      detail = body && typeof body.detail === 'string' ? body.detail : '';
-    } catch {
-      detail = '';
-    }
-    throw new Error(detail ? `生图失败：${detail}` : `生图失败（${response.status}）`);
-  }
-  return /** @type {Promise<Prediction>} */ (response.json());
+function resolveImageModel(model) {
+  const text = typeof model === 'string' ? model.trim() : '';
+  if (text === IMAGE_MODELS.pro || text === 'pro' || text === 'sunburst') return IMAGE_MODELS.pro;
+  return IMAGE_MODELS.standard;
 }
 
 /**
- * @param {Prediction} prediction
- * @param {string} token
- * @param {FetchFn} fetchFn
- * @param {SleepFn} [sleepImpl]
- * @returns {Promise<string>}
+ * @param {unknown} quote
+ * @param {string} model
+ * @returns {never}
  */
-async function waitForPrediction(prediction, token, fetchFn, sleepImpl) {
-  let current = prediction;
-  const pause = sleepImpl || sleep;
-  const deadline = Date.now() + POLL_DEADLINE_MS;
-  while (current && (current.status === 'starting' || current.status === 'processing')) {
-    if (Date.now() > deadline) throw new Error('生图超时');
-    const pollUrl = current.urls && current.urls.get;
-    if (!pollUrl) throw new Error('生图没有返回查询地址');
-    await pause(POLL_INTERVAL_MS);
-    const response = await fetchFn(pollUrl, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    current = await readPrediction(response);
-  }
-  if (!current || current.status !== 'succeeded') {
-    const reason = current && typeof current.error === 'string' && current.error ? current.error : '生图失败';
-    throw new Error(reason);
-  }
-  const url = outputUrl(current.output);
-  if (!url) throw new Error('生图没有返回图片');
-  return url;
+function throwInsufficient(quote, model) {
+  const record = quote && typeof quote === 'object' && !Array.isArray(quote)
+    ? /** @type {{ estimate?: unknown; balance?: unknown }} */ (quote)
+    : null;
+  const err = new DexModelsError('INSUFFICIENT_CREDITS', '积分不足（INSUFFICIENT_CREDITS）', 402);
+  /** @type {{ quote?: { estimate: string; balance: string; model: string } }} */ (err).quote = {
+    estimate: record && typeof record.estimate === 'string' ? record.estimate : '',
+    balance: record && typeof record.balance === 'string' ? record.balance : '',
+    model,
+  };
+  throw err;
 }
 
 /**
- * @param {{
- *   prompt: unknown;
- *   outputPath: string;
- *   references?: unknown;
- *   env?: ImageEnv | null;
- *   fetch?: FetchFn;
- *   sleep?: SleepFn;
- *   modelUrl?: string;
- * }} args
+ * @param {Pick<GenerateArgs, 'env' | 'ctx' | 'models' | 'fetch'>} args
+ * @returns {HostImageModels}
+ */
+function getModels(args) {
+  if (args.models) return args.models;
+  return /** @type {HostImageModels} */ (bindModels(args.ctx, {
+    env: readEnv(args.env),
+    fetch: args.fetch,
+  }));
+}
+
+/**
+ * @param {Pick<GenerateArgs, 'env' | 'ctx' | 'models' | 'fetch' | 'model'>} args
+ * @returns {Promise<{ estimate?: string; enough: boolean; balance?: string; model: string }>}
+ */
+async function quoteImage(args) {
+  const models = getModels(args);
+  const model = resolveImageModel(args.model);
+  const quote = await models.billing.quote({ model });
+  if (!quote || typeof quote !== 'object' || /** @type {{ enough?: unknown }} */ (quote).enough !== true) {
+    throwInsufficient(quote, model);
+  }
+  return /** @type {{ estimate?: string; enough: boolean; balance?: string; model: string }} */ ({
+    .../** @type {object} */ (quote),
+    model,
+  });
+}
+
+/**
+ * @param {GenerateArgs} args
  * @returns {Promise<string>}
  */
 async function generatePng({
@@ -154,62 +130,44 @@ async function generatePng({
   outputPath,
   references: rawReferences,
   env,
+  ctx,
+  models: modelsArg,
   fetch: fetchImpl,
-  sleep: sleepImpl,
-  modelUrl: modelUrlArg,
+  model: modelArg,
+  idempotencyKey,
 }) {
-  const token = String((env && env.REPLICATE_API_TOKEN) || '').trim();
-  if (!token) throw new Error('缺少 REPLICATE_API_TOKEN');
   const text = typeof prompt === 'string' ? prompt.trim() : '';
   if (!text) throw new Error('提示词是空的');
-  const modelUrl = typeof modelUrlArg === 'string' && modelUrlArg.trim()
-    ? modelUrlArg.trim()
-    : MODEL_URL;
-  const fetchFn = fetchImpl || globalThis.fetch;
+  const quoted = await quoteImage({ env, ctx, models: modelsArg, fetch: fetchImpl, model: modelArg });
   const references = normalizeReferences(rawReferences);
-  /** @type {string[]} */
-  const inputImages = [];
-  for (const ref of references) {
-    const uploaded = await uploadReplicateFile({
-      path: ref.path,
-      token,
-      fetch: fetchFn,
-    });
-    inputImages.push(uploaded);
-  }
   /** @type {Record<string, unknown>} */
   const input = {
     prompt: text,
-    ...IMAGE_INPUT,
+    aspect_ratio: IMAGE_ASPECT_RATIO,
   };
-  if (inputImages.length > 0) {
-    input.input_images = inputImages;
+  if (references.length > 0) {
+    input.input_images = references.map((item) => item.path);
   }
-  const created = await fetchFn(modelUrl, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      Prefer: 'wait=60',
-    },
-    body: JSON.stringify({ input }),
-  });
-  const prediction = await readPrediction(created);
-  const url = await waitForPrediction(prediction, token, fetchFn, sleepImpl);
-  const downloaded = await fetchFn(url);
-  if (!downloaded.ok) throw new Error('图片下载失败');
-  const bytes = Buffer.from(await downloaded.arrayBuffer());
-  if (bytes.length === 0) throw new Error('图片是空的');
-  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-  fs.writeFileSync(outputPath, bytes);
-  return outputPath;
+  const models = getModels({ env, ctx, models: modelsArg, fetch: fetchImpl });
+  const generated = await models.images.generate({
+    model: quoted.model,
+    input,
+    outputPath,
+  }, { idempotencyKey });
+  const record = generated && typeof generated === 'object'
+    ? /** @type {{ output?: unknown; status?: unknown }} */ (generated)
+    : null;
+  if (!record || record.status !== 'succeeded' || typeof record.output !== 'string' || !record.output) {
+    throw new Error('生图没有返回图片');
+  }
+  return record.output;
 }
 
 module.exports = {
-  IMAGE_INPUT,
-  MODEL_URL,
-  MODEL_URLS,
+  IMAGE_ASPECT_RATIO,
+  IMAGE_MODELS,
   generatePng,
   normalizeReferences,
-  outputUrl,
+  quoteImage,
+  resolveImageModel,
 };

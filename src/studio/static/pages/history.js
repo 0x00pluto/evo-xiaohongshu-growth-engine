@@ -170,6 +170,14 @@ function historyPage() {
         this.nextSlide();
       }
     },
+    async onRevealDetail() {
+      if (!this.detail || !this.detail.id || !this.hostReady) return;
+      this.notice = '';
+      const result = await window.studioHost.call('revealPost', { id: this.detail.id });
+      if (!result || result.ok === false) {
+        this.notice = (result && result.message) || '没有这张图';
+      }
+    },
     async onEdit() {
       if (!this.detail || !this.detail.id || !window.studioHost.go) return;
       const id = this.detail.id;

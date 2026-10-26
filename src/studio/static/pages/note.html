@@ -31,6 +31,7 @@
         style="width: 8rem; height: 8rem"
         loop
         autoplay
+        @ready="$el.play()"
       ></lottie-player>
       <p class="text-sm" x-text="stepText(job.step)"></p>
     </div>
@@ -211,8 +212,6 @@
 
   <section class="mx-auto flex w-full max-w-5xl flex-col gap-4" x-show="phase === 'copy'" aria-labelledby="copy-title">
     <h2 id="copy-title" class="sr-only">这篇笔记</h2>
-    <p class="text-sm leading-6" x-show="!draft">笔记还在写，出来后可以整篇复制。</p>
-    <template x-if="draft">
     <div class="flex flex-col gap-4">
       <div class="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div class="flex min-w-0 flex-col gap-4">
@@ -231,6 +230,7 @@
               style="width: 8rem; height: 8rem"
               loop
               autoplay
+              @ready="$el.play()"
             ></lottie-player>
             <p class="text-sm" x-text="stepText(job.step)"></p>
           </div>
@@ -432,8 +432,8 @@
         <article id="post-preview" class="flex flex-col gap-4 rounded-lg border border-base-300 bg-base-100 p-4" aria-label="这篇文案">
           <div class="flex items-center gap-3">
             <label class="sr-only" for="draft-title">标题</label>
-            <input id="draft-title" class="min-w-0 flex-1 border-0 bg-transparent p-0 text-base font-medium shadow-none outline-none ring-0 focus:outline-none focus:ring-0" type="text" x-model="draft.title" :readonly="job.running" @blur="persist()" />
-            <span class="shrink-0 text-sm tabular-nums" :class="charCount(draft.title) > 20 ? 'text-error' : 'text-base-content/50'" x-text="charCount(draft.title) + ' / 20'"></span>
+            <input id="draft-title" class="min-w-0 flex-1 border-0 bg-transparent p-0 text-base font-medium shadow-none outline-none ring-0 focus:outline-none focus:ring-0" type="text" x-model="copyDraft.title" :readonly="job.running" @blur="persist()" />
+            <span class="shrink-0 text-sm tabular-nums" :class="charCount(copyDraft.title) > 20 ? 'text-error' : 'text-base-content/50'" x-text="charCount(copyDraft.title) + ' / 20'"></span>
           </div>
           <div class="flex flex-col gap-2">
             <label class="sr-only" for="draft-body">正文</label>
@@ -477,9 +477,9 @@
                   </div>
                 </div>
                 <div class="flex flex-col gap-2 px-3 py-3">
-                  <h3 class="text-sm font-medium" x-text="draft.title"></h3>
-                  <p class="wrap text-xs leading-5" x-text="draft.body"></p>
-                  <p class="text-xs leading-5" x-text="formatTopics(draft.topics)"></p>
+                  <h3 class="text-sm font-medium" x-text="copyDraft.title"></h3>
+                  <p class="wrap text-xs leading-5" x-text="copyDraft.body"></p>
+                  <p class="text-xs leading-5" x-text="formatTopics(copyDraft.topics)"></p>
                 </div>
               </div>
               <div class="flex shrink-0 items-center gap-2 border-t border-base-300 px-3 py-2 text-[10px]">
@@ -499,7 +499,7 @@
                       <img class="absolute inset-0 h-full w-full object-cover" x-show="coverSlot && slotPreview(coverSlot)" :src="coverSlot ? slotPreview(coverSlot) : ''" alt="封面" />
                     </div>
                     <div class="flex flex-col gap-1 p-1.5">
-                      <p class="line-clamp-2 text-[9px] font-medium leading-[13px] text-black/80" x-text="draft.title"></p>
+                      <p class="line-clamp-2 text-[9px] font-medium leading-[13px] text-black/80" x-text="copyDraft.title"></p>
                       <p class="flex items-center justify-between text-[8px] text-[#666]"><span class="flex min-w-0 items-center"><span class="mr-1 h-3 w-3 shrink-0 rounded-full bg-[#ddd]"></span><span class="truncate text-black/60">账号</span></span><span class="flex shrink-0 items-center"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 20s-7-4.4-7-9a4 4 0 0 1 7-2 4 4 0 0 1 7 2c0 4.6-7 9-7 9z"></path></svg>0</span></p>
                     </div>
                   </div>
@@ -548,7 +548,6 @@
         </aside>
       </div>
     </div>
-    </template>
   </section>
   </div>
   <div class="shrink-0 border-t border-base-300 bg-base-100 px-4 py-3 lg:px-6" x-show="phase === 'materials'" x-cloak>

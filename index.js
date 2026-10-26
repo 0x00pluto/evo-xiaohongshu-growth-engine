@@ -7,6 +7,7 @@ const path = require('node:path');
  * @typedef {{
  *   pluginEnv?: () => Record<string, string>;
  *   dirs?: { data?: string };
+ *   models?: unknown;
  *   registerService: (name: string, service: Record<string, Function>) => void;
  * }} AppContext
  * @typedef {{
@@ -73,8 +74,9 @@ module.exports = {
       userImageRefsDir: path.join(dataDir, 'runtime', 'image-refs'),
       userUploadRefsDir: path.join(dataDir, 'runtime', 'materials', 'upload-refs'),
       userArticleSamplesDir: path.join(dataDir, 'runtime', 'materials', 'article-samples'),
-      // 设置页保存不重跑 apply；真正发请求时再读 pluginEnv。
+      // 设置页保存不重跑 apply；真正发请求时再读 pluginEnv / .env。
       readEnv: () => resolveEnv(ctx),
+      ctx,
       revealFile: revealInFolder,
     });
     ctx.registerService('onePost', {
@@ -224,6 +226,12 @@ module.exports = {
        */
       revealImage(payload) {
         return runner.revealImage(asObject(payload));
+      },
+      /**
+       * @param {unknown} payload
+       */
+      revealPost(payload) {
+        return runner.revealPost(asObject(payload));
       },
       /**
        * @param {unknown} payload

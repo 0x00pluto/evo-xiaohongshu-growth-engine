@@ -49,6 +49,7 @@ const METHODS = new Set([
   'previewHistoryPost',
   'previewAlbumSample',
   'revealImage',
+  'revealPost',
   'addUploadRef',
   'updateUploadRefUsage',
   'deleteUploadRef',
@@ -181,6 +182,8 @@ function createStudio(options) {
     userUploadRefsDir: path.join(root, 'runtime', 'materials', 'upload-refs'),
     userArticleSamplesDir: path.join(root, 'runtime', 'materials', 'article-samples'),
     env,
+    // 独立运行没有宿主 ctx.models；把合并后的 .env 交给 bindModels。
+    ctx: undefined,
     revealFile: options.revealFile || revealInFolder,
   });
 }

@@ -180,23 +180,36 @@ test('参考图按文件头校验，不合格不进模型', () => {
   assert.equal(ok.ext, '.jpg');
 });
 
-test('识图请求走 deepseek-flash 且图在 user 消息里', async () => {
-  let captured;
+test('识图请求走 chat 渠道且图在 user 消息里', async () => {
+  /** @type {{ body?: { model?: string; temperature?: number; messages?: Array<{ role: string; content: Array<{ type: string; image_url?: { detail: string } }> }> } }} */
+  let captured = {};
   const llm = createLlm({
-    DEEPSEEK_API_KEY: 'k',
-    DEEPSEEK_BASE_URL: 'https://example.test/v1',
-  }, async (_url, options) => {
-    captured = { body: JSON.parse(options.body) };
-    return {
-      ok: true,
-      json: async () => ({ choices: [{ message: { content: '{"ok":true}' } }] }),
-    };
+    models: {
+      list: async () => ({ data: [{ id: 'dexbuddy-chat', kind: 'chat' }] }),
+      billing: {
+        quote: async () => ({
+          kind: 'chat',
+          estimate: '0.0100',
+          enough: true,
+          balance: '10.0000',
+          model: 'dexbuddy-chat',
+        }),
+      },
+      chat: {
+        completions: {
+          create: async (body) => {
+            captured = { body };
+            return { choices: [{ message: { content: '{"ok":true}' } }] };
+          },
+        },
+      },
+    },
   });
   await llm.completeVision({
     text: '学这张',
     dataUrl: `data:image/jpeg;base64,${JPEG_BYTES.toString('base64')}`,
   });
-  assert.equal(captured.body.model, 'deepseek-flash');
+  assert.equal(captured.body.model, 'dexbuddy-chat');
   assert.equal(captured.body.temperature, 0.2);
   assert.equal(captured.body.messages[0].role, 'user');
   assert.equal(captured.body.messages[0].content[0].type, 'text');
@@ -334,7 +347,7 @@ test('runner 学习写入删除：失败零落盘；出厂拒绝', async () => {
     postsDir,
     promptsDir,
     userAlbumsDir,
-    env: { DEEPSEEK_API_KEY: 'k' },
+    env: { DEX_BUDDY_API_KEY: 'k' },
     completeVision: async () => {
       visionCalls += 1;
       return JSON.stringify(learnPayload({ slug: `run-${visionCalls}` }));
@@ -384,7 +397,7 @@ test('commit 可带改过的题词；用户册可 update；出厂拒绝', async 
     postsDir,
     promptsDir,
     userAlbumsDir,
-    env: { DEEPSEEK_API_KEY: 'k' },
+    env: { DEX_BUDDY_API_KEY: 'k' },
     completeVision: async () => JSON.stringify(learnPayload({
       slug: 'edit-me',
       promptMd: sheetPrompt().replace('2. 色彩：黑', '2. 色彩：主文字 #112233'),

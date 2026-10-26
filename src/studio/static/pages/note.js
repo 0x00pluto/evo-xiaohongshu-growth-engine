@@ -98,6 +98,7 @@ function notePage() {
     referenceEditorText: '',
     galleryCount: 1,
     draft: null,
+    emptyCopyDraft: { title: '', body: '', topics: [] },
     prompts: {
       cover: '',
       storyType: '',
@@ -454,6 +455,9 @@ function notePage() {
         .map((topic) => (topic.startsWith('#') ? topic : `#${topic}`))
         .join(' ');
     },
+    get copyDraft() {
+      return this.draft || this.emptyCopyDraft;
+    },
     postText() {
       if (!this.draft) return '';
       const title = String(this.draft.title || '').trim();
@@ -626,6 +630,7 @@ function notePage() {
       }
       this.galleryCount = next.galleryCount == null ? 1 : next.galleryCount;
       this.draft = next.draft || null;
+      if (this.draft) this.emptyCopyDraft = { title: '', body: '', topics: [] };
       this.prompts = next.prompts || {
         cover: '',
         storyType: '',
@@ -818,6 +823,7 @@ function notePage() {
       }
       const fresh = await this.call('startNew');
       if (fresh && fresh.ok === false) {
+        if (await this.resumeRunningJob(fresh)) return;
         await this.refresh();
         this.resetBrief();
         this.resetPreview();
@@ -846,7 +852,7 @@ function notePage() {
       };
     },
     async persist() {
-      if (!this.hostReady || this.job.running || !this.postId) return;
+      if (!this.hostReady || this.job.running || !this.postId || !this.draft) return;
       const result = await this.call('saveEditor', this.editorPayload());
       if (result && result.ok === false) {
         if (result.message === '正在生成，请等这一轮结束') return;
@@ -866,6 +872,23 @@ function notePage() {
       }
       return true;
     },
+    async resumeRunningJob(result) {
+      if (!result || result.ok !== false) return false;
+      if (result.message !== '正在生成，请等这一轮结束') return false;
+      if (!result.id || !result.job || !result.job.running) return false;
+      this.notice = '';
+      this.applyServer(result);
+      this.resetPreview();
+      this.phase = 'copy';
+      if (!this.draft) {
+        this.emptyCopyDraft = { title: '', body: '', topics: [] };
+        this.syncSlots();
+        this.syncBodyDraft();
+      }
+      this.ensurePoll();
+      await this.loadPreviews();
+      return true;
+    },
     async onGenerateDraft() {
       if (!this.hostReady || this.job.running) return;
       this.notice = '';
@@ -879,10 +902,14 @@ function notePage() {
         persona: this.persona,
         galleryCount: this.galleryCount,
       });
+      if (await this.resumeRunningJob(result)) return;
       if (this.noteRejection(result)) return;
       this.postId = result.id || this.postId;
+      this.emptyCopyDraft = { title: '', body: '', topics: [] };
       this.phase = 'copy';
       this.job = { running: true, step: '成稿', error: '' };
+      this.syncSlots();
+      this.syncBodyDraft();
       this.ensurePoll();
       await this.refresh();
     },
@@ -978,6 +1005,7 @@ function notePage() {
       if (!this.hostReady || this.job.running) return;
       const fresh = await this.call('startNew');
       if (fresh && fresh.ok === false) {
+        if (await this.resumeRunningJob(fresh)) return;
         this.notice = fresh.message || '没有完成';
         return;
       }

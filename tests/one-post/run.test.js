@@ -633,6 +633,13 @@ test('进行中的第二次调用被拒绝', async () => {
   assert.equal(first.ok, true);
   assert.equal(second.ok, false);
   assert.equal(second.message, BUSY_MESSAGE);
+  assert.equal(second.id, first.id);
+  assert.equal(second.job.running, true);
+  const started = runner.startNew();
+  assert.equal(started.ok, false);
+  assert.equal(started.message, BUSY_MESSAGE);
+  assert.equal(started.id, first.id);
+  assert.equal(started.job.running, true);
   assert.equal(calls, 1);
   release();
   await untilIdle(runner);
@@ -743,20 +750,58 @@ test('缺密钥时停在对应步骤，稿面还在', async () => {
       throw new Error('不应请求');
     },
   });
-  const failed = blocked.generateDraft(draftArgs());
-  assert.equal(failed.ok, true);
+  assert.equal(blocked.generateDraft(draftArgs()).ok, true);
   const after = await untilIdle(blocked);
-  assert.match(after.job.error, /缺少 DEEPSEEK_API_KEY/);
-  assert.equal(after.business, '卖课');
+  assert.match(after.job.error, /DEX_BUDDY_API_KEY/);
+  assert.equal(after.job.running, false);
   assert.equal(fetched, false);
 
   fetched = false;
-  runner.generateImages({ slot: 'cover' });
-  const imaged = await untilIdle(runner);
-  assert.match(imaged.job.error, /缺少 REPLICATE_API_TOKEN/);
-  assert.equal(imaged.draft.title, '标题');
-  assertCover(imaged.prompts.cover);
+  assert.equal(runner.generateImages({ slot: 'cover' }).ok, true);
+  const kept = await untilIdle(runner);
+  assert.match(kept.job.error, /DEX_BUDDY_API_KEY/);
+  assert.equal(kept.draft.title, '标题');
+  assertCover(kept.prompts.cover);
   assert.equal(fetched, false);
+});
+
+test('成稿、提示词和生图带稳定步骤键，再抽追加 retry', async () => {
+  const root = tempDir();
+  const promptsDir = path.join(root, 'prompts');
+  writePrompts(promptsDir);
+  /** @type {string[]} */
+  const chatKeys = [];
+  /** @type {string[]} */
+  const imageKeys = [];
+  const runner = createRunner({
+    postsDir: path.join(root, 'latest'),
+    promptsDir,
+    random: firstPick,
+    complete: async (prompt, options) => {
+      chatKeys.push(String(options && options.idempotencyKey || ''));
+      return responseFor(prompt, 0);
+    },
+    generateImage: async ({ outputPath, idempotencyKey }) => {
+      imageKeys.push(String(idempotencyKey || ''));
+      fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+      fs.writeFileSync(outputPath, 'png');
+      return outputPath;
+    },
+  });
+  runner.generateDraft(draftArgs());
+  await untilIdle(runner);
+  assert.match(chatKeys[0], /:copy$/);
+  assert.equal(chatKeys.some((key) => key.endsWith(':prompts:plan')), true);
+  assert.equal(chatKeys.some((key) => key.endsWith(':prompts:scenes')), true);
+  assert.equal(chatKeys.some((key) => key.includes(':retry-')), false);
+
+  runner.generateImages({ slot: 'cover' });
+  await untilIdle(runner);
+  assert.match(imageKeys[0], /:cover$/);
+
+  runner.generateImages({ slot: 'cover' });
+  await untilIdle(runner);
+  assert.match(imageKeys[1], /:cover:retry-1$/);
 });
 
 test('readEnv 在建 runner 时不读，下一轮写稿用新密钥', async () => {
@@ -777,8 +822,29 @@ test('readEnv 在建 runner 时不读，下一轮写稿用新密钥', async () =
       readCalls += 1;
       return env;
     },
-    fetch: async (_url, options) => {
+    fetch: async (url, options) => {
       auths.push(String(options && options.headers && options.headers.Authorization || ''));
+      const u = String(url);
+      if (u.includes('/v1/models')) {
+        return {
+          ok: true,
+          status: 200,
+          text: async () => JSON.stringify({ data: [{ id: 'dexbuddy-chat', kind: 'chat' }] }),
+        };
+      }
+      if (u.includes('/v1/billing/quote')) {
+        return {
+          ok: true,
+          status: 200,
+          text: async () => JSON.stringify({
+            kind: 'chat',
+            estimate: '0.0100',
+            enough: true,
+            balance: '10.0000',
+            model: 'dexbuddy-chat',
+          }),
+        };
+      }
       const body = JSON.parse(String(options && options.body || '{}'));
       const messages = Array.isArray(body.messages) ? body.messages : [];
       /** @type {string | { system: string; user: string }} */
@@ -793,7 +859,8 @@ test('readEnv 在建 runner 时不读，下一轮写稿用新密钥', async () =
       }
       return {
         ok: true,
-        json: async () => ({
+        status: 200,
+        text: async () => JSON.stringify({
           choices: [{ message: { content: responseFor(prompt, 0) } }],
         }),
       };
@@ -801,19 +868,16 @@ test('readEnv 在建 runner 时不读，下一轮写稿用新密钥', async () =
   });
   assert.equal(readCalls, 0);
 
-  runner.generateDraft(draftArgs());
+  assert.equal(runner.generateDraft(draftArgs()).ok, true);
   const missing = await untilIdle(runner);
-  assert.match(missing.job.error, /缺少 DEEPSEEK_API_KEY/);
+  assert.match(missing.job.error, /DEX_BUDDY_API_KEY/);
   assert.ok(readCalls >= 1);
   assert.deepEqual(auths, []);
 
   const readsBeforeOk = readCalls;
-  env = {
-    DEEPSEEK_API_KEY: 'fresh-key',
-    DEEPSEEK_BASE_URL: 'https://example.test/v1',
-    DEEPSEEK_MODEL: 'deepseek-chat',
-  };
-  runner.generateDraft(draftArgs());
+  env = { DEX_BUDDY_API_KEY: 'fresh-key' };
+  const started = runner.generateDraft(draftArgs());
+  assert.equal(started.ok, true);
   const ok = await untilIdle(runner);
   assert.equal(ok.draft.title, '标题');
   assert.ok(readCalls > readsBeforeOk);
@@ -969,6 +1033,63 @@ test('previewHistoryPost 返回文案与图序，不切换当前稿', () => {
   assert.match(detail.images[0].dataUrl, /^data:image\/png;base64,/);
   assert.equal(runner.loadLatest().id, '');
   assert.equal(runner.previewHistoryPost({ id: 'missing' }).ok, false);
+});
+
+test('revealPost 按篇打开第一张图，不切换当前稿', () => {
+  const root = tempDir();
+  const postsDir = path.join(root, 'posts');
+  const id = '20261022-130000';
+  const emptyId = '20261022-140000';
+  const postDir = path.join(postsDir, id);
+  const emptyDir = path.join(postsDir, emptyId);
+  fs.mkdirSync(postDir, { recursive: true });
+  fs.mkdirSync(emptyDir, { recursive: true });
+  fs.writeFileSync(path.join(postDir, 'draft.json'), `${JSON.stringify({
+    business: '详情',
+    galleryCount: 1,
+    draft: face,
+    images: {
+      cover: { status: '成功', path: 'cover-1.png', selected: 1, versions: [{ path: 'cover-1.png', revisedAt: 1 }] },
+      gallery: [
+        { status: '成功', path: 'gallery-01-1.png', selected: 1, versions: [{ path: 'gallery-01-1.png', revisedAt: 1 }] },
+      ],
+    },
+  }, null, 2)}\n`);
+  fs.writeFileSync(path.join(postDir, 'cover-1.png'), 'cover-bytes');
+  fs.writeFileSync(path.join(postDir, 'gallery-01-1.png'), 'gallery-bytes');
+  fs.writeFileSync(path.join(emptyDir, 'draft.json'), `${JSON.stringify({
+    business: '空图',
+    galleryCount: 0,
+    draft: face,
+    images: { cover: { status: '空', path: '', selected: 0, versions: [] }, gallery: [] },
+  }, null, 2)}\n`);
+  fs.writeFileSync(path.join(postsDir, 'index.json'), `${JSON.stringify({
+    posts: [
+      { id, createdAt: '2026-10-22T13:00:00.000Z', updatedAt: '2026-10-22T13:00:00.000Z', title: '标题' },
+      { id: emptyId, createdAt: '2026-10-22T14:00:00.000Z', updatedAt: '2026-10-22T14:00:00.000Z', title: '空图' },
+    ],
+  }, null, 2)}\n`);
+  /** @type {string[]} */
+  const revealed = [];
+  const runner = createRunner({
+    postsDir,
+    promptsDir: tempDir(),
+    complete: async () => '{}',
+    revealFile: (absPath) => {
+      revealed.push(absPath);
+    },
+  });
+  assert.equal(runner.loadLatest().id, '');
+  const shown = runner.revealPost({ id });
+  assert.equal(shown.ok, true);
+  assert.equal(shown.path, path.join(postDir, 'cover-1.png'));
+  assert.deepEqual(revealed, [path.join(postDir, 'cover-1.png')]);
+  assert.equal(runner.loadLatest().id, '');
+  assert.equal(runner.revealPost({ id: 'missing' }).ok, false);
+  const empty = runner.revealPost({ id: emptyId });
+  assert.equal(empty.ok, false);
+  assert.match(empty.message, /没有这张图/);
+  assert.equal(revealed.length, 1);
 });
 
 test('连续生成两篇，空态不打开历史第一篇', async () => {
