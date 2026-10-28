@@ -436,21 +436,25 @@ test('空业务一句和超长文章都不会调用模型', async () => {
   const promptsDir = path.join(tempDir(), 'prompts');
   writePrompts(promptsDir);
   let calls = 0;
+  let gates = 0;
   const runner = createRunner({
     postsDir: path.join(tempDir(), 'latest'),
     promptsDir,
     random: firstPick,
+    requireEntitlement: async () => {
+      gates += 1;
+    },
     complete: async () => {
       calls += 1;
       return '{}';
     },
   });
 
-  const empty = runner.generateDraft(draftArgs({ business: '  ', sampleBody: '有文章', galleryCount: 1 }));
+  const empty = await runner.generateDraft(draftArgs({ business: '  ', sampleBody: '有文章', galleryCount: 1 }));
   assert.equal(empty.ok, false);
   assert.equal(empty.field, 'business');
 
-  const tooLong = runner.generateDraft(draftArgs({
+  const tooLong = await runner.generateDraft(draftArgs({
     sampleBody: '字'.repeat(8001),
     galleryCount: 1,
   }));
@@ -458,6 +462,7 @@ test('空业务一句和超长文章都不会调用模型', async () => {
   assert.equal(tooLong.field, 'sampleBody');
   assert.equal(runner.loadLatest().id, '');
   assert.equal(calls, 0);
+  assert.equal(gates, 0);
 });
 
 test('配图张数为 0 时不读配图提示词，重跑成稿仍留着旧图', async () => {
@@ -480,7 +485,7 @@ test('配图张数为 0 时不读配图提示词，重跑成稿仍留着旧图',
     },
   });
 
-  assert.equal(runner.generateDraft(draftArgs()).ok, true);
+  assert.equal((await runner.generateDraft(draftArgs())).ok, true);
   const drafted = await untilIdle(runner);
   assert.equal(drafted.draft.title, '标题');
   assert.equal(drafted.draft.coverLine, '一句');
@@ -503,14 +508,14 @@ test('配图张数为 0 时不读配图提示词，重跑成稿仍留着旧图',
   assert.doesNotMatch(art, /\{\{background\}\}|\{\{colors\}\}/);
   assert.equal(drafted.job.error, '');
 
-  assert.equal(runner.generateImages({ slot: 'cover' }).ok, true);
+  assert.equal((await runner.generateImages({ slot: 'cover' })).ok, true);
   const imaged = await untilIdle(runner);
   assert.equal(imaged.images.cover.status, '成功');
   assert.equal(imaged.images.cover.path, 'cover-1.png');
   assert.equal(fs.existsSync(path.join(runner.loadLatest().directory, 'cover-1.png')), true);
   assert.equal(fs.readdirSync(runner.loadLatest().directory).some((name) => name.startsWith('gallery-')), false);
 
-  assert.equal(runner.generateDraft(draftArgs({ sampleBody: '补充' })).ok, true);
+  assert.equal((await runner.generateDraft(draftArgs({ sampleBody: '补充' }))).ok, true);
   assert.equal(fs.existsSync(path.join(runner.loadLatest().directory, 'cover-1.png')), true);
   const again = await untilIdle(runner);
   assert.equal(fs.existsSync(path.join(runner.loadLatest().directory, 'cover-1.png')), true);
@@ -541,13 +546,13 @@ test('提示词条数不对时不生图', async () => {
       images += 1;
     },
   });
-  runner.generateDraft(draftArgs({ sampleBody: '一篇短文', galleryCount: 2 }));
+  await runner.generateDraft(draftArgs({ sampleBody: '一篇短文', galleryCount: 2 }));
   const latest = await untilIdle(runner);
   assert.match(latest.job.error, /画面应为 3 张，模型返回了 1 张/);
   assert.ok(scenesCalls >= 2);
   assert.equal(latest.draft.title, '标题');
   assert.equal(images, 0);
-  assert.equal(runner.generateImages({ slot: 'cover' }).ok, false);
+  assert.equal((await runner.generateImages({ slot: 'cover' })).ok, false);
 });
 
 test('画面条数第一次错、第二次对齐后提示词成功', async () => {
@@ -571,7 +576,7 @@ test('画面条数第一次错、第二次对齐后提示词成功', async () =>
       return responseFor(prompt, 1);
     },
   });
-  runner.generateDraft(draftArgs({ sampleBody: '一篇短文', galleryCount: 1 }));
+  await runner.generateDraft(draftArgs({ sampleBody: '一篇短文', galleryCount: 1 }));
   const latest = await untilIdle(runner);
   assert.equal(latest.job.error, '');
   assert.equal(scenesCalls, 2);
@@ -601,7 +606,7 @@ test('画面第一次重复、第二次各不相同后提示词成功', async ()
       return responseFor(prompt, 1);
     },
   });
-  runner.generateDraft(draftArgs({ sampleBody: '一篇短文', galleryCount: 1 }));
+  await runner.generateDraft(draftArgs({ sampleBody: '一篇短文', galleryCount: 1 }));
   const latest = await untilIdle(runner);
   assert.equal(latest.job.error, '');
   assert.equal(scenesCalls, 2);
@@ -628,8 +633,8 @@ test('进行中的第二次调用被拒绝', async () => {
       return responseFor(prompt, 0);
     },
   });
-  const first = runner.generateDraft(draftArgs());
-  const second = runner.generateDraft(draftArgs());
+  const first = await runner.generateDraft(draftArgs());
+  const second = await runner.generateDraft(draftArgs());
   assert.equal(first.ok, true);
   assert.equal(second.ok, false);
   assert.equal(second.message, BUSY_MESSAGE);
@@ -668,20 +673,20 @@ test('失败的一张可以单独重试，另一张文件不变', async () => {
     },
   });
 
-  runner.generateDraft(draftArgs({ sampleBody: '素材', galleryCount: 1 }));
+  await runner.generateDraft(draftArgs({ sampleBody: '素材', galleryCount: 1 }));
   await untilIdle(runner);
-  runner.generateImages({ slot: 'gallery', index: 1 });
+  await runner.generateImages({ slot: 'gallery', index: 1 });
   await untilIdle(runner);
-  runner.generateImages({ slot: 'cover' });
+  await runner.generateImages({ slot: 'cover' });
   const partial = await untilIdle(runner);
   assert.equal(partial.images.cover.status, '失败');
   assert.equal(partial.images.gallery[0].status, '成功');
   assert.equal(fs.readFileSync(path.join(runner.loadLatest().directory, 'gallery-01-1.png'), 'utf8'), 'gallery-bytes');
 
-  const rejected = runner.retryImage({ slot: 'gallery', index: 1 });
+  const rejected = await runner.retryImage({ slot: 'gallery', index: 1 });
   assert.equal(rejected.ok, false);
 
-  runner.retryImage({ slot: 'cover' });
+  await runner.retryImage({ slot: 'cover' });
   const retried = await untilIdle(runner);
   assert.equal(retried.images.cover.status, '成功');
   assert.equal(fs.readFileSync(path.join(runner.loadLatest().directory, 'cover-1.png'), 'utf8'), 'cover-2');
@@ -704,7 +709,7 @@ test('改稿面不删图，也不标成待重算', async () => {
       fs.writeFileSync(outputPath, 'png');
     },
   });
-  runner.generateDraft(draftArgs());
+  await runner.generateDraft(draftArgs());
   await untilIdle(runner);
   const coverPath = path.join(runner.loadLatest().directory, 'cover-1.png');
   fs.writeFileSync(coverPath, 'old');
@@ -716,7 +721,7 @@ test('改稿面不删图，也不标成待重算', async () => {
   assert.equal(edited.draft.title, '新标题');
   assert.equal(edited.prompts.stale, false);
   assert.equal(fs.existsSync(coverPath), true);
-  assert.equal(runner.generateImages({ slot: 'cover' }).ok, true);
+  assert.equal((await runner.generateImages({ slot: 'cover' })).ok, true);
 });
 
 test('缺密钥时停在对应步骤，稿面还在', async () => {
@@ -736,7 +741,7 @@ test('缺密钥时停在对应步骤，稿面还在', async () => {
     },
     complete: async (prompt) => responseFor(prompt, 0),
   });
-  runner.generateDraft(draftArgs());
+  await runner.generateDraft(draftArgs());
   const drafted = await untilIdle(runner);
   assert.equal(drafted.draft.title, '标题');
 
@@ -750,14 +755,14 @@ test('缺密钥时停在对应步骤，稿面还在', async () => {
       throw new Error('不应请求');
     },
   });
-  assert.equal(blocked.generateDraft(draftArgs()).ok, true);
+  assert.equal((await blocked.generateDraft(draftArgs())).ok, true);
   const after = await untilIdle(blocked);
   assert.match(after.job.error, /DEX_BUDDY_API_KEY/);
   assert.equal(after.job.running, false);
   assert.equal(fetched, false);
 
   fetched = false;
-  assert.equal(runner.generateImages({ slot: 'cover' }).ok, true);
+  assert.equal((await runner.generateImages({ slot: 'cover' })).ok, true);
   const kept = await untilIdle(runner);
   assert.match(kept.job.error, /DEX_BUDDY_API_KEY/);
   assert.equal(kept.draft.title, '标题');
@@ -788,18 +793,18 @@ test('成稿、提示词和生图带稳定步骤键，再抽追加 retry', async
       return outputPath;
     },
   });
-  runner.generateDraft(draftArgs());
+  await runner.generateDraft(draftArgs());
   await untilIdle(runner);
   assert.match(chatKeys[0], /:copy$/);
   assert.equal(chatKeys.some((key) => key.endsWith(':prompts:plan')), true);
   assert.equal(chatKeys.some((key) => key.endsWith(':prompts:scenes')), true);
   assert.equal(chatKeys.some((key) => key.includes(':retry-')), false);
 
-  runner.generateImages({ slot: 'cover' });
+  await runner.generateImages({ slot: 'cover' });
   await untilIdle(runner);
   assert.match(imageKeys[0], /:cover$/);
 
-  runner.generateImages({ slot: 'cover' });
+  await runner.generateImages({ slot: 'cover' });
   await untilIdle(runner);
   assert.match(imageKeys[1], /:cover:retry-1$/);
 });
@@ -868,7 +873,7 @@ test('readEnv 在建 runner 时不读，下一轮写稿用新密钥', async () =
   });
   assert.equal(readCalls, 0);
 
-  assert.equal(runner.generateDraft(draftArgs()).ok, true);
+  assert.equal((await runner.generateDraft(draftArgs())).ok, true);
   const missing = await untilIdle(runner);
   assert.match(missing.job.error, /DEX_BUDDY_API_KEY/);
   assert.ok(readCalls >= 1);
@@ -876,7 +881,7 @@ test('readEnv 在建 runner 时不读，下一轮写稿用新密钥', async () =
 
   const readsBeforeOk = readCalls;
   env = { DEX_BUDDY_API_KEY: 'fresh-key' };
-  const started = runner.generateDraft(draftArgs());
+  const started = await runner.generateDraft(draftArgs());
   assert.equal(started.ok, true);
   const ok = await untilIdle(runner);
   assert.equal(ok.draft.title, '标题');
@@ -1104,13 +1109,13 @@ test('连续生成两篇，空态不打开历史第一篇', async () => {
     now: () => new Date(Date.UTC(2026, 9, 12, 8, 0, tick++)),
     complete: async (prompt) => responseFor(prompt, 0),
   });
-  runner.generateDraft(draftArgs({ business: '第一篇' }));
+  await runner.generateDraft(draftArgs({ business: '第一篇' }));
   const first = await untilIdle(runner);
   runner.startNew();
   const blank = runner.loadLatest();
   assert.equal(blank.id, '');
   assert.equal(blank.draft, null);
-  runner.generateDraft(draftArgs({ business: '第二篇' }));
+  await runner.generateDraft(draftArgs({ business: '第二篇' }));
   const second = await untilIdle(runner);
   assert.notEqual(first.id, second.id);
   assert.equal(second.business, '第二篇');
@@ -1139,7 +1144,7 @@ test('稿里存着指定句时，封面那句话仍由策划写出', async () =>
     },
   });
 
-  runner.generateDraft(draftArgs({
+  await runner.generateDraft(draftArgs({
     coverLineSpecified: '  我指定的  ',
   }));
   const drafted = await untilIdle(runner);
@@ -1167,15 +1172,15 @@ test('不带槽位不能生图，再抽只换这一张', async () => {
       fs.writeFileSync(outputPath, prompt);
     },
   });
-  runner.generateDraft(draftArgs({ galleryCount: 1 }));
+  await runner.generateDraft(draftArgs({ galleryCount: 1 }));
   await untilIdle(runner);
-  const missing = runner.generateImages({});
+  const missing = await runner.generateImages({});
   assert.equal(missing.ok, false);
   assert.equal(missing.message, '要指明封面或配图序号');
 
-  runner.generateImages({ slot: 'gallery', index: 1 });
+  await runner.generateImages({ slot: 'gallery', index: 1 });
   await untilIdle(runner);
-  runner.generateImages({ slot: 'cover' });
+  await runner.generateImages({ slot: 'cover' });
   const first = await untilIdle(runner);
   assert.equal(first.images.cover.status, '成功');
   assert.equal(first.images.gallery[0].status, '成功');
@@ -1186,10 +1191,10 @@ test('不带槽位不能生图，再抽只换这一张', async () => {
     prompts: { cover: first.prompts.cover, gallery: [''] },
   });
   assert.equal(cleared.ok, true);
-  const emptyGallery = runner.generateImages({ slot: 'gallery', index: 1 });
+  const emptyGallery = await runner.generateImages({ slot: 'gallery', index: 1 });
   assert.equal(emptyGallery.ok, false);
   assert.equal(emptyGallery.message, '还没有这一张的提示词');
-  const coverStill = runner.generateImages({
+  const coverStill = await runner.generateImages({
     slot: 'cover',
     prompts: { cover: '改过的封面提示词', gallery: [''] },
   });
@@ -1226,11 +1231,11 @@ test('目的或人设不在允许列表时不调用模型', async () => {
       return '{}';
     },
   });
-  const rejected = runner.generateDraft(draftArgs({ articleType: '官号', persona: '素人' }));
+  const rejected = await runner.generateDraft(draftArgs({ articleType: '官号', persona: '素人' }));
   assert.equal(rejected.ok, false);
   assert.match(rejected.message, /文章目的不在允许列表/);
   assert.equal(calls, 0);
-  const badPersona = runner.generateDraft(draftArgs({ articleType: '涨粉', persona: '营销号' }));
+  const badPersona = await runner.generateDraft(draftArgs({ articleType: '涨粉', persona: '营销号' }));
   assert.equal(badPersona.ok, false);
   assert.match(badPersona.message, /人设不在允许列表/);
 });
@@ -1253,7 +1258,7 @@ test('抽到对比时用对比规则写句子，配图张数为 0 时仍有封�
       fs.writeFileSync(outputPath, 'png');
     },
   });
-  runner.generateDraft(draftArgs());
+  await runner.generateDraft(draftArgs());
   const drafted = await untilIdle(runner);
   assert.equal(drafted.prompts.storyType, 'contrast');
   assert.equal(drafted.prompts.look, ALBUM_CONCEPTUAL);
@@ -1264,7 +1269,7 @@ test('抽到对比时用对比规则写句子，配图张数为 0 时仍有封�
   assert.equal(seenHasPrefix(seen, 'COMPAREPLAN'), true);
   assert.equal(seenHasPrefix(seen, 'PLAN'), false);
   assert.equal(drafted.prompts.gallery.length, 0);
-  assert.equal(runner.generateImages({ slot: 'cover' }).ok, true);
+  assert.equal((await runner.generateImages({ slot: 'cover' })).ok, true);
   const imaged = await untilIdle(runner);
   assert.equal(imaged.images.cover.status, '成功');
   assert.equal(fs.existsSync(path.join(imaged.directory, 'cover-1.png')), true);
@@ -1284,13 +1289,13 @@ test('抽到对比后配图角色是对照', async () => {
       fs.writeFileSync(outputPath, 'png');
     },
   });
-  runner.generateDraft(draftArgs({ galleryCount: 1 }));
+  await runner.generateDraft(draftArgs({ galleryCount: 1 }));
   const next = await untilIdle(runner);
   assert.equal(next.prompts.storyType, 'contrast');
   assert.deepEqual(next.prompts.galleryRoles, ['contrast']);
   assert.equal(next.prompts.gallery[0].includes(next.prompts.galleryLines[0]), true);
   assert.equal(next.draft.title, '标题');
-  assert.equal(runner.generateImages({ slot: 'gallery', index: 1 }).ok, true);
+  assert.equal((await runner.generateImages({ slot: 'gallery', index: 1 })).ok, true);
   const imaged = await untilIdle(runner);
   assert.equal(imaged.images.gallery[0].status, '成功');
   assert.equal(fs.existsSync(path.join(imaged.directory, 'gallery-01-1.png')), true);
@@ -1316,9 +1321,9 @@ test('有样图时生图带上 template 参考路径；无样图不传 reference
       fs.writeFileSync(args.outputPath, 'png');
     },
   });
-  withSample.generateDraft(draftArgs({ galleryCount: 0 }));
+  await withSample.generateDraft(draftArgs({ galleryCount: 0 }));
   await untilIdle(withSample);
-  assert.equal(withSample.generateImages({ slot: 'cover' }).ok, true);
+  assert.equal((await withSample.generateImages({ slot: 'cover' })).ok, true);
   await untilIdle(withSample);
   assert.equal(seen.length, 1);
   const first = /** @type {{ references?: { role: string; path: string }[]; prompt: string }} */ (seen[0]);
@@ -1341,9 +1346,9 @@ test('有样图时生图带上 template 参考路径；无样图不传 reference
       fs.writeFileSync(args.outputPath, 'png');
     },
   });
-  noSample.generateDraft(draftArgs({ galleryCount: 0 }));
+  await noSample.generateDraft(draftArgs({ galleryCount: 0 }));
   await untilIdle(noSample);
-  assert.equal(noSample.generateImages({ slot: 'cover' }).ok, true);
+  assert.equal((await noSample.generateImages({ slot: 'cover' })).ok, true);
   await untilIdle(noSample);
   assert.equal(seen.length, 1);
   const second = /** @type {{ references?: unknown; prompt: string }} */ (seen[0]);
@@ -1380,7 +1385,7 @@ test('重算提示词可固定图册，并列出图册目录', async () => {
   assert.match(detail.promptTemplate, /\{\{mainTitle\}\}/);
   assert.equal(runner.getAlbumDetail({ id: 'nope' }).ok, false);
 
-  runner.generateDraft(draftArgs({ galleryCount: 1 }));
+  await runner.generateDraft(draftArgs({ galleryCount: 1 }));
   const first = await untilIdle(runner);
   assert.equal(first.prompts.look, ALBUM_INFOGRAPHIC);
 
@@ -1450,7 +1455,7 @@ test('一张系列图是总结，多张时前面是节拍且只调用一次系�
     },
   });
   writePrompts(promptsDir);
-  runner.generateDraft(draftArgs({ galleryCount: 1 }));
+  await runner.generateDraft(draftArgs({ galleryCount: 1 }));
   const one = await untilIdle(runner);
   assert.equal(one.prompts.storyType, 'process');
   assert.equal(one.prompts.look, ALBUM_MAGAZINE);
@@ -1500,7 +1505,7 @@ test('第一次 scenes 失败时不把未完成的头图写成成功结果', asy
       images += 1;
     },
   });
-  runner.generateDraft(draftArgs({ galleryCount: 1 }));
+  await runner.generateDraft(draftArgs({ galleryCount: 1 }));
   const failed = await untilIdle(runner);
   assert.match(failed.job.error, /找不到提示词文件|未知提示词文件/);
   assert.equal(failed.draft.title, '标题');
@@ -1509,7 +1514,7 @@ test('第一次 scenes 失败时不把未完成的头图写成成功结果', asy
   assert.equal(failed.prompts.look, '');
   assert.equal(failed.prompts.stale, false);
   assert.equal(images, 0);
-  assert.equal(runner.generateImages({ slot: 'cover' }).ok, false);
+  assert.equal((await runner.generateImages({ slot: 'cover' })).ok, false);
 });
 
 test('系列句子不合格时不生图', async () => {
@@ -1540,7 +1545,7 @@ test('系列句子不合格时不生图', async () => {
         throw new Error('不应生图');
       },
     });
-    runner.generateDraft(draftArgs({ galleryCount }));
+    await runner.generateDraft(draftArgs({ galleryCount }));
     const failed = await untilIdle(runner);
     assert.match(failed.job.error, pattern);
     assert.equal(failed.prompts.cover, '');
@@ -1560,11 +1565,11 @@ test('张数变少后多出来的配图文件还留着', async () => {
       fs.writeFileSync(outputPath, 'png');
     },
   });
-  runner.generateDraft(draftArgs({ galleryCount: 2 }));
+  await runner.generateDraft(draftArgs({ galleryCount: 2 }));
   await untilIdle(runner);
-  runner.generateImages({ slot: 'gallery', index: 1 });
+  await runner.generateImages({ slot: 'gallery', index: 1 });
   await untilIdle(runner);
-  runner.generateImages({ slot: 'gallery', index: 2 });
+  await runner.generateImages({ slot: 'gallery', index: 2 });
   const imaged = await untilIdle(runner);
   const dir = imaged.directory;
   assert.equal(fs.existsSync(path.join(dir, 'gallery-01-1.png')), true);
@@ -1576,7 +1581,7 @@ test('张数变少后多出来的配图文件还留着', async () => {
   assert.equal(fs.existsSync(path.join(dir, 'gallery-01-1.png')), true);
   assert.equal(fs.existsSync(path.join(dir, 'gallery-02-1.png')), true);
 
-  runner.generateDraft(draftArgs());
+  await runner.generateDraft(draftArgs());
   await untilIdle(runner);
   assert.equal(fs.existsSync(path.join(dir, 'gallery-01-1.png')), true);
   assert.equal(fs.existsSync(path.join(dir, 'gallery-02-1.png')), true);
@@ -1611,7 +1616,7 @@ test('上传参考默认勾全槽；取消勾选后该槽不带；删除清文�
       fs.writeFileSync(args.outputPath, 'png');
     },
   });
-  runner.generateDraft(draftArgs({ galleryCount: 1 }));
+  await runner.generateDraft(draftArgs({ galleryCount: 1 }));
   await untilIdle(runner);
 
   const emptyUsage = runner.addUploadRef({
@@ -1634,7 +1639,7 @@ test('上传参考默认勾全槽；取消勾选后该槽不带；删除清文�
     true,
   );
 
-  assert.equal(runner.generateImages({ slot: 'cover' }).ok, true);
+  assert.equal((await runner.generateImages({ slot: 'cover' })).ok, true);
   await untilIdle(runner);
   assert.equal(seen.length, 1);
   const coverArgs = /** @type {{ references?: { role: string; path: string; usage?: string }[]; prompt: string }} */ (seen[0]);
@@ -1652,7 +1657,7 @@ test('上传参考默认勾全槽；取消勾选后该槽不带；删除清文�
 
   runner.setSlotPick({ slot: 'gallery', index: 1, materialIds: [], overrides: {} });
   seen.length = 0;
-  assert.equal(runner.generateImages({ slot: 'gallery', index: 1 }).ok, true);
+  assert.equal((await runner.generateImages({ slot: 'gallery', index: 1 })).ok, true);
   await untilIdle(runner);
   const galleryArgs = /** @type {{ references?: { role: string; usage?: string }[] }} */ (seen[0]);
   assert.equal(galleryArgs.references && galleryArgs.references.length, 1);
@@ -1693,7 +1698,7 @@ test('纯文字图册任意用法句可勾选并走 compose', async () => {
       fs.writeFileSync(outputPath, 'png');
     },
   });
-  runner.generateDraft(draftArgs({ galleryCount: 0 }));
+  await runner.generateDraft(draftArgs({ galleryCount: 0 }));
   await untilIdle(runner);
   assert.equal(runner.loadLatest().prompts.look, ALBUM_MAGAZINE);
 
@@ -1708,7 +1713,7 @@ test('纯文字图册任意用法句可勾选并走 compose', async () => {
     overrides: {},
   });
   assert.equal(pickOk.ok, true);
-  const allowed = runner.generateImages({ slot: 'cover' });
+  const allowed = await runner.generateImages({ slot: 'cover' });
   assert.equal(allowed.ok, true);
   await untilIdle(runner);
   assert.ok(seenPrompts.length >= 1);
@@ -1765,7 +1770,7 @@ test('存进库与从库挑复制用法句，挑入后默认勾全槽', async ()
     userUploadRefsDir: materialsDir,
     complete: async (prompt) => responseFor(prompt, 0),
   });
-  runner.generateDraft(draftArgs({ galleryCount: 0 }));
+  await runner.generateDraft(draftArgs({ galleryCount: 0 }));
   await untilIdle(runner);
   const added = runner.addUploadRef({
     dataUrl: `data:image/jpeg;base64,${TINY_JPEG.toString('base64')}`,
@@ -1780,7 +1785,7 @@ test('存进库与从库挑复制用法句，挑入后默认勾全槽', async ()
   assert.equal(listed.uploadRefs[0].usage, '实物照片。放在右下角。');
 
   runner.startNew();
-  runner.generateDraft(draftArgs({ galleryCount: 0 }));
+  await runner.generateDraft(draftArgs({ galleryCount: 0 }));
   await untilIdle(runner);
   const picked = runner.pickLibraryUploadRef({ id: saved.id });
   assert.equal(picked.ok, true);
@@ -1826,7 +1831,7 @@ test('一篇可囤超过 9 张；每槽勾选第 10 张被拒', async () => {
     promptsDir,
     complete: async (prompt) => responseFor(prompt, 0),
   });
-  runner.generateDraft(draftArgs({ galleryCount: 0 }));
+  await runner.generateDraft(draftArgs({ galleryCount: 0 }));
   await untilIdle(runner);
   const dataUrl = `data:image/jpeg;base64,${TINY_JPEG.toString('base64')}`;
   /** @type {string[]} */
@@ -1851,4 +1856,121 @@ test('一篇可囤超过 9 张；每槽勾选第 10 张被拒', async () => {
   });
   assert.equal(ten.ok, false);
   assert.match(ten.message, /最多勾 9/);
+});
+
+test('模型助手是 Dex Buddy SDK 1.0.0', () => {
+  const sdk = require('../../lib/dex-buddy-sdk');
+  assert.equal(sdk.SDK_VERSION, '1.0.0');
+  assert.equal(typeof sdk.requireEntitlement, 'function');
+  assert.equal(typeof sdk.bindModels, 'function');
+});
+
+test('未买断或未登录时写成笔记和刷图不进入进行中', async () => {
+  const root = tempDir();
+  const promptsDir = path.join(root, 'prompts');
+  writePrompts(promptsDir);
+  let gates = 0;
+  let entitled = true;
+  let failCode = 'NOT_ENTITLED';
+  let failImage = false;
+  let modelCalls = 0;
+  const runner = createRunner({
+    postsDir: path.join(root, 'posts'),
+    promptsDir,
+    random: firstPick,
+    requireEntitlement: async () => {
+      gates += 1;
+      if (entitled) return;
+      const err = new Error(failCode === 'NOT_ENTITLED' ? '尚未买断该插件' : '未登录');
+      /** @type {{ code?: string }} */ (err).code = failCode;
+      throw err;
+    },
+    complete: async (prompt) => {
+      modelCalls += 1;
+      return responseFor(prompt, 0);
+    },
+    generateImage: async ({ outputPath }) => {
+      modelCalls += 1;
+      if (failImage) throw new Error('封面失败');
+      fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+      fs.writeFileSync(outputPath, 'png');
+    },
+  });
+
+  entitled = false;
+  const blockedDraft = await runner.generateDraft(draftArgs());
+  assert.equal(blockedDraft.ok, false);
+  assert.equal(blockedDraft.silenced, true);
+  assert.equal(blockedDraft.message, undefined);
+  assert.equal(runner.loadLatest().job.running, false);
+  assert.equal(runner.loadLatest().id, '');
+  assert.equal(modelCalls, 0);
+  assert.equal(gates, 1);
+
+  failCode = 'UNAUTHORIZED';
+  const blockedLogin = await runner.generateDraft(draftArgs());
+  assert.equal(blockedLogin.ok, false);
+  assert.equal(blockedLogin.silenced, true);
+  assert.equal(runner.loadLatest().job.running, false);
+  assert.equal(modelCalls, 0);
+  assert.equal(gates, 2);
+
+  entitled = true;
+  assert.equal((await runner.generateDraft(draftArgs())).ok, true);
+  await untilIdle(runner);
+  assert.equal(runner.loadLatest().job.running, false);
+  assert.ok(modelCalls >= 1);
+
+  const gatesAfterDraft = gates;
+  const missingSlot = await runner.generateImages({});
+  assert.equal(missingSlot.ok, false);
+  assert.equal(gates, gatesAfterDraft);
+
+  entitled = false;
+  failCode = 'NOT_ENTITLED';
+  const modelsBeforeImage = modelCalls;
+  const blockedImage = await runner.generateImages({ slot: 'cover' });
+  assert.equal(blockedImage.ok, false);
+  assert.equal(blockedImage.silenced, true);
+  assert.equal(runner.loadLatest().job.running, false);
+  assert.notEqual(runner.loadLatest().images.cover.status, '生成中');
+  assert.equal(modelCalls, modelsBeforeImage);
+
+  entitled = true;
+  failImage = true;
+  assert.equal((await runner.generateImages({ slot: 'cover' })).ok, true);
+  await untilIdle(runner);
+  assert.equal(runner.loadLatest().images.cover.status, '失败');
+
+  entitled = false;
+  failCode = 'UNAUTHORIZED';
+  const modelsBeforeRetry = modelCalls;
+  const blockedRetry = await runner.retryImage({ slot: 'cover' });
+  assert.equal(blockedRetry.ok, false);
+  assert.equal(blockedRetry.silenced, true);
+  assert.equal(runner.loadLatest().job.running, false);
+  assert.equal(runner.loadLatest().images.cover.status, '失败');
+  assert.equal(modelCalls, modelsBeforeRetry);
+});
+
+test('独立运行时买断闸门直接通过', async () => {
+  const root = tempDir();
+  const promptsDir = path.join(root, 'prompts');
+  writePrompts(promptsDir);
+  const runner = createRunner({
+    postsDir: path.join(root, 'posts'),
+    promptsDir,
+    random: firstPick,
+    complete: async (prompt) => responseFor(prompt, 0),
+    generateImage: async ({ outputPath }) => {
+      fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+      fs.writeFileSync(outputPath, 'png');
+    },
+  });
+  assert.equal((await runner.generateDraft(draftArgs())).ok, true);
+  await untilIdle(runner);
+  assert.equal((await runner.generateImages({ slot: 'cover' })).ok, true);
+  await untilIdle(runner);
+  assert.equal(runner.loadLatest().job.running, false);
+  assert.equal(runner.loadLatest().images.cover.status, '成功');
 });

@@ -112,6 +112,7 @@ function notePage() {
     },
     images: { cover: { status: '空', path: '', selected: 0, revisedAt: 0, versions: [] }, gallery: [] },
     job: { running: false, step: '', error: '' },
+    pendingCall: false,
     errors: { business: '', sampleBody: '', references: '', galleryCount: '' },
     notice: '',
     copied: '',
@@ -288,7 +289,7 @@ function notePage() {
       return title || `${this.sampleLength} 字`;
     },
     get canGenerateDraft() {
-      return Boolean(this.hostReady && !this.job.running && String(this.business || '').trim());
+      return Boolean(this.hostReady && !this.job.running && !this.pendingCall && String(this.business || '').trim());
     },
     clearSample() {
       if (this.job.running) return;
@@ -863,6 +864,7 @@ function notePage() {
     },
     noteRejection(result) {
       if (!result || result.ok !== false) return false;
+      if (result.silenced) return true;
       if (result.field && Object.prototype.hasOwnProperty.call(this.errors, result.field)) {
         this.errors[result.field] = result.message;
         if (result.field === 'sampleBody') this.sampleOpen = true;
@@ -890,28 +892,33 @@ function notePage() {
       return true;
     },
     async onGenerateDraft() {
-      if (!this.hostReady || this.job.running) return;
+      if (!this.hostReady || this.job.running || this.pendingCall) return;
       this.notice = '';
       if (!this.validateForm()) return;
-      const result = await this.call('generateDraft', {
-        business: this.business,
-        sampleTitle: this.sampleTitle,
-        sampleBody: this.sampleBody,
-        references: this.references,
-        articleType: this.articleType,
-        persona: this.persona,
-        galleryCount: this.galleryCount,
-      });
-      if (await this.resumeRunningJob(result)) return;
-      if (this.noteRejection(result)) return;
-      this.postId = result.id || this.postId;
-      this.emptyCopyDraft = { title: '', body: '', topics: [] };
-      this.phase = 'copy';
-      this.job = { running: true, step: '成稿', error: '' };
-      this.syncSlots();
-      this.syncBodyDraft();
-      this.ensurePoll();
-      await this.refresh();
+      this.pendingCall = true;
+      try {
+        const result = await this.call('generateDraft', {
+          business: this.business,
+          sampleTitle: this.sampleTitle,
+          sampleBody: this.sampleBody,
+          references: this.references,
+          articleType: this.articleType,
+          persona: this.persona,
+          galleryCount: this.galleryCount,
+        });
+        if (await this.resumeRunningJob(result)) return;
+        if (this.noteRejection(result)) return;
+        this.postId = result.id || this.postId;
+        this.emptyCopyDraft = { title: '', body: '', topics: [] };
+        this.phase = 'copy';
+        this.job = { running: true, step: '成稿', error: '' };
+        this.syncSlots();
+        this.syncBodyDraft();
+        this.ensurePoll();
+        await this.refresh();
+      } finally {
+        this.pendingCall = false;
+      }
     },
     setSlotPrompt(item) {
       const value = String(item.prompt || '');
@@ -927,6 +934,7 @@ function notePage() {
     slotDrawDisabled(item) {
       return !this.hostReady
         || this.job.running
+        || this.pendingCall
         || !this.draft
         || !String(item.prompt || '').trim();
     },
@@ -936,18 +944,23 @@ function notePage() {
     async onDraw(item) {
       if (!item || this.slotDrawDisabled(item)) return;
       this.notice = '';
-      const result = await this.call('generateImages', {
-        slot: item.slot,
-        index: item.index,
-        prompts: {
-          cover: this.prompts.cover,
-          gallery: Array.isArray(this.prompts.gallery) ? this.prompts.gallery.slice() : [],
-        },
-      });
-      if (this.noteRejection(result)) return;
-      this.job = { running: true, step: item.slot === 'cover' ? '封面' : item.label, error: '' };
-      this.ensurePoll();
-      await this.refresh();
+      this.pendingCall = true;
+      try {
+        const result = await this.call('generateImages', {
+          slot: item.slot,
+          index: item.index,
+          prompts: {
+            cover: this.prompts.cover,
+            gallery: Array.isArray(this.prompts.gallery) ? this.prompts.gallery.slice() : [],
+          },
+        });
+        if (this.noteRejection(result)) return;
+        this.job = { running: true, step: item.slot === 'cover' ? '封面' : item.label, error: '' };
+        this.ensurePoll();
+        await this.refresh();
+      } finally {
+        this.pendingCall = false;
+      }
     },
     async onChooseVersion(item, version) {
       if (!this.hostReady || this.job.running || !item) return;

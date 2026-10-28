@@ -1,9 +1,9 @@
 // @ts-check
 'use strict';
 
-/** @type {typeof import('../../lib/dex-models')} */
-const dexModels = require('../../lib/dex-models');
-const { bindModels, DexModelsError } = dexModels;
+/** @type {typeof import('../../lib/dex-buddy-sdk')} */
+const dexBuddySdk = require('../../lib/dex-buddy-sdk');
+const { bindModels, DexModelsError } = dexBuddySdk;
 
 /** @type {Readonly<{ standard: string; pro: string }>} */
 const IMAGE_MODELS = {

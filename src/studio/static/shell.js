@@ -31,6 +31,10 @@
       }
       return data;
     } catch (err) {
+      const code = err && typeof err === 'object' && typeof err.code === 'string' ? err.code.trim() : '';
+      if (code === 'UNAUTHORIZED' || code === 'NOT_ENTITLED') {
+        return { ok: false, silenced: true };
+      }
       return { ok: false, message: err && err.message ? err.message : '没有完成' };
     }
   }

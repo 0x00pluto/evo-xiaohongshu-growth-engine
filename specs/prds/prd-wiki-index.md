@@ -12,3 +12,4 @@
 | 00006 | `specs/prds/prd-00006-fuse-reference-images.md` | 生图时融进上传素材：用法句、模板主体空位换人、封面与配图各自勾选；R0 挂在这篇，R1 资料库素材 Tab。工程 accepted |
 | 00007 | `specs/prds/prd-00007-note-style-samples.md` | 「要发什么」类型下拉；范文与参考资料拆开；成稿三段提示词；资料库范文笔记库。工程 accepted |
 | 00008 | `specs/prds/prd-00008-dexbuddy-host-models.md` | 官方插件 id 改为 app-dexbuddy-xiaohongshu-standard-editor；生文识图与两档生图走宿主模型；本机 .env 填 DEX_BUDDY_API_KEY；步骤键入账。工程 accepted |
+| 00009 | `specs/prds/prd-00009-sdk-entitlement-gates.md` | 换成 Dex Buddy SDK 1.0.0；写成笔记与刷图在任务开始前由插件触发买断，购买提示交给工作台弹框。工程 accepted |

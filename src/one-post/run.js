@@ -28,8 +28,11 @@ const parseModule = require('../prompts/parse');
 
 /** @type {typeof import('./model-error')} */
 const modelErrorModule = require('./model-error');
+/** @type {typeof import('../../lib/dex-buddy-sdk')} */
+const dexBuddySdk = require('../../lib/dex-buddy-sdk');
 
 const { createLlm } = llmModule;
+const { requireEntitlement: sdkRequireEntitlement } = dexBuddySdk;
 const { parseJsonObject } = parseModule;
 const { generatePng } = imageModule;
 const { formatModelError } = modelErrorModule;
@@ -110,6 +113,7 @@ const BUSY_MESSAGE = '正在生成，请等这一轮结束';
  *   env?: Record<string, string | undefined>;
  *   readEnv?: () => Record<string, string | undefined>;
  *   ctx?: unknown;
+ *   requireEntitlement?: (ctx?: unknown) => Promise<unknown>;
  *   models?: unknown;
  *   fetch?: import('../llm/client').FetchFn;
  *   now?: () => Date;
@@ -304,6 +308,38 @@ function createRunner(options) {
   const random = options.random || Math.random;
   /** @type {string | null} */
   let lock = null;
+  const checkEntitlement = typeof options.requireEntitlement === 'function'
+    ? options.requireEntitlement
+    : sdkRequireEntitlement;
+
+  /**
+   * @param {unknown} err
+   * @returns {boolean}
+   */
+  function isSilencedEntitlement(err) {
+    if (!err || typeof err !== 'object' || !('code' in err)) return false;
+    const code = /** @type {{ code?: unknown }} */ (err).code;
+    return code === 'UNAUTHORIZED' || code === 'NOT_ENTITLED';
+  }
+
+  /**
+   * 本地校验通过后、accepted 之前查买断。失败不写 job.running。
+   * @param {string} nextLock
+   * @param {() => { ok: boolean } & Record<string, unknown>} proceed
+   */
+  async function withEntitlement(nextLock, proceed) {
+    if (lock) return busy();
+    lock = nextLock;
+    try {
+      await checkEntitlement(options.ctx);
+    } catch (err) {
+      lock = null;
+      if (isSilencedEntitlement(err)) return { ok: false, silenced: true };
+      return { ok: false, message: err instanceof Error ? err.message : '没有完成' };
+    }
+    return proceed();
+  }
+
   /** @type {import('../prompts/album/learn').AlbumDraft | null} */
   let albumDraft = null;
   let albumDraftSeq = 0;
@@ -933,7 +969,7 @@ function createRunner(options) {
   /**
    * @param {Record<string, unknown>} payload
    */
-  function generateDraft(payload) {
+  async function generateDraft(payload) {
     const checked = validateInputs(payload);
     if (!checked.ok) return checked;
     const articleType = payload && payload.articleType;
@@ -944,9 +980,7 @@ function createRunner(options) {
     if (!isPersonaType(persona)) {
       return { ok: false, message: '人设不在允许列表', field: 'persona' };
     }
-    if (lock) return busy();
-    lock = 'generateDraft';
-    return acceptGenerateDraft(checked, payload, articleType, persona);
+    return withEntitlement('generateDraft', () => acceptGenerateDraft(checked, payload, articleType, persona));
   }
 
   /**
@@ -1220,7 +1254,7 @@ function createRunner(options) {
   /**
    * @param {Record<string, unknown>} payload
    */
-  function generateImages(payload) {
+  async function generateImages(payload) {
     if (!store) return { ok: false, message: '没有这一篇' };
     if (lock) return busy();
     const source = payload && typeof payload === 'object' ? payload : {};
@@ -1234,14 +1268,13 @@ function createRunner(options) {
       return { ok: false, message: reason };
     }
     store.write(state);
-    lock = 'generateImages';
-    return acceptGenerateImages(only);
+    return withEntitlement('generateImages', () => acceptGenerateImages(only));
   }
 
   /**
    * @param {Record<string, unknown>} payload
    */
-  function retryImage(payload) {
+  async function retryImage(payload) {
     if (!store) return { ok: false, message: '没有这一篇' };
     if (lock) return busy();
     const source = payload && typeof payload === 'object' ? payload : {};
@@ -1260,10 +1293,9 @@ function createRunner(options) {
     if (!image || image.status !== '失败') {
       return { ok: false, message: '只能重试失败的那一张' };
     }
-    lock = 'retryImage';
     /** @type {ImageOnly} */
     const only = slot === 'cover' ? { slot: 'cover', index: 0 } : { slot: 'gallery', index };
-    return acceptGenerateImages(only);
+    return withEntitlement('retryImage', () => acceptGenerateImages(only));
   }
 
   /**
