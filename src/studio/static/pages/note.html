@@ -304,10 +304,11 @@
                       class="relative aspect-[3/4] w-full overflow-hidden rounded-lg bg-base-200 text-left"
                       type="button"
                       role="listitem"
-                      :class="(prompts.look === album.id || selectedLook === album.id) ? 'ring-2 ring-base-content' : ''"
+                      :class="selectedLook === album.id ? 'ring-2 ring-base-content' : ''"
                       :aria-label="album.label"
+                      :aria-pressed="selectedLook === album.id ? 'true' : 'false'"
                       :disabled="job.running"
-                      @click="openAlbumDetail(album)"
+                      @click="selectAlbumStyle(album)"
                     >
                       <img class="absolute inset-0 h-full w-full object-cover" x-show="albumSamplePreview(album)" :src="albumSamplePreview(album)" alt="" />
                       <span class="absolute inset-0 flex items-center justify-center text-[10px] text-base-content/40" x-show="!albumSamplePreview(album)">无样图</span>
@@ -322,24 +323,23 @@
             </div>
           </div>
 
-          <template x-if="activeSlot">
-            <div class="rounded-lg border border-base-300 bg-base-100">
-              <button
-                class="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium"
-                type="button"
-                :aria-expanded="slotPromptExpanded ? 'true' : 'false'"
-                @click="toggleSlotPromptExpanded()"
-              >
-                <span>这张的提示词</span>
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" class="shrink-0" :class="slotPromptExpanded ? 'rotate-180' : ''"><path d="m6 9 6 6 6-6"></path></svg>
-              </button>
-              <div class="flex flex-col gap-2 border-t border-base-300 px-3 py-3" x-show="slotPromptExpanded" x-cloak>
-                <label class="sr-only" :for="'slot-prompt-' + activeKey">这张的提示词</label>
-                <textarea class="textarea min-h-32 w-full wrap" :id="'slot-prompt-' + activeKey" x-model="activeSlot.prompt" :readonly="job.running" @input="setSlotPrompt(activeSlot)" @blur="persist()"></textarea>
-                <p class="text-sm" x-show="!String(activeSlot.prompt || '').trim()">还没有这一张的提示词</p>
-              </div>
+          <div class="rounded-lg border border-base-300 bg-base-100" x-show="activeSlot" x-cloak>
+            <button
+              class="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium"
+              type="button"
+              :disabled="!canOpenSlotPrompt"
+              :aria-expanded="canOpenSlotPrompt && slotPromptExpanded ? 'true' : 'false'"
+              @click="toggleSlotPromptExpanded()"
+            >
+              <span>这张的提示词</span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" class="shrink-0" :class="canOpenSlotPrompt && slotPromptExpanded ? 'rotate-180' : ''"><path d="m6 9 6 6 6-6"></path></svg>
+            </button>
+            <div class="flex flex-col gap-2 border-t border-base-300 px-3 py-3" x-show="canOpenSlotPrompt && slotPromptExpanded" x-cloak>
+              <label class="sr-only" :for="'slot-prompt-' + activeKey">这张的提示词</label>
+              <textarea class="textarea min-h-32 w-full wrap" :id="'slot-prompt-' + activeKey" :value="activeSlot ? activeSlot.prompt : ''" :readonly="job.running" @input="activeSlot && (activeSlot.prompt = $event.target.value, setSlotPrompt(activeSlot))" @blur="persist()"></textarea>
+              <p class="text-sm" x-show="activeSlot && !String(activeSlot.prompt || '').trim()">还没有这一张的提示词</p>
             </div>
-          </template>
+          </div>
 
           <div class="flex flex-col gap-2 rounded-lg border border-base-300 bg-base-100 p-3">
             <div class="flex items-baseline gap-2">
@@ -567,50 +567,6 @@
       </div>
     </div>
   </template>
-  <div
-    id="album-detail-modal"
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-    x-show="albumDetailOpen"
-    x-cloak
-    role="dialog"
-    aria-modal="true"
-    aria-labelledby="album-detail-title"
-    @keydown.escape.window="closeAlbumDetail()"
-  >
-    <button class="absolute inset-0 cursor-default" type="button" aria-label="关闭" @click="closeAlbumDetail()"></button>
-    <div class="relative z-10 grid w-full max-w-3xl max-h-[calc(100dvh-2rem)] grid-cols-1 items-stretch overflow-hidden rounded-lg border border-base-300 bg-base-100 shadow-lg sm:grid-cols-2" @click.stop>
-      <div class="flex aspect-[3/4] w-full min-h-0 max-h-full items-center justify-center bg-base-200 p-4">
-        <img
-          class="max-h-full max-w-full object-contain"
-          x-show="albumDetailSample"
-          :src="albumDetailSample"
-          alt=""
-        />
-        <span class="text-sm text-base-content/40" x-show="!albumDetailSample">无样图</span>
-      </div>
-      <div class="flex h-full min-h-0 max-h-full flex-col gap-3 overflow-hidden p-4">
-        <div class="flex shrink-0 items-start justify-between gap-3">
-          <h3 id="album-detail-title" class="min-w-0 text-base font-medium" x-text="albumDetail && albumDetail.label"></h3>
-          <button class="btn btn-ghost btn-square btn-sm shrink-0" type="button" aria-label="关闭" @click="closeAlbumDetail()">×</button>
-        </div>
-        <p class="shrink-0 text-sm leading-6 text-base-content/70" x-text="albumDetail && albumDetail.hint"></p>
-        <div class="flex min-h-0 flex-1 flex-col gap-1 overflow-hidden">
-          <p class="shrink-0 text-sm font-medium">图册提示词</p>
-          <pre class="min-h-0 max-h-[min(28rem,calc(100dvh-16rem))] flex-1 overflow-auto whitespace-pre-wrap break-words rounded-md border border-base-300 bg-base-200 p-3 text-xs leading-5" x-text="albumDetail && albumDetail.promptTemplate"></pre>
-        </div>
-        <div class="flex shrink-0 justify-end">
-          <button
-            id="regen-album-prompts"
-            class="btn btn-primary btn-sm"
-            type="button"
-            @click="onRegenAlbumPrompts()"
-            :disabled="!canRegenAlbumPrompts()"
-          >按此风格重算提示词</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <div
     id="upload-ref-upload-modal"
     class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"

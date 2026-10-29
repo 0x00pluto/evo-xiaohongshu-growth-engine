@@ -3,6 +3,8 @@
 
 /** @type {typeof import('./album/catalog')} */
 const catalogModule = require('./album/catalog');
+/** @type {typeof import('./album/editable')} */
+const editableModule = require('./album/editable');
 /** @type {typeof import('./album/frame')} */
 const frameModule = require('./album/frame');
 /** @type {typeof import('./album/learn')} */
@@ -36,6 +38,7 @@ module.exports = {
   albumHint: catalogModule.albumHint,
   albumKind: catalogModule.albumKind,
   albumLabel: catalogModule.albumLabel,
+  albumLabelShort: editableModule.albumLabelShort,
   albumPromptName: catalogModule.albumPromptName,
   albumSampleFile: catalogModule.albumSampleFile,
   albumSamplePath: catalogModule.albumSamplePath,
@@ -53,7 +56,9 @@ module.exports = {
   clearAlbumCatalogCache: catalogModule.clearAlbumCatalogCache,
   commitAlbumDraft: albumStoreModule.commitAlbumDraft,
   updateAlbumPromptMd: albumStoreModule.updateAlbumPromptMd,
+  copyFramesFitSchema: editableModule.copyFramesFitSchema,
   copySchema: catalogModule.copySchema,
+  decodeFilledPrompt: editableModule.decodeFilledPrompt,
   deleteAlbumFiles: albumStoreModule.deleteAlbumFiles,
   composeImagePrompt: require('./album/refs').composeImagePrompt,
   formatImageRefsBlock: require('./album/refs').formatImageRefsBlock,
@@ -63,6 +68,9 @@ module.exports = {
   migrateUserAlbumPacks: albumStoreModule.migrateUserAlbumPacks,
   readAlbumPromptText: catalogModule.readAlbumPromptText,
   draftPublicView: learnModule.draftPublicView,
+  embedEditablePrompt: editableModule.embedEditablePrompt,
+  extractEditablePrompt: editableModule.extractEditablePrompt,
+  extractSceneFromPrompt: editableModule.extractSceneFromPrompt,
   fillPrompt: templateModule.fillPrompt,
   formatGallerySlots: storyModule.formatGallerySlots,
   formatPlannedLines: frameModule.formatPlannedLines,

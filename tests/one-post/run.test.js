@@ -432,6 +432,16 @@ async function untilIdle(runner) {
   throw new Error('任务没有结束');
 }
 
+/**
+ * @param {ReturnType<typeof createRunner>} runner
+ * @param {Record<string, unknown>} [payload]
+ */
+async function stampAndDraw(runner, payload = { slot: 'cover' }) {
+  const started = await runner.generateImages(payload);
+  assert.equal(started.ok, true, started.message || 'generateImages');
+  return untilIdle(runner);
+}
+
 test('空业务一句和超长文章都不会调用模型', async () => {
   const promptsDir = path.join(tempDir(), 'prompts');
   writePrompts(promptsDir);
@@ -488,16 +498,25 @@ test('配图张数为 0 时不读配图提示词，重跑成稿仍留着旧图',
   assert.equal((await runner.generateDraft(draftArgs())).ok, true);
   const drafted = await untilIdle(runner);
   assert.equal(drafted.draft.title, '标题');
-  assert.equal(drafted.draft.coverLine, '一句');
+  assert.equal(drafted.draft.coverLine, '');
   assert.equal(drafted.articleType, '涨粉');
   assert.equal(drafted.persona, '素人');
-  assert.equal(drafted.prompts.storyType, 'process');
-  assert.equal(drafted.prompts.look, ALBUM_MAGAZINE);
-  assertCover(drafted.prompts.cover);
-  assert.equal(drafted.prompts.style, STYLE);
-  assert.deepEqual(drafted.prompts.gallery, []);
-  assert.deepEqual(drafted.prompts.galleryLines, []);
-  assert.deepEqual(drafted.prompts.galleryRoles, []);
+  assert.equal(drafted.prompts.cover, '');
+  assert.equal(drafted.prompts.look, '');
+  assert.equal(drafted.job.running, false);
+  assert.equal(seenHasPrefix(seen, 'PLAN'), false);
+  assert.equal(seenHasPrefix(seen, 'SCENES'), false);
+
+  assert.equal((await runner.generateImages({ slot: 'cover' })).ok, true);
+  const imaged = await untilIdle(runner);
+  assert.equal(imaged.draft.coverLine, '一句');
+  assert.equal(imaged.prompts.storyType, 'process');
+  assert.equal(imaged.prompts.look, ALBUM_MAGAZINE);
+  assertCover(imaged.prompts.cover);
+  assert.equal(imaged.prompts.style, STYLE);
+  assert.deepEqual(imaged.prompts.gallery, []);
+  assert.deepEqual(imaged.prompts.galleryLines, []);
+  assert.deepEqual(imaged.prompts.galleryRoles, []);
   assert.equal(seenHasPrefix(seen, 'PLAN'), true);
   assert.equal(seenHasPrefix(seen, 'COMPAREPLAN'), false);
   const art = seenFindPrefix(seen, 'SCENES');
@@ -506,10 +525,7 @@ test('配图张数为 0 时不读配图提示词，重跑成稿仍留着旧图',
   assert.doesNotMatch(art, /手帐拼贴|潮流概念|知识卡片/);
   assert.match(art, /字段只有 scenes|HINT:/);
   assert.doesNotMatch(art, /\{\{background\}\}|\{\{colors\}\}/);
-  assert.equal(drafted.job.error, '');
-
-  assert.equal((await runner.generateImages({ slot: 'cover' })).ok, true);
-  const imaged = await untilIdle(runner);
+  assert.equal(imaged.job.error, '');
   assert.equal(imaged.images.cover.status, '成功');
   assert.equal(imaged.images.cover.path, 'cover-1.png');
   assert.equal(fs.existsSync(path.join(runner.loadLatest().directory, 'cover-1.png')), true);
@@ -547,12 +563,14 @@ test('提示词条数不对时不生图', async () => {
     },
   });
   await runner.generateDraft(draftArgs({ sampleBody: '一篇短文', galleryCount: 2 }));
+  await untilIdle(runner);
+  assert.equal((await runner.generateImages({ slot: 'cover' })).ok, true);
   const latest = await untilIdle(runner);
   assert.match(latest.job.error, /画面应为 3 张，模型返回了 1 张/);
   assert.ok(scenesCalls >= 2);
   assert.equal(latest.draft.title, '标题');
+  assert.equal(latest.prompts.cover, '');
   assert.equal(images, 0);
-  assert.equal((await runner.generateImages({ slot: 'cover' })).ok, false);
 });
 
 test('画面条数第一次错、第二次对齐后提示词成功', async () => {
@@ -577,6 +595,8 @@ test('画面条数第一次错、第二次对齐后提示词成功', async () =>
     },
   });
   await runner.generateDraft(draftArgs({ sampleBody: '一篇短文', galleryCount: 1 }));
+  await untilIdle(runner);
+  runner.generatePrompts();
   const latest = await untilIdle(runner);
   assert.equal(latest.job.error, '');
   assert.equal(scenesCalls, 2);
@@ -607,6 +627,8 @@ test('画面第一次重复、第二次各不相同后提示词成功', async ()
     },
   });
   await runner.generateDraft(draftArgs({ sampleBody: '一篇短文', galleryCount: 1 }));
+  await untilIdle(runner);
+  runner.generatePrompts();
   const latest = await untilIdle(runner);
   assert.equal(latest.job.error, '');
   assert.equal(scenesCalls, 2);
@@ -796,12 +818,14 @@ test('成稿、提示词和生图带稳定步骤键，再抽追加 retry', async
   await runner.generateDraft(draftArgs());
   await untilIdle(runner);
   assert.match(chatKeys[0], /:copy$/);
-  assert.equal(chatKeys.some((key) => key.endsWith(':prompts:plan')), true);
-  assert.equal(chatKeys.some((key) => key.endsWith(':prompts:scenes')), true);
-  assert.equal(chatKeys.some((key) => key.includes(':retry-')), false);
+  assert.equal(chatKeys.some((key) => key.endsWith(':prompts:plan')), false);
+  assert.equal(chatKeys.some((key) => key.endsWith(':prompts:scenes')), false);
 
   await runner.generateImages({ slot: 'cover' });
   await untilIdle(runner);
+  assert.equal(chatKeys.some((key) => key.endsWith(':prompts:plan')), true);
+  assert.equal(chatKeys.some((key) => key.endsWith(':prompts:scenes')), true);
+  assert.equal(chatKeys.some((key) => key.includes(':retry-')), false);
   assert.match(imageKeys[0], /:cover$/);
 
   await runner.generateImages({ slot: 'cover' });
@@ -1149,9 +1173,13 @@ test('稿里存着指定句时，封面那句话仍由策划写出', async () =>
   }));
   const drafted = await untilIdle(runner);
   assert.equal(drafted.coverLineSpecified, '我指定的');
-  assert.equal(drafted.draft.coverLine, '一句');
-  assertCover(drafted.prompts.cover);
-  assert.equal(drafted.prompts.style, STYLE);
+  assert.equal(drafted.draft.coverLine, '');
+  assert.equal(seenHasPrefix(seen, 'PLAN'), false);
+  runner.generatePrompts();
+  const stamped = await untilIdle(runner);
+  assert.equal(stamped.draft.coverLine, '一句');
+  assertCover(stamped.prompts.cover);
+  assert.equal(stamped.prompts.style, STYLE);
   assert.equal(seenHasPrefix(seen, 'PLAN'), true);
 });
 
@@ -1260,17 +1288,19 @@ test('抽到对比时用对比规则写句子，配图张数为 0 时仍有封�
   });
   await runner.generateDraft(draftArgs());
   const drafted = await untilIdle(runner);
-  assert.equal(drafted.prompts.storyType, 'contrast');
-  assert.equal(drafted.prompts.look, ALBUM_CONCEPTUAL);
-  assertCover(drafted.prompts.cover, '一句', ALBUM_CONCEPTUAL);
-  assert.equal(drafted.prompts.style.includes('潮流概念插画风'), true);
   assert.equal(drafted.draft.title, '标题');
-  assert.equal(drafted.draft.coverLine, '一句');
-  assert.equal(seenHasPrefix(seen, 'COMPAREPLAN'), true);
-  assert.equal(seenHasPrefix(seen, 'PLAN'), false);
-  assert.equal(drafted.prompts.gallery.length, 0);
+  assert.equal(drafted.prompts.look, '');
+  assert.equal(seenHasPrefix(seen, 'COMPAREPLAN'), false);
   assert.equal((await runner.generateImages({ slot: 'cover' })).ok, true);
   const imaged = await untilIdle(runner);
+  assert.equal(imaged.prompts.storyType, 'contrast');
+  assert.equal(imaged.prompts.look, ALBUM_CONCEPTUAL);
+  assertCover(imaged.prompts.cover, '一句', ALBUM_CONCEPTUAL);
+  assert.equal(imaged.prompts.style.includes('潮流概念插画风'), true);
+  assert.equal(imaged.draft.coverLine, '一句');
+  assert.equal(seenHasPrefix(seen, 'COMPAREPLAN'), true);
+  assert.equal(seenHasPrefix(seen, 'PLAN'), false);
+  assert.equal(imaged.prompts.gallery.length, 0);
   assert.equal(imaged.images.cover.status, '成功');
   assert.equal(fs.existsSync(path.join(imaged.directory, 'cover-1.png')), true);
 });
@@ -1290,13 +1320,13 @@ test('抽到对比后配图角色是对照', async () => {
     },
   });
   await runner.generateDraft(draftArgs({ galleryCount: 1 }));
-  const next = await untilIdle(runner);
-  assert.equal(next.prompts.storyType, 'contrast');
-  assert.deepEqual(next.prompts.galleryRoles, ['contrast']);
-  assert.equal(next.prompts.gallery[0].includes(next.prompts.galleryLines[0]), true);
-  assert.equal(next.draft.title, '标题');
+  const drafted = await untilIdle(runner);
+  assert.equal(drafted.draft.title, '标题');
   assert.equal((await runner.generateImages({ slot: 'gallery', index: 1 })).ok, true);
   const imaged = await untilIdle(runner);
+  assert.equal(imaged.prompts.storyType, 'contrast');
+  assert.deepEqual(imaged.prompts.galleryRoles, ['contrast']);
+  assert.equal(imaged.prompts.gallery[0].includes(imaged.prompts.galleryLines[0]), true);
   assert.equal(imaged.images.gallery[0].status, '成功');
   assert.equal(fs.existsSync(path.join(imaged.directory, 'gallery-01-1.png')), true);
 });
@@ -1387,7 +1417,7 @@ test('重算提示词可固定图册，并列出图册目录', async () => {
 
   await runner.generateDraft(draftArgs({ galleryCount: 1 }));
   const first = await untilIdle(runner);
-  assert.equal(first.prompts.look, ALBUM_INFOGRAPHIC);
+  assert.equal(first.prompts.look, '');
 
   assert.equal(runner.generatePrompts({ look: 'not-an-album' }).ok, false);
   runner.generatePrompts({ look: ALBUM_CARD });
@@ -1456,6 +1486,8 @@ test('一张系列图是总结，多张时前面是节拍且只调用一次系�
   });
   writePrompts(promptsDir);
   await runner.generateDraft(draftArgs({ galleryCount: 1 }));
+  await untilIdle(runner);
+  runner.generatePrompts();
   const one = await untilIdle(runner);
   assert.equal(one.prompts.storyType, 'process');
   assert.equal(one.prompts.look, ALBUM_MAGAZINE);
@@ -1506,6 +1538,8 @@ test('第一次 scenes 失败时不把未完成的头图写成成功结果', asy
     },
   });
   await runner.generateDraft(draftArgs({ galleryCount: 1 }));
+  await untilIdle(runner);
+  assert.equal((await runner.generateImages({ slot: 'cover' })).ok, true);
   const failed = await untilIdle(runner);
   assert.match(failed.job.error, /找不到提示词文件|未知提示词文件/);
   assert.equal(failed.draft.title, '标题');
@@ -1514,7 +1548,6 @@ test('第一次 scenes 失败时不把未完成的头图写成成功结果', asy
   assert.equal(failed.prompts.look, '');
   assert.equal(failed.prompts.stale, false);
   assert.equal(images, 0);
-  assert.equal((await runner.generateImages({ slot: 'cover' })).ok, false);
 });
 
 test('系列句子不合格时不生图', async () => {
@@ -1546,6 +1579,8 @@ test('系列句子不合格时不生图', async () => {
       },
     });
     await runner.generateDraft(draftArgs({ galleryCount }));
+    await untilIdle(runner);
+    assert.equal((await runner.generateImages({ slot: 'cover' })).ok, true);
     const failed = await untilIdle(runner);
     assert.match(failed.job.error, pattern);
     assert.equal(failed.prompts.cover, '');
@@ -1700,7 +1735,6 @@ test('纯文字图册任意用法句可勾选并走 compose', async () => {
   });
   await runner.generateDraft(draftArgs({ galleryCount: 0 }));
   await untilIdle(runner);
-  assert.equal(runner.loadLatest().prompts.look, ALBUM_MAGAZINE);
 
   const person = runner.addUploadRef({
     dataUrl: `data:image/jpeg;base64,${TINY_JPEG.toString('base64')}`,
@@ -1716,6 +1750,7 @@ test('纯文字图册任意用法句可勾选并走 compose', async () => {
   const allowed = await runner.generateImages({ slot: 'cover' });
   assert.equal(allowed.ok, true);
   await untilIdle(runner);
+  assert.equal(runner.loadLatest().prompts.look, ALBUM_MAGAZINE);
   assert.ok(seenPrompts.length >= 1);
   assert.match(seenPrompts[seenPrompts.length - 1], /纯文字图：只画背景/);
   assert.match(seenPrompts[seenPrompts.length - 1], /换成我的这个表情/);
@@ -1973,4 +2008,124 @@ test('独立运行时买断闸门直接通过', async () => {
   await untilIdle(runner);
   assert.equal(runner.loadLatest().job.running, false);
   assert.equal(runner.loadLatest().images.cover.status, '成功');
+});
+
+test('写成笔记只出文，刷新才套整套提示词并只画当前张', async () => {
+  const root = tempDir();
+  const promptsDir = path.join(root, 'prompts');
+  writePrompts(promptsDir);
+  /** @type {string[]} */
+  const chatKeys = [];
+  const runner = createRunner({
+    postsDir: path.join(root, 'posts'),
+    promptsDir,
+    random: firstPick,
+    complete: async (prompt, options) => {
+      chatKeys.push(String(options && options.idempotencyKey || ''));
+      return responseFor(prompt, 1);
+    },
+    generateImage: async ({ outputPath }) => {
+      fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+      fs.writeFileSync(outputPath, 'png');
+    },
+  });
+  await runner.generateDraft(draftArgs({ galleryCount: 1 }));
+  const drafted = await untilIdle(runner);
+  assert.equal(drafted.job.running, false);
+  assert.equal(drafted.prompts.cover, '');
+  assert.deepEqual(drafted.prompts.gallery, []);
+  assert.equal(chatKeys.some((key) => key.endsWith(':prompts:plan')), false);
+  assert.equal(chatKeys.some((key) => key.endsWith(':prompts:scenes')), false);
+  assert.equal(drafted.editor.cover, '');
+
+  const stamped = await stampAndDraw(runner, { slot: 'cover' });
+  assert.ok(stamped.prompts.cover);
+  assert.equal(stamped.prompts.gallery.length, 1);
+  assert.ok(stamped.prompts.gallery[0]);
+  assert.equal(stamped.images.cover.status, '成功');
+  assert.equal(stamped.images.cover.path, 'cover-1.png');
+  assert.equal(stamped.images.gallery.length === 0 || !stamped.images.gallery[0] || stamped.images.gallery[0].status !== '成功', true);
+  assert.equal(fs.readdirSync(stamped.directory).some((name) => name.startsWith('gallery-')), false);
+  assert.equal(chatKeys.some((key) => key.endsWith(':prompts:plan')), true);
+  assert.doesNotMatch(stamped.editor.cover, /1\. 背景/);
+  assert.match(stamped.editor.cover, /11\. 主题绘画内容/);
+});
+
+test('同风格再刷不调策划和第 11 槽模型', async () => {
+  const root = tempDir();
+  const promptsDir = path.join(root, 'prompts');
+  writePrompts(promptsDir);
+  let planCalls = 0;
+  let sceneCalls = 0;
+  const runner = createRunner({
+    postsDir: path.join(root, 'posts'),
+    promptsDir,
+    random: firstPick,
+    complete: async (prompt) => {
+      if (promptStartsWith(prompt, 'PLAN') || promptStartsWith(prompt, 'COMPAREPLAN')) planCalls += 1;
+      if (promptStartsWith(prompt, 'SCENES')) sceneCalls += 1;
+      return responseFor(prompt, 1);
+    },
+    generateImage: async ({ outputPath }) => {
+      fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+      fs.writeFileSync(outputPath, 'png');
+    },
+  });
+  await runner.generateDraft(draftArgs({ galleryCount: 1 }));
+  await untilIdle(runner);
+  await stampAndDraw(runner, { slot: 'cover' });
+  assert.equal(planCalls, 1);
+  assert.equal(sceneCalls, 1);
+  await stampAndDraw(runner, { slot: 'gallery', index: 1, look: ALBUM_MAGAZINE });
+  assert.equal(planCalls, 1);
+  assert.equal(sceneCalls, 1);
+  const latest = runner.loadLatest();
+  assert.equal(latest.images.gallery[0].status, '成功');
+  assert.equal(latest.images.cover.status, '成功');
+});
+
+test('杂志换手帐本地重套，换信息图才再跑策划', async () => {
+  const root = tempDir();
+  const promptsDir = path.join(root, 'prompts');
+  writePrompts(promptsDir);
+  let planCalls = 0;
+  let sceneCalls = 0;
+  const runner = createRunner({
+    postsDir: path.join(root, 'posts'),
+    promptsDir,
+    random: firstPick,
+    complete: async (prompt) => {
+      if (promptStartsWith(prompt, 'PLAN') || promptStartsWith(prompt, 'COMPAREPLAN')) planCalls += 1;
+      if (promptStartsWith(prompt, 'SCENES')) sceneCalls += 1;
+      return responseFor(prompt, 0);
+    },
+    generateImage: async ({ outputPath }) => {
+      fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+      fs.writeFileSync(outputPath, 'png');
+    },
+  });
+  await runner.generateDraft(draftArgs({ galleryCount: 0 }));
+  await untilIdle(runner);
+  await stampAndDraw(runner, { slot: 'cover', look: ALBUM_MAGAZINE });
+  assert.equal(planCalls, 1);
+  assert.equal(sceneCalls, 1);
+  const magazineCover = runner.loadLatest().prompts.cover;
+  assert.match(magazineCover, /#F2F0E6/);
+  const scene = magazineCover.match(/11\. 主题绘画内容：([^\n]+)/)[1];
+
+  await stampAndDraw(runner, { slot: 'cover', look: ALBUM_SCRAPBOOK });
+  assert.equal(planCalls, 1);
+  assert.equal(sceneCalls, 1);
+  const scrapbook = runner.loadLatest();
+  assert.equal(scrapbook.prompts.look, ALBUM_SCRAPBOOK);
+  assert.match(scrapbook.prompts.cover, /#F7E8C8/);
+  assert.match(scrapbook.prompts.cover, new RegExp(`11\\. 主题绘画内容：${scene}`));
+  assert.match(scrapbook.prompts.cover, /一句/);
+  assert.doesNotMatch(scrapbook.prompts.cover, /#F2F0E6/);
+
+  await stampAndDraw(runner, { slot: 'cover', look: ALBUM_INFOGRAPHIC });
+  assert.equal(planCalls, 2);
+  const info = runner.loadLatest();
+  assert.equal(info.prompts.look, ALBUM_INFOGRAPHIC);
+  assert.match(info.prompts.cover, /栏目标签/);
 });

@@ -48,9 +48,14 @@ const {
   buildAlbumDraft,
   buildDraftMessages,
   commitAlbumDraft,
+  copyFramesFitSchema,
   copySchema,
+  decodeFilledPrompt,
   deleteAlbumFiles,
   draftPublicView,
+  embedEditablePrompt,
+  extractEditablePrompt,
+  extractSceneFromPrompt,
   fillPrompt,
   formatGallerySlots,
   formatPlannedLines,
@@ -78,6 +83,7 @@ const {
 } = fillModule;
 const { createStore, emptyState, nextImageFile } = storeModule;
 const {
+  basisEqual,
   basisFrom,
   formatPost,
   validateDraftFace,
@@ -212,15 +218,92 @@ function slotPromptText(state, only) {
 }
 
 /**
+ * @returns {import('../draft/store').PromptsState}
+ */
+function blankPrompts() {
+  return {
+    cover: '',
+    storyType: '',
+    look: '',
+    gallery: [],
+    galleryLines: [],
+    galleryRoles: [],
+    style: '',
+    stale: false,
+    basis: null,
+  };
+}
+
+/**
+ * @param {DraftState} state
+ * @returns {boolean}
+ */
+function hasStampedPrompts(state) {
+  if (state.prompts && state.prompts.basis) return true;
+  if (String(state.prompts && state.prompts.cover || '').trim()) return true;
+  const gallery = state.prompts && Array.isArray(state.prompts.gallery) ? state.prompts.gallery : [];
+  return gallery.some((item) => String(item).trim());
+}
+
+/**
+ * @param {DraftState} state
+ * @returns {boolean}
+ */
+function copyIsStale(state) {
+  if (!state.draft) return false;
+  if (!state.prompts || !state.prompts.basis) return true;
+  return !basisEqual(
+    state.prompts.basis,
+    basisFrom(state.draft, state.galleryCount, state.coverLineSpecified),
+  );
+}
+
+/**
  * @param {DraftState} state
  * @param {ImageOnly} only
  * @returns {string}
  */
 function slotBlockReason(state, only) {
   if (!state.draft) return '还没有稿面';
+  if (only.slot === 'gallery' && only.index > state.galleryCount) return '还没有这一张的提示词';
+  if (!hasStampedPrompts(state) || copyIsStale(state)) return '';
   if (only.slot === 'gallery' && only.index > state.prompts.gallery.length) return '还没有这一张的提示词';
   if (!slotPromptText(state, only)) return '还没有这一张的提示词';
   return '';
+}
+
+/**
+ * @param {DraftState} state
+ * @returns {{ cover: string; gallery: string[] }}
+ */
+function editorFromState(state) {
+  const gallery = Array.isArray(state.prompts.gallery) ? state.prompts.gallery : [];
+  return {
+    cover: extractEditablePrompt(state.prompts.cover),
+    gallery: gallery.map((item) => extractEditablePrompt(String(item || ''))),
+  };
+}
+
+/**
+ * @param {DraftState} state
+ * @param {Record<string, unknown>} payload
+ */
+function applyPromptEdits(state, payload) {
+  const edits = payload.promptEdits;
+  if (!edits || typeof edits !== 'object' || Array.isArray(edits)) return;
+  const next = /** @type {Record<string, unknown>} */ (edits);
+  if (typeof next.cover === 'string') {
+    state.prompts.cover = embedEditablePrompt(state.prompts.cover, next.cover);
+  }
+  if (Array.isArray(next.gallery)) {
+    const gallery = Array.isArray(state.prompts.gallery) ? state.prompts.gallery.slice() : [];
+    next.gallery.forEach((item, index) => {
+      if (typeof item !== 'string') return;
+      while (gallery.length <= index) gallery.push('');
+      gallery[index] = embedEditablePrompt(gallery[index], item);
+    });
+    state.prompts.gallery = gallery;
+  }
 }
 
 /**
@@ -360,7 +443,8 @@ function createRunner(options) {
   }
 
   function blank() {
-    return { ok: true, ...emptyState(), directory: '', id: '' };
+    const state = emptyState();
+    return { ok: true, ...state, editor: editorFromState(state), directory: '', id: '' };
   }
 
   // 锁占用时把当前篇带回去，页面重挂才能接上等待层。
@@ -538,9 +622,15 @@ function createRunner(options) {
    * @param {DraftFace} face
    * @param {number} galleryCount
    * @param {string} [albumLook] 合法图册 id；缺省则随机抽
+   * @param {{ keepScenes?: string[]; keepStoryType?: string }} [options]
    */
-  async function producePrompts(face, galleryCount, albumLook) {
-    const storyType = pickStoryType(random);
+  async function producePrompts(face, galleryCount, albumLook, options) {
+    const keepStoryType = options && typeof options.keepStoryType === 'string'
+      ? options.keepStoryType.trim()
+      : '';
+    const storyType = keepStoryType === 'contrast' || keepStoryType === 'process'
+      ? keepStoryType
+      : pickStoryType(random);
     const look = typeof albumLook === 'string' && isAlbum(albumLook, promptsDir, userAlbumsDir)
       ? albumLook
       : pickAlbum(promptsDir, random, userAlbumsDir);
@@ -568,16 +658,22 @@ function createRunner(options) {
       userAlbumsDir,
     );
     const displayLines = planned.map((frame) => frameDisplayLine(look, frame, promptsDir, userAlbumsDir));
-    const art = await completeScenes(displayLines, {
-      ...shared,
-      tone,
-      albumHint: albumHint(promptsDir, look, userAlbumsDir),
-      plannedLines: formatPlannedLines(planned, look, promptsDir, userAlbumsDir),
-      storyHint: storyType === 'contrast'
-        ? '每一张画面仍是一个对照，前后接成一个故事。'
-        : '前后接成一个故事。',
-      sceneCount: String(displayLines.length),
-    }, look);
+    const keepScenes = options && Array.isArray(options.keepScenes)
+      ? options.keepScenes.map((item) => String(item || '').trim())
+      : [];
+    const canKeepScenes = keepScenes.length === displayLines.length && keepScenes.every(Boolean);
+    const art = canKeepScenes
+      ? { album: look, scenes: keepScenes }
+      : await completeScenes(displayLines, {
+        ...shared,
+        tone,
+        albumHint: albumHint(promptsDir, look, userAlbumsDir),
+        plannedLines: formatPlannedLines(planned, look, promptsDir, userAlbumsDir),
+        storyHint: storyType === 'contrast'
+          ? '每一张画面仍是一个对照，前后接成一个故事。'
+          : '前后接成一个故事。',
+        sceneCount: String(displayLines.length),
+      }, look);
     const rendered = planned.map((frame, index) => renderAlbumPrompt(
       promptsDir,
       look,
@@ -615,8 +711,9 @@ function createRunner(options) {
    *   galleryRoles: string[];
    *   style: string;
    * }} produced
+   * @param {boolean} [keepJob]
    */
-  function commitPrompts(face, galleryCount, produced) {
+  function commitPrompts(face, galleryCount, produced, keepJob) {
     if (!store) return;
     const state = store.read();
     const nextFace = { ...face, coverLine: produced.coverLine };
@@ -633,7 +730,9 @@ function createRunner(options) {
       stale: false,
       basis: basisFrom(nextFace, galleryCount, state.coverLineSpecified),
     };
-    state.job = { running: false, step: '', error: '' };
+    if (!keepJob) {
+      state.job = { running: false, step: '', error: '' };
+    }
     store.write(state);
   }
 
@@ -667,17 +766,9 @@ function createRunner(options) {
       drafted.draft = face;
       drafted.articleType = checked.articleType;
       drafted.persona = checked.persona;
-      drafted.prompts.stale = false;
-      drafted.job = { running: true, step: '提示词', error: '' };
+      drafted.prompts = blankPrompts();
+      drafted.job = { running: false, step: '', error: '' };
       store.write(drafted);
-      let produced;
-      try {
-        produced = await producePrompts(face, checked.galleryCount);
-      } catch (err) {
-        markJobFailed(errorMessage(err, '提示词失败'));
-        return;
-      }
-      commitPrompts(face, checked.galleryCount, produced);
     } catch (err) {
       markJobFailed(errorMessage(err, '生成稿失败'));
     }
@@ -704,6 +795,97 @@ function createRunner(options) {
     } catch (err) {
       markJobFailed(errorMessage(err, '提示词失败'));
     }
+  }
+
+  /**
+   * @param {DraftState} state
+   * @returns {string[]}
+   */
+  function extractAllScenes(state) {
+    const prompts = [state.prompts.cover, ...(state.prompts.gallery || [])];
+    return prompts.map((item) => extractSceneFromPrompt(String(item || '')));
+  }
+
+  /**
+   * @param {DraftState} state
+   * @param {string} newLook
+   * @returns {{
+   *   cover: string;
+   *   storyType: string;
+   *   look: string;
+   *   coverLine: string;
+   *   gallery: string[];
+   *   galleryLines: string[];
+   *   galleryRoles: string[];
+   *   style: string;
+   * } | null}
+   */
+  function tryRestylePrompts(state, newLook) {
+    const oldLook = state.prompts && typeof state.prompts.look === 'string'
+      ? state.prompts.look.trim()
+      : '';
+    if (!oldLook || !isAlbum(oldLook, promptsDir, userAlbumsDir)) return null;
+    if (!isAlbum(newLook, promptsDir, userAlbumsDir)) return null;
+    const slots = [state.prompts.cover, ...state.prompts.gallery];
+    if (slots.length !== state.galleryCount + 1) return null;
+    /** @type {{ scene: string; frame: import('../prompts/album/frame').CopyFrame }[]} */
+    const decoded = [];
+    for (const prompt of slots) {
+      const item = decodeFilledPrompt(String(prompt || ''), oldLook, promptsDir, userAlbumsDir);
+      if (!item) return null;
+      decoded.push(item);
+    }
+    const frames = decoded.map((item) => item.frame);
+    if (!copyFramesFitSchema(frames, newLook, promptsDir, userAlbumsDir)) return null;
+    try {
+      const rendered = decoded.map((item) => renderAlbumPrompt(
+        promptsDir,
+        newLook,
+        item.scene,
+        item.frame,
+        userAlbumsDir,
+      ));
+      const displayLines = frames.map((frame) => (
+        frameDisplayLine(newLook, frame, promptsDir, userAlbumsDir)
+      ));
+      return {
+        cover: rendered[0].prompt,
+        storyType: state.prompts.storyType,
+        look: newLook,
+        coverLine: displayLines[0],
+        gallery: rendered.slice(1).map((item) => item.prompt),
+        galleryLines: displayLines.slice(1),
+        galleryRoles: state.prompts.galleryRoles,
+        style: rendered[0].style,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * @param {DraftState} state
+   * @param {string} requestedLook
+   * @returns {'plan' | 'restyle' | 'draw'}
+   */
+  function promptWorkKind(state, requestedLook) {
+    const stampedLook = state.prompts && typeof state.prompts.look === 'string'
+      ? state.prompts.look.trim()
+      : '';
+    const look = requestedLook || stampedLook;
+    if (!hasStampedPrompts(state) || copyIsStale(state)) return 'plan';
+    if (!look || look === stampedLook) return 'draw';
+    return tryRestylePrompts(state, look) ? 'restyle' : 'plan';
+  }
+
+  /**
+   * @param {string} step
+   */
+  function setJobRunning(step) {
+    if (!store) return;
+    const state = store.read();
+    state.job = { running: true, step, error: '' };
+    store.write(state);
   }
 
   let imageStamp = 0;
@@ -867,7 +1049,7 @@ function createRunner(options) {
       state.images.gallery = state.images.gallery.map((slot) => stopGenerating(slot));
       store.write(state);
     }
-    return { ok: true, ...state, directory: currentDir, id: currentId };
+    return { ok: true, ...state, editor: editorFromState(state), directory: currentDir, id: currentId };
   }
 
   function startNew() {
@@ -929,6 +1111,7 @@ function createRunner(options) {
     }
     applyDraftText(state, source);
     applyPromptText(state, source);
+    applyPromptEdits(state, source);
     store.write(state);
     return { ok: true };
   }
@@ -1009,7 +1192,7 @@ function createRunner(options) {
     if (faceMessage) return { ok: false, message: faceMessage };
     state.draft = normalizeFace(state.draft);
     lock = 'generatePrompts';
-    state.job = { running: true, step: '提示词', error: '' };
+    state.job = { running: true, step: '定画面', error: '' };
     store.write(state);
     runGeneratePrompts(albumLook || undefined).finally(() => {
       lock = null;
@@ -1232,20 +1415,65 @@ function createRunner(options) {
 
   /**
    * @param {ImageOnly} only
+   * @param {string} [requestedLook]
    */
-  function acceptGenerateImages(only) {
+  async function runRefreshThenDraw(only, requestedLook) {
+    try {
+      if (!store) throw new Error('没有这一篇');
+      const state = store.read();
+      const face = state.draft;
+      if (!face) throw new Error('还没有稿面');
+      const galleryCount = state.galleryCount;
+      const stampedLook = state.prompts && typeof state.prompts.look === 'string'
+        ? state.prompts.look.trim()
+        : '';
+      const look = requestedLook && isAlbum(requestedLook, promptsDir, userAlbumsDir)
+        ? requestedLook
+        : (stampedLook && isAlbum(stampedLook, promptsDir, userAlbumsDir) ? stampedLook : '');
+      const needContent = !hasStampedPrompts(state) || copyIsStale(state);
+      if (needContent) {
+        setJobRunning('定画面');
+        const produced = await producePrompts(face, galleryCount, look || undefined);
+        commitPrompts(face, galleryCount, produced, true);
+      } else if (look && look !== stampedLook) {
+        const restyled = tryRestylePrompts(state, look);
+        if (restyled) {
+          commitPrompts(face, galleryCount, restyled, true);
+        } else {
+          setJobRunning('定画面');
+          const produced = await producePrompts(face, galleryCount, look, {
+            keepScenes: extractAllScenes(state),
+            keepStoryType: state.prompts.storyType,
+          });
+          commitPrompts(face, galleryCount, produced, true);
+        }
+      }
+      await runImages(only);
+    } catch (err) {
+      markJobFailed(errorMessage(err, '生图失败'));
+    }
+  }
+
+  /**
+   * @param {ImageOnly} only
+   * @param {string} [requestedLook]
+   */
+  function acceptGenerateImages(only, requestedLook) {
     if (!store) {
       lock = null;
       return { ok: false, message: '没有这一篇' };
     }
     const state = store.read();
+    const kind = promptWorkKind(state, requestedLook || '');
     state.job = {
       running: true,
-      step: only.slot === 'cover' ? '封面' : `配图 ${only.index}`,
+      step: kind === 'plan'
+        ? '定画面'
+        : (only.slot === 'cover' ? '封面' : `配图 ${only.index}`),
       error: '',
     };
     store.write(state);
-    runImages(only).finally(() => {
+    runRefreshThenDraw(only, requestedLook).finally(() => {
       lock = null;
     });
     return { ok: true, accepted: true };
@@ -1262,13 +1490,19 @@ function createRunner(options) {
     if (!only) return { ok: false, message: '要指明封面或配图序号' };
     const state = store.read();
     applyPromptText(state, source);
+    applyPromptEdits(state, source);
+    const albumLook = typeof source.look === 'string' ? source.look.trim() : '';
+    if (albumLook && !isAlbum(albumLook, promptsDir, userAlbumsDir)) {
+      store.write(state);
+      return { ok: false, message: '图册不在允许列表', field: 'look' };
+    }
     const reason = slotBlockReason(state, only);
     if (reason) {
       store.write(state);
       return { ok: false, message: reason };
     }
     store.write(state);
-    return withEntitlement('generateImages', () => acceptGenerateImages(only));
+    return withEntitlement('generateImages', () => acceptGenerateImages(only, albumLook));
   }
 
   /**

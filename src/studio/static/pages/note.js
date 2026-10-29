@@ -130,9 +130,7 @@ function notePage() {
     albums: [],
     selectedLook: '',
     albumSamples: {},
-    albumDetailOpen: false,
-    albumDetail: null,
-    albumDetailSample: '',
+    editor: { cover: '', gallery: [] },
     postUploadRefs: [],
     picks: { cover: { materialIds: [], overrides: {} }, gallery: [] },
     uploadRefPreviews: {},
@@ -398,12 +396,12 @@ function notePage() {
         index: 0,
         label: '封面',
         image: cover,
-        prompt: String(this.prompts.cover || ''),
+        prompt: String((this.editor && this.editor.cover) || ''),
       }];
       const total = this.committedGalleryCount();
       for (let index = 1; index <= total; index += 1) {
         const image = (this.images.gallery && this.images.gallery[index - 1]) || { status: '空', path: '' };
-        const prompt = (this.prompts.gallery && this.prompts.gallery[index - 1]) || '';
+        const prompt = (this.editor && this.editor.gallery && this.editor.gallery[index - 1]) || '';
         slots.push({
           slot: 'gallery',
           index,
@@ -466,10 +464,28 @@ function notePage() {
       const topics = this.formatTopics(this.draft.topics);
       return [title, body, topics].filter(Boolean).join('\n\n');
     },
+    albumWaitName() {
+      const style = this.prompts && String(this.prompts.style || '').trim();
+      const look = String(this.selectedLook || (this.prompts && this.prompts.look) || '').trim();
+      let label = style;
+      if (!label && look) {
+        const hit = (this.albums || []).find((item) => item.id === look);
+        if (hit && hit.label) label = hit.label;
+      }
+      const text = String(label || '').trim();
+      if (!text) return '';
+      const cut = text.split(/[,，、]/)[0].trim();
+      return cut || text;
+    },
     stepText(step) {
-      if (step === '成稿' || step === '提示词') return '正在写这篇笔记';
-      if (step === '封面') return '正在做封面';
-      if (typeof step === 'string' && step.startsWith('配图')) return `正在做${step}`;
+      if (step === '成稿') return '正在写这篇笔记';
+      if (step === '定画面') return '正在定这一套图';
+      const name = this.albumWaitName();
+      if (step === '封面') return name ? `正在用${name}画封面` : '正在画封面';
+      if (typeof step === 'string' && step.startsWith('配图')) {
+        const number = step.replace(/^配图\s*/, '');
+        return name ? `正在用${name}画第 ${number} 张` : `正在画第 ${number} 张`;
+      }
       return step || '';
     },
     statusLabel(status) {
@@ -548,7 +564,16 @@ function notePage() {
       if (!item) return;
       this.activeKey = this.promptKey(item);
     },
+    get canOpenSlotPrompt() {
+      const editor = this.editor && typeof this.editor === 'object' ? this.editor : { cover: '', gallery: [] };
+      if (String(editor.cover || '').trim()) return true;
+      return (Array.isArray(editor.gallery) ? editor.gallery : []).some((item) => String(item || '').trim());
+    },
     toggleSlotPromptExpanded() {
+      if (!this.canOpenSlotPrompt) {
+        this.slotPromptExpanded = false;
+        return;
+      }
       this.slotPromptExpanded = !this.slotPromptExpanded;
     },
     showSlide(index) {
@@ -608,6 +633,7 @@ function notePage() {
     },
     applyServer(data) {
       const next = data || {};
+      const prevId = this.postId;
       this.business = typeof next.business === 'string' ? next.business : '';
       this.sampleTitle = typeof next.sampleTitle === 'string' ? next.sampleTitle : '';
       if (typeof next.sampleBody === 'string') {
@@ -653,7 +679,18 @@ function notePage() {
       this.job = next.job || { running: false, step: '', error: '' };
       this.directory = next.directory || '';
       this.postId = next.id || '';
-      this.selectedLook = typeof this.prompts.look === 'string' ? this.prompts.look : '';
+      this.editor = next.editor && typeof next.editor === 'object'
+        ? {
+          cover: typeof next.editor.cover === 'string' ? next.editor.cover : '',
+          gallery: Array.isArray(next.editor.gallery)
+            ? next.editor.gallery.map((item) => String(item || ''))
+            : [],
+        }
+        : { cover: '', gallery: [] };
+      if (!this.canOpenSlotPrompt) this.slotPromptExpanded = false;
+      const stamped = typeof this.prompts.look === 'string' ? this.prompts.look : '';
+      if (this.postId !== prevId) this.selectedLook = stamped;
+      else if (!this.selectedLook) this.selectedLook = stamped;
       this.syncSlots();
       this.syncBodyDraft();
       this.loadUploadRefPreviews();
@@ -706,55 +743,10 @@ function notePage() {
         if (!this.selectedLook && this.prompts.look) this.selectedLook = this.prompts.look;
       }
     },
-    async openAlbumDetail(album) {
+    selectAlbumStyle(album) {
       if (this.job.running || !album || !album.id) return;
       this.notice = '';
       this.selectedLook = album.id;
-      const detail = await this.call('getAlbumDetail', { id: album.id });
-      if (!detail || detail.ok === false) {
-        this.notice = (detail && detail.message) || '没有读到这一册';
-        return;
-      }
-      this.albumDetail = detail;
-      this.albumDetailSample = this.albumSamplePreview(album) || '';
-      if (!this.albumDetailSample && detail.hasSample) {
-        const sample = await this.call('previewAlbumSample', { id: album.id });
-        if (sample && sample.ok && sample.dataUrl) {
-          this.albumDetailSample = sample.dataUrl;
-          this.albumSamples = { ...this.albumSamples, [album.id]: sample.dataUrl };
-        }
-      }
-      this.albumDetailOpen = true;
-    },
-    closeAlbumDetail() {
-      this.albumDetailOpen = false;
-      this.albumDetail = null;
-      this.albumDetailSample = '';
-    },
-    canRegenAlbumPrompts() {
-      return Boolean(
-        this.hostReady
-        && !this.job.running
-        && this.draft
-        && this.albumDetail
-        && String(this.albumDetail.id || this.selectedLook || '').trim(),
-      );
-    },
-    async onRegenAlbumPrompts() {
-      if (!this.canRegenAlbumPrompts()) return;
-      const look = (this.albumDetail && this.albumDetail.id) || this.selectedLook;
-      this.notice = '';
-      this.selectedLook = look;
-      const result = await this.call('generatePrompts', {
-        look,
-        draft: this.draft,
-        galleryCount: this.galleryCount,
-      });
-      if (this.noteRejection(result)) return;
-      this.closeAlbumDetail();
-      this.job = { running: true, step: '提示词', error: '' };
-      this.ensurePoll();
-      await this.refresh();
     },
     resetBrief() {
       this.articleType = '涨粉';
@@ -846,9 +838,9 @@ function notePage() {
         persona: this.persona,
         galleryCount: this.galleryCount,
         draft: this.draft,
-        prompts: {
-          cover: this.prompts.cover,
-          gallery: this.prompts.gallery,
+        promptEdits: {
+          cover: this.editor && this.editor.cover ? this.editor.cover : '',
+          gallery: this.editor && Array.isArray(this.editor.gallery) ? this.editor.gallery.slice() : [],
         },
       };
     },
@@ -922,21 +914,23 @@ function notePage() {
     },
     setSlotPrompt(item) {
       const value = String(item.prompt || '');
+      const editor = this.editor && typeof this.editor === 'object'
+        ? this.editor
+        : { cover: '', gallery: [] };
       if (item.slot === 'cover') {
-        this.prompts.cover = value;
+        this.editor = { ...editor, cover: value };
         return;
       }
-      const gallery = Array.isArray(this.prompts.gallery) ? this.prompts.gallery.slice() : [];
+      const gallery = Array.isArray(editor.gallery) ? editor.gallery.slice() : [];
       while (gallery.length < item.index) gallery.push('');
       gallery[item.index - 1] = value;
-      this.prompts.gallery = gallery;
+      this.editor = { ...editor, gallery };
     },
     slotDrawDisabled(item) {
       return !this.hostReady
         || this.job.running
         || this.pendingCall
-        || !this.draft
-        || !String(item.prompt || '').trim();
+        || !this.draft;
     },
     drawLabel(item) {
       return item.image && item.image.status === '成功' ? '再抽一张' : '生成这张';
@@ -949,13 +943,13 @@ function notePage() {
         const result = await this.call('generateImages', {
           slot: item.slot,
           index: item.index,
-          prompts: {
-            cover: this.prompts.cover,
-            gallery: Array.isArray(this.prompts.gallery) ? this.prompts.gallery.slice() : [],
+          look: this.selectedLook,
+          promptEdits: {
+            cover: this.editor && this.editor.cover ? this.editor.cover : '',
+            gallery: this.editor && Array.isArray(this.editor.gallery) ? this.editor.gallery.slice() : [],
           },
         });
         if (this.noteRejection(result)) return;
-        this.job = { running: true, step: item.slot === 'cover' ? '封面' : item.label, error: '' };
         this.ensurePoll();
         await this.refresh();
       } finally {
