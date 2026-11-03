@@ -25,6 +25,7 @@ const STATUSES = new Set(['空', '生成中', '成功', '失败', '作废']);
  *   revisedAt: number;
  *   versions: ImageVersion[];
  *   attempts: number;
+ *   idempotencyKey: string;
  * }} ImageSlot
  * @typedef {{
  *   copy: number;
@@ -117,7 +118,15 @@ function nextImageFile(slot, index, versions) {
  * @returns {ImageSlot}
  */
 function emptySlot() {
-  return { status: '空', path: '', selected: 0, revisedAt: 0, versions: [], attempts: 0 };
+  return {
+    status: '空',
+    path: '',
+    selected: 0,
+    revisedAt: 0,
+    versions: [],
+    attempts: 0,
+    idempotencyKey: '',
+  };
 }
 
 /**
@@ -267,6 +276,9 @@ function normalizeSlot(slot) {
   }
   const chosen = selected > 0 ? versions[selected - 1] : null;
   const attempts = Number(source && source.attempts);
+  const pendingKey = source && typeof source.idempotencyKey === 'string'
+    ? source.idempotencyKey.trim()
+    : '';
   return {
     status,
     path: chosen ? chosen.path : '',
@@ -274,6 +286,7 @@ function normalizeSlot(slot) {
     revisedAt: chosen ? chosen.revisedAt : 0,
     versions,
     attempts: Number.isInteger(attempts) && attempts >= 0 ? attempts : 0,
+    idempotencyKey: pendingKey,
   };
 }
 

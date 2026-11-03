@@ -792,7 +792,7 @@ test('缺密钥时停在对应步骤，稿面还在', async () => {
   assert.equal(fetched, false);
 });
 
-test('成稿、提示词和生图带稳定步骤键，再抽追加 retry', async () => {
+test('成稿、提示词和生图带稳定步骤键，再抽换 gen', async () => {
   const root = tempDir();
   const promptsDir = path.join(root, 'prompts');
   writePrompts(promptsDir);
@@ -826,11 +826,97 @@ test('成稿、提示词和生图带稳定步骤键，再抽追加 retry', async
   assert.equal(chatKeys.some((key) => key.endsWith(':prompts:plan')), true);
   assert.equal(chatKeys.some((key) => key.endsWith(':prompts:scenes')), true);
   assert.equal(chatKeys.some((key) => key.includes(':retry-')), false);
-  assert.match(imageKeys[0], /:cover$/);
+  assert.match(imageKeys[0], /:cover:gen-1$/);
 
   await runner.generateImages({ slot: 'cover' });
   await untilIdle(runner);
-  assert.match(imageKeys[1], /:cover:retry-1$/);
+  assert.match(imageKeys[1], /:cover:gen-2$/);
+});
+
+test('生图网络失败后同 key 重放，attempts 不加', async () => {
+  const root = tempDir();
+  const promptsDir = path.join(root, 'prompts');
+  writePrompts(promptsDir);
+  /** @type {string[]} */
+  const imageKeys = [];
+  let blows = 1;
+  const runner = createRunner({
+    postsDir: path.join(root, 'latest'),
+    promptsDir,
+    random: firstPick,
+    complete: async (prompt) => responseFor(prompt, 0),
+    generateImage: async ({ outputPath, idempotencyKey }) => {
+      imageKeys.push(String(idempotencyKey || ''));
+      if (blows > 0) {
+        blows -= 1;
+        const err = new Error('网络中断');
+        /** @type {{ code?: string }} */ (err).code = 'NETWORK_ERROR';
+        throw err;
+      }
+      fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+      fs.writeFileSync(outputPath, 'png');
+      return outputPath;
+    },
+  });
+  await runner.generateDraft(draftArgs());
+  await untilIdle(runner);
+
+  await runner.generateImages({ slot: 'cover' });
+  const afterFail = await untilIdle(runner);
+  assert.equal(afterFail.images.cover.status, '失败');
+  assert.equal(afterFail.images.cover.attempts, 0);
+  assert.match(afterFail.images.cover.idempotencyKey, /:cover:gen-1$/);
+  assert.match(String(afterFail.job.error || ''), /请再点一次取回这张图/);
+  assert.match(imageKeys[0], /:cover:gen-1$/);
+
+  await runner.generateImages({ slot: 'cover' });
+  const afterReplay = await untilIdle(runner);
+  assert.equal(afterReplay.images.cover.status, '成功');
+  assert.equal(afterReplay.images.cover.attempts, 1);
+  assert.equal(afterReplay.images.cover.idempotencyKey, '');
+  assert.equal(imageKeys[1], imageKeys[0]);
+});
+
+test('OUTPUT_EXPIRED 清空 pending key，下次换新 gen', async () => {
+  const root = tempDir();
+  const promptsDir = path.join(root, 'prompts');
+  writePrompts(promptsDir);
+  /** @type {string[]} */
+  const imageKeys = [];
+  let mode = 'expire';
+  const runner = createRunner({
+    postsDir: path.join(root, 'latest'),
+    promptsDir,
+    random: firstPick,
+    complete: async (prompt) => responseFor(prompt, 0),
+    generateImage: async ({ outputPath, idempotencyKey }) => {
+      imageKeys.push(String(idempotencyKey || ''));
+      if (mode === 'expire') {
+        mode = 'ok';
+        const err = new Error('成图对象已删');
+        /** @type {{ code?: string }} */ (err).code = 'OUTPUT_EXPIRED';
+        throw err;
+      }
+      fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+      fs.writeFileSync(outputPath, 'png');
+      return outputPath;
+    },
+  });
+  await runner.generateDraft(draftArgs());
+  await untilIdle(runner);
+
+  await runner.generateImages({ slot: 'cover' });
+  const afterExpire = await untilIdle(runner);
+  assert.equal(afterExpire.images.cover.idempotencyKey, '');
+  assert.equal(afterExpire.images.cover.attempts, 1);
+  assert.match(String(afterExpire.job.error || ''), /成图已过期/);
+
+  await runner.generateImages({ slot: 'cover' });
+  const afterRetry = await untilIdle(runner);
+  assert.match(imageKeys[0], /:cover:gen-1$/);
+  assert.match(imageKeys[1], /:cover:gen-2$/);
+  assert.equal(afterRetry.images.cover.status, '成功');
+  assert.equal(afterRetry.images.cover.attempts, 2);
 });
 
 test('readEnv 在建 runner 时不读，下一轮写稿用新密钥', async () => {

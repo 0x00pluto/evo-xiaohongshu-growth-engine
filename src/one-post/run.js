@@ -43,7 +43,7 @@ const {
   cssAspectRatio,
   normalizeAspectRatio,
 } = aspectModule;
-const { formatModelError } = modelErrorModule;
+const { errorCode, formatModelError } = modelErrorModule;
 const {
   albumHint,
   albumSampleFile,
@@ -178,6 +178,16 @@ function isSceneDuplicateError(err) {
  */
 function isSceneRetryableError(err) {
   return isSceneLengthError(err) || isSceneDuplicateError(err);
+}
+
+/**
+ * 策划缺必填上图字段、空句、重复句时允许再调一次。
+ * @param {unknown} err
+ * @returns {boolean}
+ */
+function isPlanRetryableError(err) {
+  const text = errorMessage(err, '');
+  return /策划字段不完整|策划那一句是空的|策划那一句重复了|策划句子应为/.test(text);
 }
 
 /**
@@ -713,14 +723,34 @@ function createRunner(options) {
       imageCount: String(galleryCount + 1),
       slots: formatGallerySlots(slots),
     });
-    const planned = parsePlanText(
-      await completeWithStep(planPrompt, 'promptsPlan', 'prompts:plan'),
-      galleryCount,
-      face.body,
-      look,
-      promptsDir,
-      userAlbumsDir,
-    );
+    /** @type {import('../prompts/album/frame').CopyFrame[] | null} */
+    let planned = null;
+    /** @type {unknown} */
+    let lastPlanErr = null;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const prompt = attempt === 0
+        ? planPrompt
+        : `${planPrompt}\n\n上一轮有字段缺失或不合规。copySchema 里未标明可空/可选/没有则…的字段必须给出非空可上图文案；只返回 JSON。`;
+      try {
+        planned = parsePlanText(
+          await completeWithStep(prompt, 'promptsPlan', 'prompts:plan'),
+          galleryCount,
+          face.body,
+          look,
+          promptsDir,
+          userAlbumsDir,
+        );
+        lastPlanErr = null;
+        break;
+      } catch (err) {
+        lastPlanErr = err;
+        if (attempt === 0 && isPlanRetryableError(err)) continue;
+        throw err;
+      }
+    }
+    if (!planned) {
+      throw lastPlanErr instanceof Error ? lastPlanErr : new Error('策划失败');
+    }
     const displayLines = planned.map((frame) => frameDisplayLine(look, frame, promptsDir, userAlbumsDir));
     const keepScenes = options && Array.isArray(options.keepScenes)
       ? options.keepScenes.map((item) => String(item || '').trim())
@@ -975,6 +1005,7 @@ function createRunner(options) {
       revisedAt: 0,
       versions: [],
       attempts: 0,
+      idempotencyKey: '',
     };
   }
 
@@ -990,16 +1021,31 @@ function createRunner(options) {
       return;
     }
     const gallery = state.images.gallery.slice();
-    while (gallery.length < index) gallery.push({
-      status: '空',
-      path: '',
-      selected: 0,
-      revisedAt: 0,
-      versions: [],
-      attempts: 0,
-    });
+    while (gallery.length < index) {
+      gallery.push({
+        status: '空',
+        path: '',
+        selected: 0,
+        revisedAt: 0,
+        versions: [],
+        attempts: 0,
+        idempotencyKey: '',
+      });
+    }
     gallery[index - 1] = next;
     state.images.gallery = gallery;
+  }
+
+  /**
+   * 生图幂等键：{postId}:{cover|gallery-NN}:gen-{n}；n 从 1 起。
+   * @param {string} id
+   * @param {string} stepName
+   * @param {number} gen
+   * @returns {string}
+   */
+  function imageGenKey(id, stepName, gen) {
+    const n = Number.isInteger(gen) && gen > 0 ? gen : 1;
+    return `${id}:${stepName}:gen-${n}`;
   }
 
   /**
@@ -1029,14 +1075,21 @@ function createRunner(options) {
         : jobs;
       let failed = 0;
       let lastError = '';
+      let lastFailKind = '';
       for (const job of selected) {
         const current = store.read();
         const previous = readImageSlot(current, job.slot, job.index);
         const attempts = Number.isInteger(previous.attempts) ? previous.attempts : 0;
         const stepName = job.slot === 'cover' ? 'cover' : `gallery-${String(job.index).padStart(2, '0')}`;
-        const key = stepKey(currentId, stepName, attempts);
+        const pending = typeof previous.idempotencyKey === 'string' ? previous.idempotencyKey.trim() : '';
+        // 失败未取回时复用同一把 key；成功后再抽才 gen+1。
+        const key = pending || imageGenKey(currentId, stepName, attempts + 1);
         const file = nextImageFile(job.slot, job.index, previous.versions);
-        setImageSlot(current, job.slot, job.index, { ...previous, status: '生成中' });
+        setImageSlot(current, job.slot, job.index, {
+          ...previous,
+          status: '生成中',
+          idempotencyKey: key,
+        });
         current.job = { running: true, step: job.label, error: '' };
         store.write(current);
         const outputPath = path.join(currentDir, file);
@@ -1072,11 +1125,14 @@ function createRunner(options) {
             revisedAt,
             versions,
             attempts: attempts + 1,
+            idempotencyKey: '',
           });
           done.job = { running: true, step: job.label, error: '' };
           store.write(done);
         } catch (err) {
           failed += 1;
+          const expired = errorCode(err) === 'OUTPUT_EXPIRED';
+          lastFailKind = expired ? 'expired' : 'replay';
           lastError = errorMessage(err, '生图失败');
           fs.rmSync(outputPath, { force: true });
           const failedState = store.read();
@@ -1084,17 +1140,25 @@ function createRunner(options) {
           setImageSlot(failedState, job.slot, job.index, {
             ...base,
             status: base.versions.length > 0 ? '成功' : '失败',
-            attempts: attempts + 1,
+            // 非过期保留 pending key，attempts 不加；过期清 key 且 attempts+1，避免再用已删对象的 gen。
+            attempts: expired ? attempts + 1 : attempts,
+            idempotencyKey: expired ? '' : key,
           });
           failedState.job = { running: true, step: job.label, error: '' };
           store.write(failedState);
         }
       }
       const finished = store.read();
+      let failHint = '';
+      if (failed > 0) {
+        failHint = lastFailKind === 'expired'
+          ? '成图已过期，请再点一次出一张新的'
+          : '请再点一次取回这张图（不会重复扣费）';
+      }
       finished.job = {
         running: false,
         step: '',
-        error: failed > 0 ? `${lastError}。可以再抽这一张` : '',
+        error: failed > 0 ? `${lastError}。${failHint}` : '',
       };
       store.write(finished);
     } catch (err) {

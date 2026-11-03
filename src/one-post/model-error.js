@@ -46,5 +46,6 @@ function formatModelError(err, fallback) {
 }
 
 module.exports = {
+  errorCode,
   formatModelError,
 };

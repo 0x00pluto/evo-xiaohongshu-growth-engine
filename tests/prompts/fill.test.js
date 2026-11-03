@@ -565,6 +565,84 @@ test('magazine 题词多占位符时按模板装填，不因 kind 丢字段', ()
   assert.match(roundtrip.prompt, /@studio/);
 });
 
+test('bodyCn 标非空时策划不得留空；可空字段仍可空', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'album-bodycn-req-'));
+  const id = '100051.magazine.bodycn-required';
+  fs.mkdirSync(path.join(dir, 'albums', id), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'albums', id, 'album.json'), `${JSON.stringify({
+    id,
+    kind: 'magazine',
+    slug: 'bodycn-required',
+    hint: '正文必填',
+    label: '正文必填',
+    copySchema: [
+      '每一项对象字段：',
+      '- line：中文大标题（非空）',
+      '- kicker：英文小标题，没有则空字符串',
+      '- bodyEn：英文正文，没有则空字符串',
+      '- bodyCn：须写一段可上图的中文正文（非空），勿留空',
+      '- credit：署名，没有则空字符串',
+      '返回形状：{"frames":[{"line":"...","kicker":"...","bodyEn":"...","bodyCn":"...","credit":"..."}]}',
+    ].join('\n'),
+    legacyIds: [],
+    enabled: true,
+    promptSheetVersion: 2,
+  }, null, 2)}\n`);
+  fs.writeFileSync(path.join(dir, 'albums', id, 'prompt.md'), [
+    '竖版 3:4。',
+    '1. 背景：白', '2. 色彩：黑', '3. 字体：宋', '4. 字号：大', '5. 字重：粗',
+    '6. 文字排版：中', '7. 文字位置：中', '8. 构图布局：中', '9. 视觉风格：刊',
+    '10. 光影与质感：平',
+    '11. 主题绘画内容：{{scene}}',
+    '',
+    '图片必须准确呈现的中文文案：',
+    '{{line}}',
+    '',
+    '英文小标题：',
+    '{{kicker}}',
+    '',
+    '英文正文：',
+    '{{bodyEn}}',
+    '',
+    '中文正文：',
+    '{{bodyCn}}',
+    '',
+    '署名：',
+    '{{credit}}',
+    '',
+    '文案必须完整、准确。',
+  ].join('\n'));
+  fs.writeFileSync(path.join(dir, 'albums', id, 'copy-sample.md'), '仅示例\n');
+  clearAlbumCatalogCache(dir);
+
+  assert.throws(
+    () => parsePlanText(JSON.stringify({
+      frames: [{
+        line: '只有标题',
+        kicker: '',
+        bodyEn: '',
+        bodyCn: '',
+        credit: '',
+      }],
+    }), 0, '正文结尾别抄', id, dir),
+    /策划字段不完整/,
+  );
+
+  const ok = parsePlanText(JSON.stringify({
+    frames: [{
+      line: '只有标题',
+      kicker: '',
+      bodyEn: '',
+      bodyCn: '挂上商店之后才有人问怎么装。',
+      credit: '',
+    }],
+  }), 0, '正文结尾别抄', id, dir);
+  assert.equal(ok[0].bodyCn, '挂上商店之后才有人问怎么装。');
+  assert.equal(ok[0].kicker, '');
+  assert.equal(ok[0].bodyEn, '');
+  assert.equal(ok[0].credit, '');
+});
+
 test('assets 里序号≥100000 的用户册可迁到 runtime/albums', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'album-migrate-'));
   const promptsDir = path.join(root, 'prompts');
