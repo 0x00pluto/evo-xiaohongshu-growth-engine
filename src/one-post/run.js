@@ -9,6 +9,8 @@ const path = require('node:path');
 const llmModule = require('../llm/client');
 /** @type {typeof import('../image/generate')} */
 const imageModule = require('../image/generate');
+/** @type {typeof import('../image/aspect')} */
+const aspectModule = require('../image/aspect');
 /** @type {typeof import('../prompts/fill')} */
 const fillModule = require('../prompts/fill');
 /** @type {typeof import('../draft/store')} */
@@ -35,6 +37,12 @@ const { createLlm } = llmModule;
 const { requireEntitlement: sdkRequireEntitlement } = dexBuddySdk;
 const { parseJsonObject } = parseModule;
 const { generatePng } = imageModule;
+const {
+  ASPECT_RATIOS,
+  DEFAULT_ASPECT_RATIO,
+  cssAspectRatio,
+  normalizeAspectRatio,
+} = aspectModule;
 const { formatModelError } = modelErrorModule;
 const {
   albumHint,
@@ -54,6 +62,8 @@ const {
   deleteAlbumFiles,
   draftPublicView,
   embedEditablePrompt,
+  ensureAlbumAspectRatio,
+  ensureAllAlbumAspectRatios,
   extractEditablePrompt,
   extractSceneFromPrompt,
   fillPrompt,
@@ -350,6 +360,11 @@ function createRunner(options) {
     uploadRefFiles.migrateLibraryUploadRefsLayout(userUploadRefsDir);
   }
   importLegacy(postsDir, promptsDir, userAlbumsDir);
+  try {
+    ensureAllAlbumAspectRatios(promptsDir, userAlbumsDir);
+  } catch {
+    // 补算失败不阻断启动
+  }
   let currentId = '';
   let currentDir = '';
   /** @type {import('../draft/store').DraftStore | null} */
@@ -372,12 +387,14 @@ function createRunner(options) {
     prompt: string;
     outputPath: string;
     references?: import('../image/generate').ImageReference[];
+    aspectRatio?: string;
     idempotencyKey?: string;
     model?: string;
   }} */ args) => generatePng({
     prompt: args.prompt,
     outputPath: args.outputPath,
     references: args.references,
+    aspectRatio: args.aspectRatio,
     env: readEnv,
     ctx: options.ctx,
     models: options.models ? /** @type {import('../image/generate').HostImageModels} */ (options.models) : undefined,
@@ -444,13 +461,60 @@ function createRunner(options) {
 
   function blank() {
     const state = emptyState();
-    return { ok: true, ...state, editor: editorFromState(state), directory: '', id: '' };
+    return {
+      ok: true,
+      ...state,
+      ...aspectPublicFields(state),
+      editor: editorFromState(state),
+      directory: '',
+      id: '',
+    };
   }
 
   // 锁占用时把当前篇带回去，页面重挂才能接上等待层。
   function busy() {
     if (!store) return { ok: false, message: BUSY_MESSAGE };
     return { ...loadLatest(), ok: false, message: BUSY_MESSAGE };
+  }
+
+  /**
+   * 本篇有效比例：锁定优先，否则跟当前图册归档，再兜底 3:4。
+   * @param {DraftState} state
+   * @param {string} [lookOverride]
+   * @returns {string}
+   */
+  function resolveEffectiveAspectRatio(state, lookOverride) {
+    const locked = normalizeAspectRatio(state && state.aspectRatioLocked);
+    if (locked) return locked;
+    const look = typeof lookOverride === 'string' && lookOverride.trim()
+      ? lookOverride.trim()
+      : (state && state.prompts && typeof state.prompts.look === 'string'
+        ? state.prompts.look.trim()
+        : '');
+    if (look && isAlbum(look, promptsDir, userAlbumsDir)) {
+      return ensureAlbumAspectRatio(promptsDir, userAlbumsDir, look) || DEFAULT_ASPECT_RATIO;
+    }
+    return DEFAULT_ASPECT_RATIO;
+  }
+
+  /**
+   * @param {DraftState} state
+   * @returns {{
+   *   aspectRatio: string;
+   *   aspectRatioLocked: string;
+   *   aspectRatioCss: string;
+   *   aspectRatios: ReadonlyArray<string>;
+   * }}
+   */
+  function aspectPublicFields(state) {
+    const aspectRatio = resolveEffectiveAspectRatio(state);
+    const locked = normalizeAspectRatio(state && state.aspectRatioLocked);
+    return {
+      aspectRatio,
+      aspectRatioLocked: locked || '',
+      aspectRatioCss: cssAspectRatio(aspectRatio),
+      aspectRatios: ASPECT_RATIOS,
+    };
   }
 
   /**
@@ -948,6 +1012,7 @@ function createRunner(options) {
       const look = initial.prompts && typeof initial.prompts.look === 'string'
         ? initial.prompts.look.trim()
         : '';
+      const aspectRatio = resolveEffectiveAspectRatio(initial, look);
       /** @type {{ slot: 'cover' | 'gallery'; index: number; prompt: string; label: string }[]} */
       const jobs = [{ slot: 'cover', index: 0, prompt: initial.prompts.cover, label: '封面' }];
       initial.prompts.gallery.forEach((prompt, index) => {
@@ -987,17 +1052,19 @@ function createRunner(options) {
             postDir: currentDir,
             uploadRefs: current.uploadRefs,
             pick,
+            aspectRatio,
           });
           await generateImage({
             prompt: composed.prompt,
             outputPath,
+            aspectRatio,
             idempotencyKey: key,
             ...(composed.references.length > 0 ? { references: composed.references } : {}),
           });
           const done = store.read();
           const base = readImageSlot(done, job.slot, job.index);
           const revisedAt = nextRevisedAt();
-          const versions = base.versions.concat([{ path: file, revisedAt }]);
+          const versions = base.versions.concat([{ path: file, revisedAt, aspectRatio }]);
           setImageSlot(done, job.slot, job.index, {
             status: '成功',
             path: file,
@@ -1049,7 +1116,14 @@ function createRunner(options) {
       state.images.gallery = state.images.gallery.map((slot) => stopGenerating(slot));
       store.write(state);
     }
-    return { ok: true, ...state, editor: editorFromState(state), directory: currentDir, id: currentId };
+    return {
+      ok: true,
+      ...state,
+      ...aspectPublicFields(state),
+      editor: editorFromState(state),
+      directory: currentDir,
+      id: currentId,
+    };
   }
 
   function startNew() {
@@ -1206,6 +1280,7 @@ function createRunner(options) {
       ok: true,
       albums: catalog.list().map((meta) => {
         const samplePath = albumSamplePath(meta.id, promptsDir, userAlbumsDir);
+        const aspectRatio = ensureAlbumAspectRatio(promptsDir, userAlbumsDir, meta.id);
         return {
           id: meta.id,
           label: meta.label,
@@ -1214,9 +1289,26 @@ function createRunner(options) {
           samplePath,
           hasSample: fs.existsSync(albumSampleFile(promptsDir, meta.id, userAlbumsDir)),
           deletable: meta.source === 'user',
+          aspectRatio,
+          aspectRatioCss: cssAspectRatio(aspectRatio),
         };
       }),
     };
+  }
+
+  /**
+   * @param {Record<string, unknown>} payload
+   */
+  function setAspectRatio(payload) {
+    if (!store) return { ok: false, message: '没有这一篇' };
+    if (lock) return busy();
+    const source = payload && typeof payload === 'object' ? payload : {};
+    const ratio = normalizeAspectRatio(source.aspectRatio);
+    if (!ratio) return { ok: false, message: '比例不在七档里' };
+    const state = store.read();
+    state.aspectRatioLocked = ratio;
+    store.write(state);
+    return { ok: true, ...aspectPublicFields(state) };
   }
 
   /**
@@ -1401,6 +1493,7 @@ function createRunner(options) {
     } catch {
       return { ok: false, message: '找不到图册题词' };
     }
+    const aspectRatio = ensureAlbumAspectRatio(promptsDir, userAlbumsDir, id);
     return {
       ok: true,
       id: meta.id,
@@ -1410,6 +1503,8 @@ function createRunner(options) {
       hasSample: fs.existsSync(albumSampleFile(promptsDir, id, userAlbumsDir)),
       promptSheetVersion: meta.promptSheetVersion,
       promptTemplate,
+      aspectRatio,
+      aspectRatioCss: cssAspectRatio(aspectRatio),
     };
   }
 
@@ -1671,18 +1766,18 @@ function createRunner(options) {
    * @param {Record<string, unknown>} payload
    */
   function revealImage(payload) {
-    if (!currentDir) return { ok: false, message: '没有这张图' };
+    if (!currentDir) return { ok: false, message: '没有这一篇' };
     const source = payload && typeof payload === 'object' ? payload : {};
     const file = imageFileFor(source);
-    if (!file) return { ok: false, message: '没有这张图' };
-    const abs = path.join(currentDir, file);
-    if (!fs.existsSync(abs)) return { ok: false, message: '图片不在' };
+    const abs = file ? path.join(currentDir, file) : currentDir;
+    const target = file && fs.existsSync(abs) ? abs : currentDir;
+    if (!fs.existsSync(target)) return { ok: false, message: '打不开文件夹' };
     try {
-      revealFile(abs);
+      revealFile(target);
     } catch {
-      return { ok: true, path: abs };
+      return { ok: true, path: target };
     }
-    return { ok: true, path: abs };
+    return { ok: true, path: target };
   }
 
   /**
@@ -2115,6 +2210,7 @@ function createRunner(options) {
     saveEditor,
     saveLibraryArticleSample,
     saveUploadRefToLibrary,
+    setAspectRatio,
     setSlotPick,
     startNew,
     updateAlbumPrompt,

@@ -3,7 +3,13 @@
 
 /** @type {typeof import('../../lib/dex-buddy-sdk')} */
 const dexBuddySdk = require('../../lib/dex-buddy-sdk');
+/** @type {typeof import('./aspect')} */
+const aspectModule = require('./aspect');
 const { bindModels, DexModelsError } = dexBuddySdk;
+const {
+  DEFAULT_ASPECT_RATIO,
+  normalizeAspectRatio,
+} = aspectModule;
 
 /** @type {Readonly<{ standard: string; pro: string }>} */
 const IMAGE_MODELS = {
@@ -11,7 +17,8 @@ const IMAGE_MODELS = {
   pro: 'dexbuddy/image-pro',
 };
 
-const IMAGE_ASPECT_RATIO = '3:4';
+/** 兜底比例；出图以传入的 aspectRatio 为准。 */
+const IMAGE_ASPECT_RATIO = DEFAULT_ASPECT_RATIO;
 
 /**
  * @typedef {Record<string, string | undefined>} ImageEnv
@@ -27,6 +34,7 @@ const IMAGE_ASPECT_RATIO = '3:4';
  *   prompt: unknown;
  *   outputPath: string;
  *   references?: unknown;
+ *   aspectRatio?: unknown;
  *   env?: ImageEnv | ImageEnvReader | null;
  *   ctx?: unknown;
  *   models?: HostImageModels | null;
@@ -129,6 +137,7 @@ async function generatePng({
   prompt,
   outputPath,
   references: rawReferences,
+  aspectRatio: aspectRatioArg,
   env,
   ctx,
   models: modelsArg,
@@ -140,10 +149,11 @@ async function generatePng({
   if (!text) throw new Error('提示词是空的');
   const quoted = await quoteImage({ env, ctx, models: modelsArg, fetch: fetchImpl, model: modelArg });
   const references = normalizeReferences(rawReferences);
+  const aspectRatio = normalizeAspectRatio(aspectRatioArg) || IMAGE_ASPECT_RATIO;
   /** @type {Record<string, unknown>} */
   const input = {
     prompt: text,
-    aspect_ratio: IMAGE_ASPECT_RATIO,
+    aspect_ratio: aspectRatio,
   };
   if (references.length > 0) {
     input.input_images = references.map((item) => item.path);

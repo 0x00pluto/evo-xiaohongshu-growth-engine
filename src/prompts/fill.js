@@ -55,6 +55,8 @@ module.exports = {
   buildDraftPrompt: articleModule.buildDraftPrompt,
   clearAlbumCatalogCache: catalogModule.clearAlbumCatalogCache,
   commitAlbumDraft: albumStoreModule.commitAlbumDraft,
+  ensureAlbumAspectRatio: albumStoreModule.ensureAlbumAspectRatio,
+  ensureAllAlbumAspectRatios: albumStoreModule.ensureAllAlbumAspectRatios,
   updateAlbumPromptMd: albumStoreModule.updateAlbumPromptMd,
   copyFramesFitSchema: editableModule.copyFramesFitSchema,
   copySchema: catalogModule.copySchema,

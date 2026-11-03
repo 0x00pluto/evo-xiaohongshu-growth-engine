@@ -55,7 +55,7 @@ test('没有 Dex Buddy 钥匙时不发请求', async () => {
   assert.equal(called, false);
 });
 
-test('生图只传 3:4 和标准档，并在完成后落成 PNG', async () => {
+test('生图默认 3:4 和标准档，并在完成后落成 PNG', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'one-post-image-'));
   const outputPath = path.join(dir, 'cover.png');
   const models = fakeModels();
@@ -75,6 +75,36 @@ test('生图只传 3:4 和标准档，并在完成后落成 PNG', async () => {
   assert.equal(input.input.number_of_images, undefined);
   assert.equal(Object.prototype.hasOwnProperty.call(input.input, 'input_images'), false);
   assert.equal(fs.readFileSync(outputPath).length, 4);
+});
+
+test('生图可传入七档 aspectRatio', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'one-post-image-ar-'));
+  const outputPath = path.join(dir, 'cover.png');
+  const models = fakeModels();
+  await generatePng({
+    prompt: '一张桌子',
+    outputPath,
+    aspectRatio: '16:9',
+    models,
+  });
+  const image = models.calls.find((item) => item.op === 'image');
+  const input = /** @type {{ input: Record<string, unknown> }} */ (image.input);
+  assert.equal(input.input.aspect_ratio, '16:9');
+});
+
+test('非法 aspectRatio 回退到默认 3:4', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'one-post-image-bad-ar-'));
+  const outputPath = path.join(dir, 'cover.png');
+  const models = fakeModels();
+  await generatePng({
+    prompt: '一张桌子',
+    outputPath,
+    aspectRatio: '7:5',
+    models,
+  });
+  const image = models.calls.find((item) => item.op === 'image');
+  const input = /** @type {{ input: Record<string, unknown> }} */ (image.input);
+  assert.equal(input.input.aspect_ratio, IMAGE_ASPECT_RATIO);
 });
 
 test('专业档用 image-pro', async () => {

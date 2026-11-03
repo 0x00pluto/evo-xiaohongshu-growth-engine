@@ -6,7 +6,10 @@ const path = require('node:path');
 
 /** @type {typeof import('./sheet')} */
 const sheetModule = require('./sheet');
+/** @type {typeof import('../../image/aspect')} */
+const aspectModule = require('../../image/aspect');
 const { normalizePromptSheetVersion } = sheetModule;
+const { normalizeAspectRatio } = aspectModule;
 
 /** @type {ReadonlyArray<string>} */
 const ALBUM_KINDS = ['magazine', 'scrapbook', 'conceptual', 'card', 'infographic'];
@@ -43,6 +46,7 @@ function isAlbumToken(value) {
  *   enabled: boolean;
  *   constraints: AlbumConstraints;
  *   promptSheetVersion: number;
+ *   aspectRatio: string;
  *   source: 'factory' | 'user';
  *   home: string;
  * }} AlbumMeta
@@ -153,6 +157,8 @@ function normalizeMeta(raw, fileId) {
     if (steps) constraints.steps = steps;
   }
   const promptSheetVersion = normalizePromptSheetVersion(source.promptSheetVersion);
+  // 缺字段时留空，由 ensureAlbumAspectRatio 按样图补算；非法串忽略。
+  const aspectRatio = normalizeAspectRatio(source.aspectRatio);
   return {
     id,
     kind,
@@ -164,6 +170,7 @@ function normalizeMeta(raw, fileId) {
     enabled,
     constraints,
     promptSheetVersion,
+    aspectRatio,
     source: 'factory',
     home: '',
   };
@@ -339,7 +346,12 @@ function loadAlbumCatalog(promptsDir, userAlbumsDir) {
     }
   }
 
-  const metas = Array.from(byId.values()).sort((left, right) => left.id.localeCompare(right.id));
+  const metas = Array.from(byId.values()).sort((left, right) => {
+    if (left.source !== right.source) {
+      return left.source === 'user' ? -1 : 1;
+    }
+    return left.id.localeCompare(right.id);
+  });
   if (metas.length === 0) {
     throw new Error('图册目录里没有可用图册');
   }

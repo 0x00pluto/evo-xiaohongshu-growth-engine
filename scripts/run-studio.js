@@ -42,6 +42,7 @@ const METHODS = new Set([
   'generateDraft',
   'generatePrompts',
   'chooseImage',
+  'setAspectRatio',
   'generateImages',
   'retryImage',
   'previewImage',

@@ -19,5 +19,6 @@
       "max": 7
     }
   },
-  "promptSheetVersion": 2
+  "promptSheetVersion": 2,
+  "aspectRatio": "3:4"
 }

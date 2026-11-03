@@ -14,3 +14,4 @@
 | 00008 | `specs/prds/prd-00008-dexbuddy-host-models.md` | 官方插件 id 改为 app-dexbuddy-xiaohongshu-standard-editor；生文识图与两档生图走宿主模型；本机 .env 填 DEX_BUDDY_API_KEY；步骤键入账。工程 accepted |
 | 00009 | `specs/prds/prd-00009-sdk-entitlement-gates.md` | 换成 Dex Buddy SDK 1.0.0；写成笔记与刷图在任务开始前由插件触发买断，购买提示交给工作台弹框。工程 accepted |
 | 00010 | `specs/prds/prd-00010-image-prompt-on-refresh.md` | 写成笔记只出文；点风格即选中；刷新才套整套提示词并生当前张；同风格不重算；提示词框只留可改段。 |
+| 00011 | `specs/prds/prd-00011-image-aspect-ratio.md` | 一篇一个生图比例；七档可选；未改跟图册样图最近档；学图不再焊死 3:4；生图前整篇选定。工程 accepted |

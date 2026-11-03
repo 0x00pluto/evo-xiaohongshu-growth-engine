@@ -2,7 +2,18 @@
   <header class="shrink-0">
     <div class="flex items-center justify-between gap-3 px-4 py-3 lg:px-6">
       <h1 class="text-xl font-medium">写一篇笔记</h1>
-      <button id="open-history" class="btn btn-ghost btn-sm" type="button" @click="onOpenHistory()">以前的笔记</button>
+      <div class="flex items-center gap-1">
+        <button
+          id="write-new-note"
+          class="btn btn-ghost btn-sm"
+          type="button"
+          x-show="phase === 'copy'"
+          x-cloak
+          @click="onNew()"
+          :disabled="!hostReady || job.running"
+        >写新的一篇</button>
+        <button id="open-history" class="btn btn-ghost btn-sm" type="button" @click="onOpenHistory()">以前的笔记</button>
+      </div>
     </div>
     <div class="flex justify-center border-y border-base-300 bg-base-200 px-4 py-3">
       <div class="steps mx-auto w-full max-w-lg" role="tablist" aria-label="进度">
@@ -234,32 +245,31 @@
             ></lottie-player>
             <p class="text-sm" x-text="stepText(job.step)"></p>
           </div>
-          <div class="flex items-center justify-between gap-2">
+          <div class="flex min-h-8 items-center justify-between gap-2">
             <p class="text-sm font-medium" x-text="'图片 ' + imageIndex + '/' + imageTotal"></p>
             <button
               class="btn btn-ghost btn-sm"
               type="button"
-              x-show="activeSlot && activeSlot.image.status === '成功'"
               @click="onReveal(activeSlot)"
               :disabled="!hostReady || !activeSlot"
             >显示文件</button>
           </div>
           <div class="flex gap-2 overflow-x-auto p-1">
             <template x-for="item in slots" :key="drawKey(item)">
-              <div class="relative w-16 shrink-0">
+              <div class="relative aspect-[3/4] w-16 shrink-0">
                 <button
-                  class="block aspect-[3/4] w-full overflow-hidden bg-base-100 text-left active:scale-95"
+                  class="absolute inset-0 block overflow-hidden bg-base-100 text-left active:scale-95"
                   type="button"
                   :class="slotSelected(item) ? 'ring-2 ring-base-content' : ''"
                   :aria-pressed="slotSelected(item) ? 'true' : 'false'"
                   :aria-label="item.label"
                   @click="selectImage(item)"
                 >
-                  <img class="h-full w-full object-cover" x-show="slotPreview(item)" :src="slotPreview(item)" :alt="item.label" />
-                  <span class="flex h-full items-center justify-center px-1 text-center text-xs" x-show="!slotPreview(item) && (item.image.status === '生成中' || item.image.status === '失败' || item.image.status === '作废')" x-text="statusLabel(item.image.status)"></span>
+                  <img class="h-full w-full object-contain" x-show="slotPreview(item)" :src="slotPreview(item)" :alt="item.label" />
+                  <span class="flex h-full w-full items-center justify-center px-1 text-center text-xs" x-show="!slotPreview(item) && (item.image.status === '生成中' || item.image.status === '失败' || item.image.status === '作废')" x-text="statusLabel(item.image.status)"></span>
                 </button>
                 <button
-                  class="btn btn-primary btn-square btn-xs absolute bottom-1 right-1"
+                  class="btn btn-primary btn-square btn-xs absolute bottom-1 right-1 z-[1]"
                   type="button"
                   @click="onDraw(item)"
                   :disabled="slotDrawDisabled(item)"
@@ -274,78 +284,13 @@
           <div class="grid grid-cols-[repeat(15,minmax(0,1fr))] gap-2" x-show="activeVersions.length" x-cloak>
             <template x-for="(version, index) in activeVersions" :key="version.path">
               <button class="relative aspect-[3/4] w-full overflow-hidden bg-base-100" type="button" :class="versionChosen(activeSlot, index) ? 'ring-2 ring-base-content' : ''" :aria-label="'第 ' + (index + 1) + ' 张'" :aria-pressed="versionChosen(activeSlot, index) ? 'true' : 'false'" @click="onChooseVersion(activeSlot, index + 1)" :disabled="job.running">
-                <img class="h-full w-full object-cover" x-show="versionPreview(version)" :src="versionPreview(version)" alt="" />
+                <img class="h-full w-full object-contain" x-show="versionPreview(version)" :src="versionPreview(version)" alt="" />
                 <span class="absolute bottom-0 right-0 bg-base-100 px-0.5 text-[10px] leading-none" x-text="index + 1"></span>
               </button>
             </template>
           </div>
 
-          <div class="border border-base-300 bg-base-100">
-            <button
-              id="toggle-album-style"
-              class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm font-medium"
-              type="button"
-              :aria-expanded="albumStyleOpen ? 'true' : 'false'"
-              aria-controls="album-style-panel"
-              @click="toggleAlbumStyle()"
-              :disabled="job.running"
-            >
-              <span class="shrink-0">图册风格</span>
-              <span class="flex min-w-0 flex-1 items-center justify-end gap-2 font-normal">
-                <span class="truncate" x-text="albumStyleLabel()"></span>
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" class="shrink-0" :class="albumStyleOpen ? 'rotate-180' : ''"><path d="m6 9 6 6 6-6"></path></svg>
-              </span>
-            </button>
-            <div id="album-style-panel" class="flex flex-col gap-3 border-t border-base-300 px-3 py-3" x-show="albumStyleOpen" x-cloak>
-              <div class="max-h-64 overflow-y-auto" role="list" aria-label="图册风格">
-                <div class="grid grid-cols-3 gap-2 sm:grid-cols-6">
-                  <template x-for="album in albums" :key="album.id">
-                    <button
-                      class="relative aspect-[3/4] w-full overflow-hidden rounded-lg bg-base-200 text-left"
-                      type="button"
-                      role="listitem"
-                      :class="selectedLook === album.id ? 'ring-2 ring-base-content' : ''"
-                      :aria-label="album.label"
-                      :aria-pressed="selectedLook === album.id ? 'true' : 'false'"
-                      :disabled="job.running"
-                      @click="selectAlbumStyle(album)"
-                    >
-                      <img class="absolute inset-0 h-full w-full object-cover" x-show="albumSamplePreview(album)" :src="albumSamplePreview(album)" alt="" />
-                      <span class="absolute inset-0 flex items-center justify-center text-[10px] text-base-content/40" x-show="!albumSamplePreview(album)">无样图</span>
-                      <span class="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-1.5 pb-1.5 pt-6">
-                        <span class="line-clamp-2 text-xs leading-4 text-white" x-text="album.label"></span>
-                      </span>
-                    </button>
-                  </template>
-                </div>
-              </div>
-              <p class="text-sm text-base-content/60" x-show="!albums.length">还没有读到图册列表</p>
-            </div>
-          </div>
-
-          <div class="rounded-lg border border-base-300 bg-base-100" x-show="activeSlot" x-cloak>
-            <button
-              class="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium"
-              type="button"
-              :disabled="!canOpenSlotPrompt"
-              :aria-expanded="canOpenSlotPrompt && slotPromptExpanded ? 'true' : 'false'"
-              @click="toggleSlotPromptExpanded()"
-            >
-              <span>这张的提示词</span>
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" class="shrink-0" :class="canOpenSlotPrompt && slotPromptExpanded ? 'rotate-180' : ''"><path d="m6 9 6 6 6-6"></path></svg>
-            </button>
-            <div class="flex flex-col gap-2 border-t border-base-300 px-3 py-3" x-show="canOpenSlotPrompt && slotPromptExpanded" x-cloak>
-              <label class="sr-only" :for="'slot-prompt-' + activeKey">这张的提示词</label>
-              <textarea class="textarea min-h-32 w-full wrap" :id="'slot-prompt-' + activeKey" :value="activeSlot ? activeSlot.prompt : ''" :readonly="job.running" @input="activeSlot && (activeSlot.prompt = $event.target.value, setSlotPrompt(activeSlot))" @blur="persist()"></textarea>
-              <p class="text-sm" x-show="activeSlot && !String(activeSlot.prompt || '').trim()">还没有这一张的提示词</p>
-            </div>
-          </div>
-
-          <div class="flex flex-col gap-2 rounded-lg border border-base-300 bg-base-100 p-3">
-            <div class="flex items-baseline gap-2">
-              <p class="text-sm font-medium">上传参考图</p>
-              <span class="text-sm tabular-nums text-base-content/50" x-text="slotUploadRefSelectedCount() + '/9'"></span>
-            </div>
+          <div class="relative" @click.outside="slotPromptExpanded = false; uploadRefsPanelOpen = false; uploadRefAddMenuOpen = false">
             <input
               class="hidden"
               type="file"
@@ -353,65 +298,240 @@
               x-ref="uploadRefFileInput"
               @change="onUploadRefFileChange($event)"
             />
-            <p class="text-sm text-base-content/60" x-show="!postUploadRefs.length">可囤多张，当前图最多勾 9 张。点 + 上传或从库挑；点方块勾到当前图，悬停看用法。</p>
-            <div class="grid grid-cols-[repeat(auto-fill,minmax(3.5rem,3.5rem))] gap-2" role="list" aria-label="上传参考图">
-              <template x-for="(item, index) in postUploadRefs" :key="item.id">
-                <div
-                  class="group relative"
-                  role="listitem"
-                  @mouseenter="showUploadRefHover(item, $event)"
-                  @mouseleave="hideUploadRefHover()"
-                >
-                  <button
-                    class="relative h-14 w-14 shrink-0 overflow-hidden rounded-md bg-base-200 active:scale-95"
-                    type="button"
-                    :class="slotHasUploadRef(item.id) ? 'ring-2 ring-base-content' : ''"
-                    :aria-pressed="slotHasUploadRef(item.id) ? 'true' : 'false'"
-                    :aria-label="'参考 ' + (index + 1) + '，点击勾选到当前图'"
-                    :disabled="job.running || !activeSlot"
-                    @click="toggleSlotUploadRef(item)"
-                  >
-                    <img class="h-full w-full object-cover" x-show="uploadRefPreview(item)" :src="uploadRefPreview(item)" alt="" />
-                    <span class="absolute inset-0 flex items-center justify-center text-[10px] text-base-content/40" x-show="!uploadRefPreview(item)">图</span>
-                    <span class="absolute left-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-base-content text-[10px] font-semibold leading-none tabular-nums text-base-100 shadow" x-text="index + 1"></span>
-                    <span
-                      class="absolute bottom-0.5 right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-success text-success-content shadow"
-                      x-show="slotHasUploadRef(item.id)"
-                      aria-hidden="true"
-                    >
-                      <iconify-icon icon="lucide:check" width="12" height="12"></iconify-icon>
-                    </span>
-                  </button>
-                  <button
-                    class="btn btn-ghost btn-xs absolute -right-1 -top-1 flex h-6 min-h-0 w-6 items-center justify-center rounded-full border border-base-300 bg-base-100 p-0 shadow opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto focus-visible:opacity-100 focus-visible:pointer-events-auto"
-                    type="button"
-                    aria-label="编辑用法"
-                    :disabled="job.running"
-                    @click.stop="openUploadRefEditor(item)"
-                  >
-                    <iconify-icon icon="lucide:pencil" width="12" height="12" aria-hidden="true"></iconify-icon>
-                  </button>
-                </div>
-              </template>
-              <div class="relative" x-show="postUploadRefs.length < 48" x-cloak>
+            <div class="flex flex-wrap gap-2">
+              <div class="relative" @click.outside="aspectPanelOpen = false">
                 <button
-                  class="flex h-14 w-14 items-center justify-center rounded-md border border-dashed border-base-300 bg-base-100 text-xl leading-none text-base-content/50 active:scale-95"
+                  id="toggle-aspect-ratio"
+                  class="btn btn-sm gap-1.5 border border-base-300 bg-base-100 font-normal"
                   type="button"
-                  aria-label="添加上传参考图"
-                  aria-haspopup="menu"
-                  :aria-expanded="uploadRefAddMenuOpen ? 'true' : 'false'"
-                  :disabled="!hostReady || job.running"
-                  @click="toggleUploadRefAddMenu()"
-                >+</button>
-                <div
-                  class="absolute left-0 top-full z-20 mt-1 min-w-[7rem] rounded-md border border-base-300 bg-base-100 p-1 shadow-md"
-                  role="menu"
-                  x-show="uploadRefAddMenuOpen"
-                  x-cloak
-                  @click.outside="uploadRefAddMenuOpen = false"
+                  :aria-expanded="aspectPanelOpen ? 'true' : 'false'"
+                  aria-controls="aspect-ratio-panel"
+                  aria-label="比例"
+                  @click="toggleAspectPanel()"
+                  :disabled="job.running || pendingCall || !postId"
                 >
-                  <button class="btn btn-ghost btn-sm w-full justify-start" type="button" role="menuitem" @click="chooseAddFromLibrary()">从库挑</button>
-                  <button class="btn btn-ghost btn-sm w-full justify-start" type="button" role="menuitem" @click="chooseAddUpload()">上传</button>
+                  <iconify-icon icon="lucide:ratio" width="14" height="14" aria-hidden="true"></iconify-icon>
+                  <span class="max-w-[4.5rem] truncate" x-text="aspectRatio"></span>
+                  <iconify-icon
+                    icon="lucide:chevron-down"
+                    width="14"
+                    height="14"
+                    aria-hidden="true"
+                    class="shrink-0 transition-transform"
+                    :class="aspectPanelOpen ? 'rotate-180' : ''"
+                  ></iconify-icon>
+                </button>
+                <div
+                  id="aspect-ratio-panel"
+                  class="absolute left-0 top-full z-10 mt-1 min-w-[18rem] rounded-lg border border-base-300 bg-base-100 p-3 shadow-md sm:min-w-[22rem]"
+                  x-show="aspectPanelOpen"
+                  x-cloak
+                >
+                  <p class="mb-2 text-xs text-base-content/60">选择比例</p>
+                  <div class="grid grid-cols-4 gap-2 sm:grid-cols-7" role="listbox" aria-label="生图比例">
+                    <template x-for="ratio in aspectRatios" :key="ratio">
+                      <button
+                        class="flex flex-col items-center gap-1.5 rounded-lg border border-transparent bg-base-200 px-1 py-2 text-left"
+                        type="button"
+                        role="option"
+                        :class="aspectRatio === ratio ? 'ring-2 ring-base-content' : ''"
+                        :aria-selected="aspectRatio === ratio ? 'true' : 'false'"
+                        :aria-label="'比例 ' + ratio"
+                        @click="onSetAspectRatio(ratio)"
+                        :disabled="!hostReady || job.running || pendingCall || !postId"
+                      >
+                        <span class="flex h-10 w-full items-center justify-center">
+                          <span
+                            class="max-h-9 max-w-[2.25rem] rounded-sm border border-base-content/40 bg-base-100"
+                            :style="{ aspectRatio: cssAspectFromRatio(ratio), width: ratioBoxWidth(ratio) }"
+                          ></span>
+                        </span>
+                        <span class="text-xs leading-none" x-text="ratio"></span>
+                      </button>
+                    </template>
+                  </div>
+                </div>
+              </div>
+
+              <div class="relative" @click.outside="albumStyleOpen = false">
+                <button
+                  id="toggle-album-style"
+                  class="btn btn-sm max-w-[14rem] gap-1.5 border border-base-300 bg-base-100 font-normal"
+                  type="button"
+                  :aria-expanded="albumStyleOpen ? 'true' : 'false'"
+                  aria-controls="album-style-panel"
+                  aria-label="图册风格"
+                  @click="toggleAlbumStyle()"
+                  :disabled="job.running"
+                >
+                  <iconify-icon icon="lucide:palette" width="14" height="14" class="shrink-0" aria-hidden="true"></iconify-icon>
+                  <span class="min-w-0 truncate" x-text="albumStyleLabel()"></span>
+                  <iconify-icon
+                    icon="lucide:chevron-down"
+                    width="14"
+                    height="14"
+                    aria-hidden="true"
+                    class="shrink-0 transition-transform"
+                    :class="albumStyleOpen ? 'rotate-180' : ''"
+                  ></iconify-icon>
+                </button>
+                <div
+                  id="album-style-panel"
+                  class="absolute left-0 top-full z-10 mt-1 w-[min(100vw-3rem,28rem)] rounded-lg border border-base-300 bg-base-100 p-3 shadow-md"
+                  x-show="albumStyleOpen"
+                  x-cloak
+                >
+                  <div class="max-h-64 overflow-y-auto" role="list" aria-label="图册风格">
+                    <div class="grid grid-cols-3 gap-2 sm:grid-cols-6">
+                      <template x-for="album in albums" :key="album.id">
+                        <button
+                          class="relative aspect-[3/4] w-full overflow-hidden rounded-lg bg-base-200 text-left"
+                          type="button"
+                          role="listitem"
+                          :class="selectedLook === album.id ? 'ring-2 ring-base-content' : ''"
+                          :aria-label="album.label"
+                          :aria-pressed="selectedLook === album.id ? 'true' : 'false'"
+                          :disabled="job.running"
+                          @click="selectAlbumStyle(album)"
+                        >
+                          <img class="absolute inset-0 h-full w-full object-contain" x-show="albumSamplePreview(album)" :src="albumSamplePreview(album)" alt="" />
+                          <span class="absolute inset-0 flex items-center justify-center text-[10px] text-base-content/40" x-show="!albumSamplePreview(album)">无样图</span>
+                          <span class="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-1.5 pb-1.5 pt-6">
+                            <span class="line-clamp-2 text-xs leading-4 text-white" x-text="album.label"></span>
+                          </span>
+                        </button>
+                      </template>
+                    </div>
+                  </div>
+                  <p class="mt-2 text-sm text-base-content/60" x-show="!albums.length">还没有读到图册列表</p>
+                </div>
+              </div>
+
+              <button
+                id="toggle-slot-prompt"
+                class="btn btn-sm gap-1.5 border border-base-300 bg-base-100 font-normal"
+                type="button"
+                x-show="activeSlot"
+                x-cloak
+                :disabled="!canOpenSlotPrompt"
+                :aria-expanded="canOpenSlotPrompt && slotPromptExpanded ? 'true' : 'false'"
+                aria-controls="slot-prompt-panel"
+                aria-label="提示词"
+                @click="toggleSlotPromptExpanded()"
+              >
+                <iconify-icon icon="lucide:text" width="14" height="14" class="shrink-0" aria-hidden="true"></iconify-icon>
+                <span>提示词</span>
+                <iconify-icon
+                  icon="lucide:chevron-down"
+                  width="14"
+                  height="14"
+                  aria-hidden="true"
+                  class="shrink-0 transition-transform"
+                  :class="canOpenSlotPrompt && slotPromptExpanded ? 'rotate-180' : ''"
+                ></iconify-icon>
+              </button>
+
+              <button
+                id="toggle-upload-refs"
+                class="btn btn-sm gap-1.5 border border-base-300 bg-base-100 font-normal"
+                type="button"
+                :aria-expanded="uploadRefsPanelOpen ? 'true' : 'false'"
+                aria-controls="upload-refs-panel"
+                aria-label="参考图"
+                @click="toggleUploadRefsPanel()"
+                :disabled="job.running"
+              >
+                <iconify-icon icon="lucide:image" width="14" height="14" class="shrink-0" aria-hidden="true"></iconify-icon>
+                <span>参考图</span>
+                <span class="tabular-nums text-base-content/60" x-text="slotUploadRefSelectedCount() + '/9'"></span>
+                <iconify-icon
+                  icon="lucide:chevron-down"
+                  width="14"
+                  height="14"
+                  aria-hidden="true"
+                  class="shrink-0 transition-transform"
+                  :class="uploadRefsPanelOpen ? 'rotate-180' : ''"
+                ></iconify-icon>
+              </button>
+            </div>
+
+            <div
+              id="slot-prompt-panel"
+              class="absolute left-0 right-0 top-full z-10 mt-1 rounded-lg border border-base-300 bg-base-100 p-3 shadow-md"
+              x-show="activeSlot && canOpenSlotPrompt && slotPromptExpanded"
+              x-cloak
+            >
+              <label class="sr-only" :for="'slot-prompt-' + activeKey">这张的提示词</label>
+              <textarea class="textarea min-h-56 w-full wrap" :id="'slot-prompt-' + activeKey" :value="activeSlot ? activeSlot.prompt : ''" :readonly="job.running" @input="activeSlot && (activeSlot.prompt = $event.target.value, setSlotPrompt(activeSlot))" @blur="persist()"></textarea>
+              <p class="mt-2 text-sm" x-show="activeSlot && !String(activeSlot.prompt || '').trim()">还没有这一张的提示词</p>
+            </div>
+
+            <div
+              id="upload-refs-panel"
+              class="absolute left-0 right-0 top-full z-10 mt-1 flex flex-col gap-2 rounded-lg border border-base-300 bg-base-100 p-3 shadow-md"
+              x-show="uploadRefsPanelOpen"
+              x-cloak
+            >
+              <p class="text-sm text-base-content/60">可囤多张，当前图最多勾 9 张。点 + 上传或从库挑；点方块勾到当前图，悬停看用法。</p>
+              <div class="grid grid-cols-[repeat(auto-fill,minmax(3.5rem,3.5rem))] gap-2" role="list" aria-label="上传参考图">
+                <template x-for="(item, index) in postUploadRefs" :key="item.id">
+                  <div
+                    class="group relative"
+                    role="listitem"
+                    @mouseenter="showUploadRefHover(item, $event)"
+                    @mouseleave="hideUploadRefHover()"
+                  >
+                    <button
+                      class="relative h-14 w-14 shrink-0 overflow-hidden rounded-md bg-base-200 active:scale-95"
+                      type="button"
+                      :class="slotHasUploadRef(item.id) ? 'ring-2 ring-base-content' : ''"
+                      :aria-pressed="slotHasUploadRef(item.id) ? 'true' : 'false'"
+                      :aria-label="'参考 ' + (index + 1) + '，点击勾选到当前图'"
+                      :disabled="job.running || !activeSlot"
+                      @click="toggleSlotUploadRef(item)"
+                    >
+                      <img class="h-full w-full object-cover" x-show="uploadRefPreview(item)" :src="uploadRefPreview(item)" alt="" />
+                      <span class="absolute inset-0 flex items-center justify-center text-[10px] text-base-content/40" x-show="!uploadRefPreview(item)">图</span>
+                      <span class="absolute left-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-base-content text-[10px] font-semibold leading-none tabular-nums text-base-100 shadow" x-text="index + 1"></span>
+                      <span
+                        class="absolute bottom-0.5 right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-success text-success-content shadow"
+                        x-show="slotHasUploadRef(item.id)"
+                        aria-hidden="true"
+                      >
+                        <iconify-icon icon="lucide:check" width="12" height="12"></iconify-icon>
+                      </span>
+                    </button>
+                    <button
+                      class="btn btn-ghost btn-xs absolute -right-1 -top-1 flex h-6 min-h-0 w-6 items-center justify-center rounded-full border border-base-300 bg-base-100 p-0 shadow opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto focus-visible:opacity-100 focus-visible:pointer-events-auto"
+                      type="button"
+                      aria-label="编辑用法"
+                      :disabled="job.running"
+                      @click.stop="openUploadRefEditor(item)"
+                    >
+                      <iconify-icon icon="lucide:pencil" width="12" height="12" aria-hidden="true"></iconify-icon>
+                    </button>
+                  </div>
+                </template>
+                <div class="relative" x-show="postUploadRefs.length < 48" x-cloak>
+                  <button
+                    class="flex h-14 w-14 items-center justify-center rounded-md border border-dashed border-base-300 bg-base-100 text-xl leading-none text-base-content/50 active:scale-95"
+                    type="button"
+                    aria-label="添加上传参考图"
+                    aria-haspopup="menu"
+                    :aria-expanded="uploadRefAddMenuOpen ? 'true' : 'false'"
+                    :disabled="!hostReady || job.running"
+                    @click="toggleUploadRefAddMenu()"
+                  >+</button>
+                  <div
+                    class="absolute left-0 top-full z-20 mt-1 min-w-[7rem] rounded-md border border-base-300 bg-base-100 p-1 shadow-md"
+                    role="menu"
+                    x-show="uploadRefAddMenuOpen"
+                    x-cloak
+                    @click.outside="uploadRefAddMenuOpen = false"
+                  >
+                    <button class="btn btn-ghost btn-sm w-full justify-start" type="button" role="menuitem" @click="chooseAddFromLibrary()">从库挑</button>
+                    <button class="btn btn-ghost btn-sm w-full justify-start" type="button" role="menuitem" @click="chooseAddUpload()">上传</button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -467,7 +587,7 @@
               </div>
               <div class="min-h-0 flex-1 overflow-y-auto">
                 <div class="relative aspect-[3/4] bg-base-200">
-                  <img class="h-full w-full object-cover" x-show="activeSlot && slotPreview(activeSlot)" :src="activeSlot ? slotPreview(activeSlot) : ''" alt="" />
+                  <img class="h-full w-full object-contain" x-show="activeSlot && slotPreview(activeSlot)" :src="activeSlot ? slotPreview(activeSlot) : ''" alt="" />
                   <button class="btn btn-circle btn-xs absolute left-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100" type="button" x-show="hasGeneratedImage && imageTotal > 1" x-cloak @click="stepImage(-1)" aria-label="上一张">‹</button>
                   <button class="btn btn-circle btn-xs absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100" type="button" x-show="hasGeneratedImage && imageTotal > 1" x-cloak @click="stepImage(1)" aria-label="下一张">›</button>
                   <div class="absolute bottom-2 left-0 right-0 flex justify-center gap-1" x-show="imageTotal > 1">
@@ -492,6 +612,7 @@
             </div>
             <div class="flex min-h-0 flex-1 flex-col bg-white" x-show="previewMode === 'cover'" x-cloak>
               <div class="aspect-[750/265] w-full shrink-0 bg-no-repeat" style="background-image:url('https://fe-static.xhscdn.com/formula-static/ugc/public/resource/image/topbar-1679.9cd67711.jpg');background-size:100% auto;background-position:top center" aria-hidden="true"></div>
+              <p class="shrink-0 px-2 pt-1 text-[10px] leading-4 text-base-content/60" x-show="aspectRatio !== '3:4'" x-cloak>发现页按 3:4 裁封面</p>
               <div class="flex min-h-0 flex-1 items-start overflow-hidden bg-[#fafafa] pt-0.5">
                 <div class="mx-0.5 min-w-0 flex-1">
                   <div class="mb-[3px] overflow-hidden bg-white" style="border-radius:2.5px">

@@ -10,6 +10,8 @@ const catalogModule = require('./catalog');
 const frameModule = require('./frame');
 /** @type {typeof import('./sheet')} */
 const sheetModule = require('./sheet');
+/** @type {typeof import('../../image/aspect')} */
+const aspectModule = require('../../image/aspect');
 const { ALBUM_KIND_SET } = catalogModule;
 const { schemaFieldNames } = frameModule;
 const {
@@ -17,6 +19,7 @@ const {
   SHEET_SLOTS,
   assertPromptSheet,
 } = sheetModule;
+const { aspectRatioFromImage } = aspectModule;
 
 const LEARN_PROMPT_REL = 'learn-album/system.md';
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -38,6 +41,7 @@ const USER_ALBUM_SEQ_START = 100000;
  *   sampleMime: string;
  *   sampleBytes: Buffer;
  *   sampleDataUrl: string;
+ *   aspectRatio: string;
  * }} AlbumDraft
  */
 
@@ -283,6 +287,7 @@ function allocateAlbumId(promptsDir, parts, userAlbumsDir) {
 function buildAlbumDraft(promptsDir, learnRaw, image, draftId, userAlbumsDir) {
   const parsed = parseLearnResult(learnRaw);
   const id = allocateAlbumId(promptsDir, parsed, userAlbumsDir);
+  const aspectRatio = aspectRatioFromImage(image.bytes);
   return {
     draftId,
     id,
@@ -297,6 +302,7 @@ function buildAlbumDraft(promptsDir, learnRaw, image, draftId, userAlbumsDir) {
     sampleMime: image.mime,
     sampleBytes: image.bytes,
     sampleDataUrl: image.dataUrl,
+    aspectRatio,
   };
 }
 
@@ -316,6 +322,7 @@ function draftPublicView(draft) {
     promptTemplate: draft.promptMd,
     copySample: draft.copySample,
     sampleDataUrl: draft.sampleDataUrl,
+    aspectRatio: draft.aspectRatio,
     builtin: false,
   };
 }

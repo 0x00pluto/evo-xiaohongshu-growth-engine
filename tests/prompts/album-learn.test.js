@@ -158,7 +158,8 @@ test('学习提示词独立文件可现读', () => {
   const text = readLearnSystemPrompt(ROOT_PROMPTS);
   assert.match(text, /图册/);
   assert.match(text, /promptMd/);
-  assert.match(text, /竖版 3:4/);
+  assert.match(text, /程序会按样图像素/);
+  assert.doesNotMatch(text, /小红书固定出图规格/);
   assert.match(text, /magazine.*scrapbook.*conceptual.*card.*infographic/s);
   assert.match(text, /可以新开 kind/);
   assert.match(text, /学图方法/);
@@ -166,7 +167,8 @@ test('学习提示词独立文件可现读', () => {
   assert.match(text, /槽 6～8|还原核心/);
   assert.match(text, /输出前核对/);
   assert.match(text, /无主题插画，只保留参考图已有的背景/);
-  assert.doesNotMatch(text, /实测像素|识别画幅/);
+  // 禁令用语可出现在「不要写…」里；不得要求模型自报实测比例
+  assert.match(text, /不要.*(?:实测像素|识别画幅|自报比例)/);
 });
 
 test('参考图按文件头校验，不合格不进模型', () => {

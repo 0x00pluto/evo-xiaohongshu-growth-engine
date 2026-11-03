@@ -8,13 +8,16 @@ const path = require('node:path');
 const fillModule = require('../prompts/fill');
 /** @type {typeof import('../upload-refs/rules')} */
 const uploadRefRules = require('../upload-refs/rules');
+/** @type {typeof import('../image/aspect')} */
+const aspectModule = require('../image/aspect');
 const { migrateAlbumId } = fillModule;
 const { emptyPicks, normalizePicks, readUploadRefsFromDraft } = uploadRefRules;
+const { normalizeAspectRatio } = aspectModule;
 
 const STATUSES = new Set(['空', '生成中', '成功', '失败', '作废']);
 
 /**
- * @typedef {{ path: string; revisedAt: number }} ImageVersion
+ * @typedef {{ path: string; revisedAt: number; aspectRatio?: string }} ImageVersion
  * @typedef {{
  *   status: string;
  *   path: string;
@@ -55,6 +58,7 @@ const STATUSES = new Set(['空', '生成中', '成功', '失败', '作废']);
  *   picks: import('../upload-refs/rules').PicksState;
  *   billing: BillingAttempts;
  *   job: { running: boolean; step: string; error: string };
+ *   aspectRatioLocked: string;
  * }} DraftState
  * @typedef {{
  *   exists: () => boolean;
@@ -146,6 +150,7 @@ function emptyState() {
     picks: emptyPicks(1),
     billing: { copy: 0, promptsPlan: 0, promptsScenes: 0 },
     job: { running: false, step: '', error: '' },
+    aspectRatioLocked: '',
   };
 }
 
@@ -231,16 +236,25 @@ function normalizeSlot(slot) {
    * @param {unknown} filePath
    * @param {unknown} revisedAt
    */
-  const pushVersion = (filePath, revisedAt) => {
+  /**
+   * @param {unknown} filePath
+   * @param {unknown} revisedAt
+   * @param {unknown} [aspectRatio]
+   */
+  const pushVersion = (filePath, revisedAt, aspectRatio) => {
     const safe = safeImageName(filePath);
     if (!safe || seen.has(safe)) return;
     seen.add(safe);
-    versions.push({ path: safe, revisedAt: versionStamp(revisedAt) });
+    const ratio = normalizeAspectRatio(aspectRatio);
+    /** @type {ImageVersion} */
+    const entry = { path: safe, revisedAt: versionStamp(revisedAt) };
+    if (ratio) entry.aspectRatio = ratio;
+    versions.push(entry);
   };
   if (source && Array.isArray(source.versions)) {
     for (const item of source.versions) {
       const version = item && typeof item === 'object' ? /** @type {Record<string, unknown>} */ (item) : null;
-      pushVersion(version && version.path, version && version.revisedAt);
+      pushVersion(version && version.path, version && version.revisedAt, version && version.aspectRatio);
     }
   }
   // 旧稿只有一个路径。它算这个位置的第 1 张，文件名不改。
@@ -392,6 +406,18 @@ function normalize(raw, promptsDir, userAlbumsDir) {
   base.uploadRefs = readUploadRefsFromDraft(source);
   base.picks = normalizePicks(source.picks, base.galleryCount);
   base.billing = normalizeBilling(source.billing);
+  const lockedRaw = source.aspectRatioLocked;
+  if (lockedRaw != null && lockedRaw !== '') {
+    const locked = normalizeAspectRatio(lockedRaw);
+    if (locked) {
+      base.aspectRatioLocked = locked;
+    } else {
+      console.warn('[draft] 忽略非法 aspectRatioLocked:', lockedRaw);
+      base.aspectRatioLocked = '';
+    }
+  } else {
+    base.aspectRatioLocked = '';
+  }
   const job = source.job && typeof source.job === 'object'
     ? /** @type {Record<string, unknown>} */ (source.job)
     : {};
@@ -436,7 +462,12 @@ function createStore(latestDir, options) {
     // 先写临时文件再替换，轮询才不会读到半截 JSON。
     fs.mkdirSync(latestDir, { recursive: true });
     const tmp = `${file}.${process.pid}.tmp`;
-    fs.writeFileSync(tmp, `${JSON.stringify(normalize(state, promptsDir, userAlbumsDir), null, 2)}\n`);
+    const normalized = normalize(state, promptsDir, userAlbumsDir);
+    /** @type {Record<string, unknown>} */
+    const payload = { ...normalized };
+    // 未锁定不落字段，避免旧稿被写成空串。
+    if (!payload.aspectRatioLocked) delete payload.aspectRatioLocked;
+    fs.writeFileSync(tmp, `${JSON.stringify(payload, null, 2)}\n`);
     fs.renameSync(tmp, file);
   }
 

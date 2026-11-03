@@ -12,6 +12,9 @@ const parseModule = require('../parse');
 const uploadRefRules = require('../../upload-refs/rules');
 /** @type {typeof import('../../upload-refs/files')} */
 const uploadRefFiles = require('../../upload-refs/files');
+/** @type {typeof import('../../image/aspect')} */
+const aspectModule = require('../../image/aspect');
+const { DEFAULT_ASPECT_RATIO, applyFrameSentence, normalizeAspectRatio } = aspectModule;
 
 const IMAGE_REFS_REL = 'article-image/image-refs.md';
 const TEXT_ONLY_LOCK = '纯文字图：只画背景、文案和题词已写明的固定装饰，禁止人物、物体、场景和概念插画。';
@@ -224,6 +227,7 @@ function uploadRefReferencesFor(postDir, uploadRefs, pick) {
  *   uploadRefs?: UploadRefItem[];
  *   materials?: UploadRefItem[];
  *   pick?: SlotPick;
+ *   aspectRatio?: unknown;
  * }} options
  * @returns {{ prompt: string; references: ImageReference[] }}
  */
@@ -235,8 +239,10 @@ function composeImagePrompt(basePrompt, options) {
   const look = options.look;
   const userAlbumsDir = options.userAlbumsDir;
   const userImageRefsDir = options.userImageRefsDir;
-  const base = typeof basePrompt === 'string' ? basePrompt.trim() : '';
-  if (!base) throw new Error('提示词是空的');
+  const baseRaw = typeof basePrompt === 'string' ? basePrompt.trim() : '';
+  if (!baseRaw) throw new Error('提示词是空的');
+  const aspectRatio = normalizeAspectRatio(options.aspectRatio) || DEFAULT_ASPECT_RATIO;
+  const base = applyFrameSentence(baseRaw, aspectRatio);
   const uploadRefs = Array.isArray(options.uploadRefs)
     ? options.uploadRefs
     : (Array.isArray(options.materials) ? options.materials : []);

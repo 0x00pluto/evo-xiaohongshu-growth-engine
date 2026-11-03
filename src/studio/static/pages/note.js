@@ -127,14 +127,20 @@ function notePage() {
     bodyDraft: '',
     activeKey: 'cover-0',
     albumStyleOpen: false,
+    aspectPanelOpen: false,
     albums: [],
     selectedLook: '',
     albumSamples: {},
+    aspectRatios: ['9:16', '2:3', '3:4', '1:1', '4:3', '3:2', '16:9'],
+    aspectRatio: '3:4',
+    aspectRatioLocked: '',
+    aspectRatioCss: '3 / 4',
     editor: { cover: '', gallery: [] },
     postUploadRefs: [],
     picks: { cover: { materialIds: [], overrides: {} }, gallery: [] },
     uploadRefPreviews: {},
     slotPromptExpanded: false,
+    uploadRefsPanelOpen: false,
     uploadRefEditorOpen: false,
     uploadRefEditorTarget: null,
     uploadRefEditorUsage: '',
@@ -575,6 +581,23 @@ function notePage() {
         return;
       }
       this.slotPromptExpanded = !this.slotPromptExpanded;
+      if (this.slotPromptExpanded) {
+        this.aspectPanelOpen = false;
+        this.albumStyleOpen = false;
+        this.uploadRefsPanelOpen = false;
+        this.uploadRefAddMenuOpen = false;
+      }
+    },
+    toggleUploadRefsPanel() {
+      if (this.job.running) return;
+      this.uploadRefsPanelOpen = !this.uploadRefsPanelOpen;
+      if (this.uploadRefsPanelOpen) {
+        this.aspectPanelOpen = false;
+        this.albumStyleOpen = false;
+        this.slotPromptExpanded = false;
+      } else {
+        this.uploadRefAddMenuOpen = false;
+      }
     },
     showSlide(index) {
       const item = this.slots[Number(index)];
@@ -687,6 +710,18 @@ function notePage() {
             : [],
         }
         : { cover: '', gallery: [] };
+      if (Array.isArray(next.aspectRatios) && next.aspectRatios.length) {
+        this.aspectRatios = next.aspectRatios.map((item) => String(item));
+      }
+      this.aspectRatio = typeof next.aspectRatio === 'string' && next.aspectRatio
+        ? next.aspectRatio
+        : '3:4';
+      this.aspectRatioLocked = typeof next.aspectRatioLocked === 'string'
+        ? next.aspectRatioLocked
+        : '';
+      this.aspectRatioCss = typeof next.aspectRatioCss === 'string' && next.aspectRatioCss
+        ? next.aspectRatioCss
+        : this.cssAspectFromRatio(this.aspectRatio);
       if (!this.canOpenSlotPrompt) this.slotPromptExpanded = false;
       const stamped = typeof this.prompts.look === 'string' ? this.prompts.look : '';
       if (this.postId !== prevId) this.selectedLook = stamped;
@@ -695,7 +730,73 @@ function notePage() {
       this.syncBodyDraft();
       this.loadUploadRefPreviews();
     },
+    cssAspectFromRatio(ratio) {
+      const text = String(ratio || '3:4');
+      const parts = text.split(':');
+      if (parts.length !== 2) return '3 / 4';
+      return `${parts[0]} / ${parts[1]}`;
+    },
+    syncAspectFromAlbum() {
+      if (this.aspectRatioLocked) return;
+      const look = String(this.selectedLook || (this.prompts && this.prompts.look) || '').trim();
+      if (!look) {
+        this.aspectRatio = '3:4';
+        this.aspectRatioCss = '3 / 4';
+        return;
+      }
+      const hit = (this.albums || []).find((item) => item.id === look);
+      const ratio = hit && hit.aspectRatio ? hit.aspectRatio : '3:4';
+      this.aspectRatio = ratio;
+      this.aspectRatioCss = (hit && hit.aspectRatioCss) || this.cssAspectFromRatio(ratio);
+    },
+    ratioBoxWidth(ratio) {
+      const css = this.cssAspectFromRatio(ratio);
+      const parts = String(css).split('/');
+      const w = Number(parts[0]);
+      const h = Number(parts[1]);
+      if (!(w > 0) || !(h > 0)) return '1.5rem';
+      // 竖图用固定宽，横图用固定高，格子里都能看见画幅。
+      if (w / h <= 1) return '1.15rem';
+      return `${Math.min(2.25, 1.15 * (w / h)).toFixed(2)}rem`;
+    },
+    toggleAspectPanel() {
+      if (this.job.running || this.pendingCall || !this.postId) return;
+      this.aspectPanelOpen = !this.aspectPanelOpen;
+      if (this.aspectPanelOpen) {
+        this.albumStyleOpen = false;
+        this.slotPromptExpanded = false;
+        this.uploadRefsPanelOpen = false;
+        this.uploadRefAddMenuOpen = false;
+      }
+    },
+    async onSetAspectRatio(ratio) {
+      if (!this.hostReady || this.job.running || this.pendingCall || !this.postId) return;
+      const next = String(ratio || '').trim();
+      if (!next) return;
+      this.notice = '';
+      this.pendingCall = true;
+      try {
+        const result = await this.call('setAspectRatio', { aspectRatio: next });
+        if (result && result.ok === false) {
+          this.notice = result.message || '比例改不了';
+          return;
+        }
+        if (result && result.ok) {
+          this.aspectRatio = result.aspectRatio || next;
+          this.aspectRatioLocked = result.aspectRatioLocked || next;
+          this.aspectRatioCss = result.aspectRatioCss || this.cssAspectFromRatio(this.aspectRatio);
+          this.aspectPanelOpen = false;
+        }
+      } finally {
+        this.pendingCall = false;
+      }
+    },
     albumStyleLabel() {
+      const selected = String(this.selectedLook || '').trim();
+      if (selected) {
+        const hit = (this.albums || []).find((item) => item.id === selected);
+        if (hit && hit.label) return hit.label;
+      }
       const style = this.prompts && String(this.prompts.style || '').trim();
       if (style) return style;
       const look = this.prompts && String(this.prompts.look || '').trim();
@@ -719,6 +820,7 @@ function notePage() {
       }
       this.albums = data.albums;
       if (!this.selectedLook && this.prompts.look) this.selectedLook = this.prompts.look;
+      this.syncAspectFromAlbum();
       await this.loadAlbumSamples();
     },
     async loadAlbumSamples() {
@@ -738,6 +840,10 @@ function notePage() {
       if (this.job.running) return;
       this.albumStyleOpen = !this.albumStyleOpen;
       if (this.albumStyleOpen) {
+        this.aspectPanelOpen = false;
+        this.slotPromptExpanded = false;
+        this.uploadRefsPanelOpen = false;
+        this.uploadRefAddMenuOpen = false;
         if (!this.albums.length) await this.loadAlbums();
         else await this.loadAlbumSamples();
         if (!this.selectedLook && this.prompts.look) this.selectedLook = this.prompts.look;
@@ -747,6 +853,8 @@ function notePage() {
       if (this.job.running || !album || !album.id) return;
       this.notice = '';
       this.selectedLook = album.id;
+      this.syncAspectFromAlbum();
+      this.albumStyleOpen = false;
     },
     resetBrief() {
       this.articleType = '涨粉';
@@ -971,9 +1079,9 @@ function notePage() {
       await this.refresh();
     },
     async onReveal(item) {
-      if (!this.hostReady || item.image.status !== '成功') return;
+      if (!this.hostReady || !item) return;
       const result = await this.call('revealImage', { slot: item.slot, index: item.index });
-      if (result && result.ok === false) this.notice = result.message || '没有找到这张图';
+      if (result && result.ok === false) this.notice = result.message || '打不开文件夹';
     },
     async onCopyPost() {
       const text = this.postText();

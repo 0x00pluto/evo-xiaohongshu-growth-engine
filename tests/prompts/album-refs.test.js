@@ -69,7 +69,15 @@ test('出厂 template 说明仍拼第一张是版式模板', () => {
     look: '000001.magazine.dazibao',
   });
   assert.match(composed.prompt, /第一张是版式模板参考图/);
+  assert.match(composed.prompt, /^竖版 3:4，题词正文仅测试/);
   assert.equal(composed.references[0].role, 'template');
+
+  const wide = composeImagePrompt('竖版 3:4，杂志风。\n1. 背景', {
+    promptsDir: factoryPromptsDir,
+    look: '000001.magazine.dazibao',
+    aspectRatio: '16:9',
+  });
+  assert.match(wide.prompt, /^横版 16:9，杂志风/);
 });
 
 test('合并 runtime/image-refs：新角色能拼上，同名覆盖出厂，无目录不报错', () => {

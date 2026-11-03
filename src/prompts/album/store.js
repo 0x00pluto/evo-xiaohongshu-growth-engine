@@ -10,6 +10,8 @@ const catalogModule = require('./catalog');
 const learnModule = require('./learn');
 /** @type {typeof import('./sheet')} */
 const sheetModule = require('./sheet');
+/** @type {typeof import('../../image/aspect')} */
+const aspectModule = require('../../image/aspect');
 
 const {
   SAMPLE_EXTS,
@@ -18,6 +20,7 @@ const {
   albumMetaPath,
   albumPackDir,
   albumPromptPath,
+  albumSampleFile,
   clearAlbumCatalogCache,
   isAlbum,
   isBuiltinAlbum,
@@ -25,6 +28,12 @@ const {
 } = catalogModule;
 const { assertPromptPlaceholders, assertPromptSheet, isBuiltinAlbumId } = learnModule;
 const { PROMPT_SHEET_VERSION } = sheetModule;
+const {
+  DEFAULT_ASPECT_RATIO,
+  applyFrameSentence,
+  aspectRatioFromImage,
+  normalizeAspectRatio,
+} = aspectModule;
 
 /**
  * @typedef {import('./learn').AlbumDraft} AlbumDraft
@@ -228,6 +237,11 @@ function commitAlbumDraft(userAlbumsDir, draft, promptsDir) {
     }
   }
 
+  const aspectRatio = normalizeAspectRatio(draft.aspectRatio)
+    || aspectRatioFromImage(draft.sampleBytes)
+    || DEFAULT_ASPECT_RATIO;
+  const promptMd = applyFrameSentence(String(draft.promptMd).trim(), aspectRatio);
+
   /** @type {string[]} */
   const written = [];
   try {
@@ -242,10 +256,11 @@ function commitAlbumDraft(userAlbumsDir, draft, promptsDir) {
       legacyIds: [],
       enabled: true,
       promptSheetVersion: PROMPT_SHEET_VERSION,
+      aspectRatio,
     };
     fs.writeFileSync(jsonPath, `${JSON.stringify(meta, null, 2)}\n`, 'utf8');
     written.push(jsonPath);
-    fs.writeFileSync(mdPath, `${String(draft.promptMd).trim()}\n`, 'utf8');
+    fs.writeFileSync(mdPath, `${promptMd}\n`, 'utf8');
     written.push(mdPath);
     fs.writeFileSync(sampleMdPath, `${String(draft.copySample).trim()}\n`, 'utf8');
     written.push(sampleMdPath);
@@ -347,9 +362,64 @@ function updateAlbumPromptMd(promptsDir, userAlbumsDir, id, promptMd) {
   return { id: albumId };
 }
 
+/**
+ * 旧册缺 aspectRatio 时按样图补算并写回 album.json；样图丢失则兜底 3:4。
+ * 出厂册只读内存，不写 assets。
+ * @param {string} promptsDir
+ * @param {string | undefined} userAlbumsDir
+ * @param {string} albumId
+ * @returns {string}
+ */
+function ensureAlbumAspectRatio(promptsDir, userAlbumsDir, albumId) {
+  if (!isAlbum(albumId, promptsDir, userAlbumsDir)) {
+    return DEFAULT_ASPECT_RATIO;
+  }
+  const catalog = loadAlbumCatalog(promptsDir, userAlbumsDir);
+  const meta = catalog.get(albumId);
+  const existing = normalizeAspectRatio(meta.aspectRatio);
+  if (existing) return existing;
+
+  const sampleAbs = albumSampleFile(promptsDir, albumId, userAlbumsDir);
+  const ratio = fs.existsSync(sampleAbs)
+    ? aspectRatioFromImage(sampleAbs)
+    : DEFAULT_ASPECT_RATIO;
+
+  if (meta.source === 'user') {
+    const jsonPath = albumMetaPath(albumPackDir(meta));
+    try {
+      /** @type {Record<string, unknown>} */
+      const raw = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+      raw.aspectRatio = ratio;
+      fs.writeFileSync(jsonPath, `${JSON.stringify(raw, null, 2)}\n`, 'utf8');
+      clearAlbumCatalogCache(promptsDir, userAlbumsDir);
+    } catch {
+      // 补算失败仍返回内存值，不阻断浏览
+    }
+  } else {
+    // 出厂册：缓存里补上，避免反复读像素；不改仓库文件。
+    meta.aspectRatio = ratio;
+  }
+  return ratio;
+}
+
+/**
+ * @param {string} promptsDir
+ * @param {string} [userAlbumsDir]
+ * @returns {void}
+ */
+function ensureAllAlbumAspectRatios(promptsDir, userAlbumsDir) {
+  if (typeof promptsDir !== 'string' || !promptsDir) return;
+  const ids = loadAlbumCatalog(promptsDir, userAlbumsDir).ids();
+  for (const id of ids) {
+    ensureAlbumAspectRatio(promptsDir, userAlbumsDir, id);
+  }
+}
+
 module.exports = {
   commitAlbumDraft,
   deleteAlbumFiles,
+  ensureAlbumAspectRatio,
+  ensureAllAlbumAspectRatios,
   migrateFlatAlbumsInRoot,
   migrateUserAlbumPacks,
   migrateUserAlbumsFromAssets,

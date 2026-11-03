@@ -188,6 +188,12 @@ module.exports = {
       /**
        * @param {unknown} payload
        */
+      setAspectRatio(payload) {
+        return runner.setAspectRatio(asObject(payload));
+      },
+      /**
+       * @param {unknown} payload
+       */
       generateImages(payload) {
         return runner.generateImages(asObject(payload));
       },

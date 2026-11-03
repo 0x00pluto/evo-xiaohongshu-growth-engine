@@ -121,7 +121,7 @@
                 :disabled="learning || committing"
                 @click="openDetail(album)"
               >
-                <img class="absolute inset-0 h-full w-full object-cover" x-show="albumSamplePreview(album)" :src="albumSamplePreview(album)" alt="" />
+                <img class="absolute inset-0 h-full w-full object-contain" x-show="albumSamplePreview(album)" :src="albumSamplePreview(album)" alt="" />
                 <span class="absolute inset-0 flex items-center justify-center text-[10px] text-base-content/40" x-show="!albumSamplePreview(album)">无样图</span>
                 <span class="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-1.5 pb-1.5 pt-6">
                   <span class="line-clamp-2 text-xs leading-4 text-white" x-text="album.label"></span>

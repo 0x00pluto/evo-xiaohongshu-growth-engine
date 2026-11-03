@@ -1234,7 +1234,9 @@ test('不带槽位不能生图，再抽只换这一张', async () => {
   assert.equal(redrawn.images.cover.versions.length, 2);
   assert.ok(redrawn.images.cover.revisedAt > first.images.cover.revisedAt);
   assert.equal(fs.readFileSync(path.join(redrawn.directory, 'cover-1.png'), 'utf8'), coverBytes);
-  assert.equal(fs.readFileSync(path.join(redrawn.directory, 'cover-2.png'), 'utf8'), '改过的封面提示词');
+  const redrawnPrompt = fs.readFileSync(path.join(redrawn.directory, 'cover-2.png'), 'utf8');
+  assert.match(redrawnPrompt, /改过的封面提示词/);
+  assert.match(redrawnPrompt, /^(?:竖版|横版|方图)\s*\d+\s*:\s*\d+/);
   assert.equal(fs.readFileSync(path.join(redrawn.directory, 'gallery-01-1.png'), 'utf8'), galleryBytes);
   const chosen = runner.chooseImage({ slot: 'cover', version: 1 });
   assert.equal(chosen.ok, true);
@@ -1242,7 +1244,7 @@ test('不带槽位不能生图，再抽只换这一张', async () => {
   assert.equal(picked.images.cover.path, 'cover-1.png');
   assert.equal(picked.images.cover.selected, 1);
   assert.equal(picked.images.cover.versions.length, 2);
-  assert.equal(seen.includes('改过的封面提示词'), true);
+  assert.equal(seen.some((item) => String(item).includes('改过的封面提示词')), true);
 });
 
 test('目的或人设不在允许列表时不调用模型', async () => {
@@ -1329,6 +1331,96 @@ test('抽到对比后配图角色是对照', async () => {
   assert.equal(imaged.prompts.gallery[0].includes(imaged.prompts.galleryLines[0]), true);
   assert.equal(imaged.images.gallery[0].status, '成功');
   assert.equal(fs.existsSync(path.join(imaged.directory, 'gallery-01-1.png')), true);
+});
+
+test('一篇比例：未锁定跟图册，锁定后换册仍传锁定档', async () => {
+  const root = tempDir();
+  const promptsDir = path.join(root, 'prompts');
+  writePrompts(promptsDir);
+  // 给杂志册写一张近似 16:9 的样图，归档应落在 16:9
+  const zlib = require('node:zlib');
+  function tinyPng(width, height) {
+    const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const ihdrData = Buffer.alloc(13);
+    ihdrData.writeUInt32BE(width, 0);
+    ihdrData.writeUInt32BE(height, 4);
+    ihdrData[8] = 8;
+    ihdrData[9] = 2;
+    const typeBuf = Buffer.from('IHDR');
+    const length = Buffer.alloc(4);
+    length.writeUInt32BE(13, 0);
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(zlib.crc32(Buffer.concat([typeBuf, ihdrData])) >>> 0, 0);
+    const ihdr = Buffer.concat([length, typeBuf, ihdrData, crc]);
+    const raw = Buffer.alloc((width * 3 + 1) * height, 0);
+    const idatData = zlib.deflateSync(raw);
+    const idatLen = Buffer.alloc(4);
+    idatLen.writeUInt32BE(idatData.length, 0);
+    const idatType = Buffer.from('IDAT');
+    const idatCrc = Buffer.alloc(4);
+    idatCrc.writeUInt32BE(zlib.crc32(Buffer.concat([idatType, idatData])) >>> 0, 0);
+    const idat = Buffer.concat([idatLen, idatType, idatData, idatCrc]);
+    const iendType = Buffer.from('IEND');
+    const iendLen = Buffer.alloc(4);
+    const iendCrc = Buffer.alloc(4);
+    iendCrc.writeUInt32BE(zlib.crc32(iendType) >>> 0, 0);
+    const iend = Buffer.concat([iendLen, iendType, Buffer.alloc(0), iendCrc]);
+    return Buffer.concat([signature, ihdr, idat, iend]);
+  }
+  const samplePath = path.join(promptsDir, 'albums', ALBUM_MAGAZINE, 'sample.png');
+  fs.writeFileSync(samplePath, tinyPng(16, 9));
+  // 去掉 album.json 里可能没有的字段，强制补算
+  const metaPath = path.join(promptsDir, 'albums', ALBUM_MAGAZINE, 'album.json');
+  const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+  delete meta.aspectRatio;
+  fs.writeFileSync(metaPath, `${JSON.stringify(meta, null, 2)}\n`);
+
+  /** @type {Array<{ aspectRatio?: string; prompt: string }>} */
+  const seen = [];
+  const runner = createRunner({
+    postsDir: path.join(root, 'posts'),
+    promptsDir,
+    random: firstPick,
+    complete: async (prompt) => responseFor(prompt, 0),
+    generateImage: async (args) => {
+      seen.push(args);
+      fs.mkdirSync(path.dirname(args.outputPath), { recursive: true });
+      fs.writeFileSync(args.outputPath, 'png');
+    },
+  });
+  await runner.generateDraft(draftArgs({ galleryCount: 1 }));
+  await untilIdle(runner);
+  const listed = runner.listAlbums();
+  const mag = listed.albums.find((item) => item.id === ALBUM_MAGAZINE);
+  assert.equal(mag.aspectRatio, '16:9');
+
+  seen.length = 0;
+  assert.equal((await runner.generateImages({ slot: 'cover' })).ok, true);
+  await untilIdle(runner);
+  assert.equal(seen[0].aspectRatio, '16:9');
+  assert.match(seen[0].prompt, /^横版 16:9/);
+
+  const locked = runner.setAspectRatio({ aspectRatio: '1:1' });
+  assert.equal(locked.ok, true);
+  assert.equal(locked.aspectRatio, '1:1');
+  assert.equal(locked.aspectRatioLocked, '1:1');
+
+  // 换册：未再点芯片，仍应锁定 1:1
+  seen.length = 0;
+  assert.equal((await runner.generateImages({
+    slot: 'gallery',
+    index: 1,
+    look: ALBUM_SCRAPBOOK,
+  })).ok, true);
+  await untilIdle(runner);
+  assert.equal(seen[0].aspectRatio, '1:1');
+  assert.match(seen[0].prompt, /^方图 1:1/);
+
+  const after = runner.loadLatest();
+  assert.equal(after.aspectRatio, '1:1');
+  assert.equal(after.images.cover.versions.length, 1);
+  assert.equal(after.images.cover.versions[0].aspectRatio, '16:9');
+  assert.equal(after.images.gallery[0].versions[0].aspectRatio, '1:1');
 });
 
 test('有样图时生图带上 template 参考路径；无样图不传 references', async () => {
@@ -1893,9 +1985,9 @@ test('一篇可囤超过 9 张；每槽勾选第 10 张被拒', async () => {
   assert.match(ten.message, /最多勾 9/);
 });
 
-test('模型助手是 Dex Buddy SDK 1.0.0', () => {
+test('模型助手是 Dex Buddy SDK 1.0.2', () => {
   const sdk = require('../../lib/dex-buddy-sdk');
-  assert.equal(sdk.SDK_VERSION, '1.0.0');
+  assert.equal(sdk.SDK_VERSION, '1.0.2');
   assert.equal(typeof sdk.requireEntitlement, 'function');
   assert.equal(typeof sdk.bindModels, 'function');
 });
