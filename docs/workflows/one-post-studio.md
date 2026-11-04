@@ -13,23 +13,15 @@ node scripts/run-studio.js --open
 
 同一套页面也可以作为 Dex Buddy 插件打开。仓库根上的 `plugin.manifest.json` 指向 `index.js` 和这份页面。插件里优先走 `window.dex.call`。既不在工作台、也不是这条本机命令打开时，生成按钮不可用，并说明要在工作台或本机操作台里打开。
 
-开发时不要把源码拷进 Dex Buddy 的 `plugins/`。在 Dex Buddy 仓库根把 `config.dev.example.json` 复制为 `config.dev.json`，写入：
+开发时不要把源码拷进 Dex Buddy 的 `plugins/`。**打包版 Dex Buddy**：打开插件页 → 加号 →「加载本地目录」，选本仓根（里面直接有 `plugin.manifest.json`）。登记写在用户数据的 `unpacked-plugins.json`，重启还在。本地实例 id 是 `dev-` + 路径哈希，不是清单 `id`；设置、`plugin-data` 和页面调用都按实例 id。改完 `index.js`、它 require 的子文件或页面后，在插件详情「…」或工作区标题栏点重新加载即可，不必退出。详情里也可按发布预览（与插件中心同一套文件规则，仍用这份实例的设置）。移除只取消登记并删该实例下的宿主数据，源码还在磁盘上。侧边栏名字是「小红书增长引擎」，图标是仓库根上的 `icon.png`。
 
-```json
-{
-  "extraPluginPaths": [
-    "/Users/peng.zhi/Documents/Codex/0007-小红书增长引擎"
-  ]
-}
-```
+**未打包的 Dex Buddy 维护者**才用仓库根 `config.dev.json` 的 `extraPluginPaths`（从 `config.dev.example.json` 复制），或把本仓软链进 `plugins/`；打包后的应用不读 `extraPluginPaths`。界面里没有「移除」这些路径。
 
-`config.dev.json` 只在未打包的开发版里生效。改 `index.js` 或页面后重启 Dex Buddy。侧边栏名字是「小红书增长引擎」，图标是仓库根上的 `icon.png`。
+本地目录挂进来时，`ctx.dirs.data` 就是本仓：笔记写在 `output/one-post/posts/`，用户自学图册写在 `runtime/albums/`（一册一夹），用户参考图角色包写在 `runtime/image-refs/`，上传参考库写在 `runtime/materials/upload-refs/`，用户范文库写在 `runtime/materials/article-samples/`（整目录 `runtime/` gitignore）。从插件中心装进 Dex Buddy 之后，`ctx.dirs.data` 是用户数据目录 `plugin-data/app-dexbuddy-xiaohongshu-standard-editor/`，同样是 `output/…` 与上述 `runtime/` 分工。`assets/` 仍从安装目录读（出厂提示词与出厂图册）；启动时会把 assets 里序号 ≥ `100000` 的旧用户册迁到 `runtime/albums/`。
 
-开发、或 `config.dev.json` 挂进来时，`ctx.dirs.data` 就是本仓：笔记写在 `output/one-post/posts/`，用户自学图册写在 `runtime/albums/`（一册一夹），用户参考图角色包写在 `runtime/image-refs/`，上传参考库写在 `runtime/materials/upload-refs/`，用户范文库写在 `runtime/materials/article-samples/`（整目录 `runtime/` gitignore）。从插件中心装进 Dex Buddy 之后，`ctx.dirs.data` 是用户数据目录 `plugin-data/app-dexbuddy-xiaohongshu-standard-editor/`，同样是 `output/…` 与上述 `runtime/` 分工。`assets/` 仍从安装目录读（出厂提示词与出厂图册）；启动时会把 assets 里序号 ≥ `100000` 的旧用户册迁到 `runtime/albums/`。
+日常发版只走 [`docs/builtin-workflows/cut-release-tag.md`](../builtin-workflows/cut-release-tag.md)：`evo_agent_pack.json` 与 `plugin.manifest.json` 的 `version` 必须同号（`X.Y.Z`，不含 `v`），tag 为 `v` + 该号。插件中心只读清单；**禁止**只改一边。根上的 `dex-buddy-plugin.pack` 只列入清单、`index.js`、`icon.png`、`lib/`、`src/` 和 `assets/`（`lib/` 含接口层与独立跑实现）。可选再放 `dex-buddy-plugin.ignore` 从候选里挖掉路径。`scripts/`、测试、文档和 `.env` 不进这份 zip。这不是 `dex-buddy-plugin-pack.json`，仓库根上有那份旧文件时发布会失败。把仓库和这个 tag 告诉 Dex Buddy 维护者，由他在 Actions 里运行 Publish Plugin。
 
-日常发版只走 [`docs/builtin-workflows/cut-release-tag.md`](../builtin-workflows/cut-release-tag.md)：`evo_agent_pack.json` 与 `plugin.manifest.json` 的 `version` 必须同号（`X.Y.Z`，不含 `v`），tag 为 `v` + 该号。插件中心只读清单；**禁止**只改一边。根上的 `dex-buddy-plugin.pack` 只列入清单、`index.js`、`icon.png`、`lib/`、`src/` 和 `assets/`。`scripts/`、测试、文档和 `.env` 不进这份 zip。这不是 `dex-buddy-plugin-pack.json`，仓库根上有那份旧文件时发布会失败。把仓库和这个 tag 告诉 Dex Buddy 维护者，由他在 Actions 里运行 Publish Plugin。
-
-工作台登录后走宿主会话，设置页不再要模型钥匙。作者独立运行在仓库 `.env` 填 `DEX_BUDDY_API_KEY`（可选 `DEX_GATEWAY_BASE_URL`）。钥匙不进设置页，不进 zip。装进 Dex Buddy 后不读这把钥匙。
+模型助手：`lib/dex-buddy-sdk.js` 是接口层（`SDK_VERSION` 对照母版）；工作台走宿主 `ctx.models`。本机 `node scripts/run-studio.js` 无宿主时，同目录还要有 `lib/dex-buddy-standalone.js`（`bindModels` 会懒加载）。工作台登录后走宿主会话，设置页不再要模型钥匙。作者独立运行在仓库 `.env` 填 `DEX_BUDDY_API_KEY`（可选 `DEX_GATEWAY_BASE_URL`）；本仓自己读 `.env`，SDK 不读。钥匙不进设置页，不进 zip。装进 Dex Buddy 后不读这把钥匙。
 
 ## 参数
 
