@@ -447,3 +447,187 @@ test('commit 可带改过的题词；用户册可 update；出厂拒绝', async 
   assert.equal(factoryDetail.ok, true);
   assert.equal(factoryDetail.editable, false);
 });
+
+/**
+ * 11 槽齐全，文案区故意不用出厂口号（复现「缺了文案区」卡死）。
+ * @returns {string}
+ */
+function elevenSlotsHead() {
+  return [
+    '竖版 3:4，测。',
+    '1. 背景：白',
+    '2. 色彩：黑',
+    '3. 字体：黑',
+    '4. 字号：大',
+    '5. 字重：粗',
+    '6. 文字排版：短',
+    '7. 文字位置：中',
+    '8. 构图布局：偏',
+    '9. 视觉风格：测',
+    '10. 光影与质感：平',
+    '11. 主题绘画内容：{{scene}}',
+  ].join('\n');
+}
+
+/**
+ * @param {string} userDir
+ * @param {{
+ *   id: string;
+ *   kind: string;
+ *   slug: string;
+ *   copySchema: string;
+ *   promptMd: string;
+ *   constraints?: Record<string, unknown>;
+ * }} pack
+ */
+function writeUserAlbumPack(userDir, pack) {
+  const home = path.join(userDir, pack.id);
+  fs.mkdirSync(home, { recursive: true });
+  fs.writeFileSync(path.join(home, 'album.json'), `${JSON.stringify({
+    id: pack.id,
+    kind: pack.kind,
+    slug: pack.slug,
+    hint: `hint ${pack.id}`,
+    label: `label ${pack.id}`,
+    copySchema: pack.copySchema,
+    legacyIds: [],
+    enabled: true,
+    promptSheetVersion: 2,
+    ...(pack.constraints ? { constraints: pack.constraints } : {}),
+  }, null, 2)}\n`);
+  fs.writeFileSync(path.join(home, 'prompt.md'), `${pack.promptMd}\n`);
+  fs.writeFileSync(path.join(home, 'copy-sample.md'), '仅示例\n');
+}
+
+test('五种版式文案区不用出厂口号时仍能 renderAlbumPrompt', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'album-copy-zone-'));
+  const userDir = path.join(dir, 'runtime', 'albums');
+  seedFactoryAlbums(dir);
+
+  /** @type {Array<{
+   *   id: string;
+   *   kind: string;
+   *   slug: string;
+   *   copySchema: string;
+   *   promptMd: string;
+   *   constraints?: Record<string, unknown>;
+   *   scene: string;
+   *   frame: Record<string, unknown>;
+   *   expect: RegExp[];
+   * }>} */
+  const cases = [
+    {
+      id: '100000.magazine.noir-like',
+      kind: 'magazine',
+      slug: 'noir-like',
+      copySchema: '字段：\n- line：主标题（非空）\n返回：{"frames":[{"line":"..."}]}',
+      // 暗调珠宝封面同款：少「中文」二字
+      promptMd: `${elevenSlotsHead()}\n\n图片必须准确呈现的文案：\n{{line}}\n\n文案须完整准确。`,
+      scene: '低光人像与项链',
+      frame: { line: 'SHINE' },
+      expect: [/低光人像与项链/, /SHINE/, /图片必须准确呈现的文案/],
+    },
+    {
+      id: '100001.scrapbook.hand-like',
+      kind: 'scrapbook',
+      slug: 'hand-like',
+      copySchema: '字段：\n- line：一句（非空）\n- note：旁注（可空）\n返回：{"frames":[{"line":"...","note":"..."}]}',
+      promptMd: `${elevenSlotsHead()}\n\n上图文案：\n{{line}}\n{{noteBlock}}\n\n文案须完整准确。`,
+      scene: '便签与钢笔',
+      frame: { line: '记一句', note: '圈一下' },
+      expect: [/便签与钢笔/, /记一句/, /旁注：圈一下/],
+    },
+    {
+      id: '100002.conceptual.view-like',
+      kind: 'conceptual',
+      slug: 'view-like',
+      copySchema: '字段：\n- theme：主题\n- mainTitle：主标题\n- subTitle：副标题\n返回：{"frames":[{...}]}',
+      // 不用「本次主题内容」
+      promptMd: `${elevenSlotsHead()}\n\n主题：\n{{theme}}\n\n标题：\n{{mainTitle}}\n\n副标：\n{{subTitle}}\n\n文案须完整准确。`,
+      scene: '几何块托起箭头',
+      frame: { theme: '自我成长', mainTitle: '旺自己', subTitle: '六十法' },
+      expect: [/几何块托起箭头/, /自我成长/, /旺自己/, /六十法/],
+    },
+    {
+      id: '100003.card.know-like',
+      kind: 'card',
+      slug: 'know-like',
+      copySchema: '字段：\n- mainTitle：主标题\n- point：要点\n返回：{"frames":[{...}]}',
+      // 不用「底部要点」
+      promptMd: `${elevenSlotsHead()}\n\n标题：\n{{mainTitle}}\n\n收束：\n{{point}}\n\n文案须完整准确。`,
+      scene: '模块箭头',
+      frame: { mainTitle: '先装命令', point: '再装插件' },
+      expect: [/模块箭头/, /先装命令/, /再装插件/],
+    },
+    {
+      id: '100004.infographic.mod-like',
+      kind: 'infographic',
+      slug: 'mod-like',
+      copySchema: [
+        '字段：',
+        '- seriesLabel：系列',
+        '- theme：主题',
+        '- mainTitle：主标题',
+        '- subTitle：副标题',
+        '- modules：模块数组',
+        '- stepsBar：流程条',
+        '- steps：步骤数组',
+        '- summary：总结',
+        '- credit：署名',
+        '返回：{"frames":[{...}]}',
+      ].join('\n'),
+      constraints: {
+        modules: { min: 2, max: 6 },
+        steps: { min: 3, max: 7 },
+      },
+      // 不用「栏目标签 / 总结金句」等出厂口号
+      promptMd: [
+        elevenSlotsHead(),
+        '',
+        '系列：{{seriesLabel}}',
+        '主题：{{theme}}',
+        '标题：{{mainTitle}}',
+        '副标：{{subTitle}}',
+        '{{modulesBlock}}',
+        '{{stepsBlock}}',
+        '收束：{{summary}}',
+        '署名：{{credit}}',
+        '',
+        '文案须完整准确。',
+      ].join('\n'),
+      scene: '线面图标不盖标题',
+      frame: {
+        seriesLabel: '★ 测 · 01',
+        theme: '讲清顺序',
+        mainTitle: '顺序要对',
+        subTitle: '先定方法',
+        modules: [
+          { title: '甲', body: '说明甲', note: '', icon: '图甲' },
+          { title: '乙', body: '说明乙', note: '', icon: '图乙' },
+        ],
+        stepsBar: '两步',
+        steps: [
+          { name: '一步', body: '做一', icon: '标一' },
+          { name: '二步', body: '做二', icon: '标二' },
+          { name: '三步', body: '做三', icon: '标三' },
+        ],
+        summary: '先对再久',
+        credit: '测试',
+      },
+      expect: [/线面图标不盖标题/, /★ 测 · 01/, /顺序要对/, /先对再久/, /测试/],
+    },
+  ];
+
+  for (const item of cases) {
+    writeUserAlbumPack(userDir, item);
+  }
+  clearAlbumCatalogCache(dir, userDir);
+
+  for (const item of cases) {
+    const frame = normalizeFrame(item.frame, item.id, dir, userDir);
+    const rendered = renderAlbumPrompt(dir, item.id, item.scene, frame, userDir);
+    for (const pattern of item.expect) {
+      assert.match(rendered.prompt, pattern, `${item.id} 应含 ${pattern}`);
+    }
+  }
+});

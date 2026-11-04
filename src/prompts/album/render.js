@@ -13,8 +13,6 @@ const sheetModule = require('./sheet');
 const templateModule = require('../template');
 
 const {
-  ALBUM_KIND_SET,
-  albumKind,
   albumLabel,
   isAlbum,
   loadAlbumCatalog,
@@ -126,7 +124,6 @@ function renderAlbumPrompt(promptsDir, album, scene, frame, userAlbumsDir) {
   const copy = /** @type {import('./frame').CopyFrame} */ (frame);
   const display = frameDisplayLine(album, copy, promptsDir, userAlbumsDir);
   if (!display) throw new Error('这一张的文案是空的');
-  const kind = albumKind(album, promptsDir, userAlbumsDir);
   const template = readAlbumPromptText(promptsDir, album, userAlbumsDir);
   assertPromptSheet(template);
 
@@ -137,34 +134,8 @@ function renderAlbumPrompt(promptsDir, album, scene, frame, userAlbumsDir) {
     picture,
   );
 
+  // 文案区口号由题词自定；不按出厂原句拦截，避免自学册措辞略异就卡死生图
   const prompt = fillPrompt(template, vars).trim();
-  if (SHEET_SLOTS.some((slot) => !prompt.includes(slot)) || !prompt.includes(picture) || !prompt.includes(display)) {
-    throw new Error('绘图提示词缺了一槽');
-  }
-  if (kind === 'magazine' || kind === 'scrapbook') {
-    if (!prompt.includes('图片必须准确呈现的中文文案')) {
-      throw new Error('绘图提示词缺了文案区');
-    }
-  } else if (kind === 'conceptual') {
-    if (!prompt.includes('本次主题内容') || !prompt.includes('主标题') || !prompt.includes('副标题')) {
-      throw new Error('绘图提示词缺了文案区');
-    }
-  } else if (kind === 'card') {
-    if (!prompt.includes('主标题') || !prompt.includes('底部要点')) {
-      throw new Error('绘图提示词缺了文案区');
-    }
-  } else if (kind === 'infographic') {
-    if (
-      !prompt.includes('栏目标签')
-      || !prompt.includes('核心信息模块')
-      || !prompt.includes('步骤流程')
-      || !prompt.includes('总结金句')
-    ) {
-      throw new Error('绘图提示词缺了文案区');
-    }
-  } else if (!ALBUM_KIND_SET.has(kind)) {
-    // 通用槽：展示句已写入 prompt（上方统一检查）
-  }
   return {
     prompt,
     style: albumLabel(album, promptsDir, userAlbumsDir),
