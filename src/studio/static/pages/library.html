@@ -2,9 +2,10 @@
   class="flex min-h-0 min-w-0 flex-1 flex-col"
   x-data="libraryPage()"
   x-init="init()"
-  @library-open-create.window="openCreateMenu()"
+    @library-open-create.window="openCreateMenu()"
   @library-albums-busy.window="onAlbumsBusy($event.detail)"
   @library-toast.window="onLibraryToast($event.detail)"
+  @library-select-tab.window="selectTab($event.detail)"
 >
   <template x-if="toast">
     <div class="toast toast-top toast-center z-[70]">
@@ -57,6 +58,12 @@
             role="menuitem"
             @click="onCreateArticleSamples()"
           >范文</button>
+          <button
+            class="flex w-full items-center px-3 py-2 text-left text-sm hover:bg-base-200"
+            type="button"
+            role="menuitem"
+            @click="onCreateXhsNote()"
+          >小红书笔记</button>
         </div>
       </div>
     </div>
@@ -84,6 +91,7 @@
     role="tabpanel"
     aria-labelledby="library-tab-albums"
     @library-pick-image.window="onPickImage()"
+    @library-learn-album-dataurl.window="onLearnDataUrl($event.detail)"
   >
     <input
       class="hidden"
@@ -650,6 +658,191 @@
           <button class="btn btn-ghost btn-sm" type="button" @click="cancelDelete()" :disabled="deleting">取消</button>
           <button class="btn btn-error btn-sm" type="button" @click="confirmDelete()" :disabled="deleting">删除</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div
+    x-data="libraryXhsNote()"
+    x-init="init()"
+    @library-create-xhs-note.window="openModal()"
+  >
+    <div
+      id="library-xhs-note-modal"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      x-show="open"
+      x-cloak
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="library-xhs-note-title"
+      @keydown.escape.window="open && !busy && close()"
+    >
+      <button class="absolute inset-0 cursor-default" type="button" aria-label="关闭" @click="!busy && close()"></button>
+      <div class="relative z-10 flex w-full max-w-xl flex-col gap-3 rounded-lg border border-base-300 bg-base-100 p-4 shadow-lg" @click.stop>
+        <h3 id="library-xhs-note-title" class="text-base font-medium" x-text="step === 'done' ? '收录完成' : (step === 'choose' ? '学这篇笔记' : '从小红书笔记学')"></h3>
+
+        <template x-if="step === 'url'">
+          <div class="flex flex-col gap-3">
+            <label class="text-sm" for="library-xhs-note-url">笔记链接</label>
+            <input
+              id="library-xhs-note-url"
+              class="input input-bordered w-full"
+              type="url"
+              x-ref="urlInput"
+              x-model="url"
+              :disabled="busy"
+              placeholder="https://www.xiaohongshu.com/explore/… 或 xhslink"
+              @keydown.enter.prevent="onResolve()"
+            />
+            <p class="text-sm text-base-content/60">需要本机 Chrome 已登录小红书，并打开内部特供版「允许 Dex Buddy 连接」。</p>
+            <p class="text-sm text-error" role="alert" x-show="error" x-text="error"></p>
+            <div class="flex justify-end gap-2">
+              <button class="btn btn-ghost btn-sm" type="button" @click="close()" :disabled="busy">取消</button>
+              <button class="btn btn-primary btn-sm" type="button" @click="onResolve()" :disabled="busy || !String(url || '').trim()">
+                <span x-show="!busy">取这篇</span>
+                <span x-show="busy">正在取料…</span>
+              </button>
+            </div>
+          </div>
+        </template>
+
+        <template x-if="step === 'choose'">
+          <div class="flex flex-col gap-3">
+            <fieldset class="flex flex-row flex-wrap items-center gap-x-4 gap-y-2">
+              <legend class="sr-only">选择学习内容</legend>
+              <label
+                class="flex cursor-pointer items-center gap-2 text-sm"
+                :title="!parts.body ? '这篇没有正文' : ''"
+              >
+                <input class="checkbox checkbox-sm" type="checkbox" x-model="learnArticle" :disabled="busy || !parts.body" />
+                <span class="font-medium">学习文章</span>
+              </label>
+              <label
+                class="flex cursor-pointer items-center gap-2 text-sm"
+                :title="!parts.hasCover ? '这篇没有封面图' : ''"
+              >
+                <input class="checkbox checkbox-sm" type="checkbox" x-model="learnCover" :disabled="busy || !parts.hasCover" />
+                <span class="font-medium">学习首图</span>
+              </label>
+              <label
+                class="flex cursor-pointer items-center gap-2 text-sm"
+                :title="parts.innerCount < 1 ? '这篇没有内页' : ''"
+              >
+                <input class="checkbox checkbox-sm" type="checkbox" x-model="learnInner" :disabled="busy || parts.innerCount < 1" />
+                <span class="font-medium">学习内页</span>
+              </label>
+            </fieldset>
+            <p class="text-sm text-base-content/60" x-show="!parts.body || !parts.hasCover || parts.innerCount < 1">
+              <span x-show="!parts.body">这篇没有正文。</span>
+              <span x-show="!parts.hasCover">这篇没有封面图。</span>
+              <span x-show="parts.innerCount < 1">这篇没有内页。</span>
+            </p>
+            <div
+              class="flex flex-col gap-2"
+              x-show="(learnCover && parts.hasCover) || (learnInner && parts.innerCount >= 1)"
+            >
+              <p class="text-sm text-base-content/60">
+                悬停可看大图。
+                <span x-show="learnInner && parts.innerCount > 1">多内页时只学一张。</span>
+              </p>
+              <div class="flex flex-wrap gap-2" role="radiogroup" aria-label="首图与内页">
+                <div
+                  class="relative h-16 w-16 overflow-hidden rounded-md border border-base-300 bg-base-200"
+                  x-show="learnCover && parts.hasCover"
+                  role="img"
+                  aria-label="首图预览"
+                  @mouseenter="showInnerHover($event, { previewUrl: parts.coverPreviewUrl, url: parts.coverUrl })"
+                  @mouseleave="hideInnerHover()"
+                  @focusin="showInnerHover($event, { previewUrl: parts.coverPreviewUrl, url: parts.coverUrl })"
+                  @focusout="hideInnerHover()"
+                  tabindex="0"
+                >
+                  <img class="h-full w-full object-cover" :src="parts.coverPreviewUrl || parts.coverUrl" alt="首图" />
+                  <span class="pointer-events-none absolute bottom-0 left-0 right-0 bg-base-100/90 px-1 py-0.5 text-center text-[10px] leading-none text-base-content/80">首图</span>
+                </div>
+                <template x-for="item in parts.inners" :key="item.index">
+                  <label
+                    class="relative h-16 w-16 cursor-pointer overflow-hidden rounded-md border border-base-300 bg-base-200"
+                    x-show="learnInner && parts.innerCount >= 1"
+                    @mouseenter="showInnerHover($event, item)"
+                    @mouseleave="hideInnerHover()"
+                    @focusin="showInnerHover($event, item)"
+                    @focusout="hideInnerHover()"
+                  >
+                    <input
+                      class="sr-only"
+                      type="radio"
+                      name="xhs-inner"
+                      :value="item.index"
+                      x-model.number="innerIndex"
+                      :disabled="busy || parts.innerCount < 2"
+                    />
+                    <img class="h-full w-full object-cover" :src="item.previewUrl || item.url" alt="" />
+                    <span
+                      class="pointer-events-none absolute inset-0 ring-2 ring-inset"
+                      :class="innerIndex === item.index ? 'ring-primary' : 'ring-transparent'"
+                    ></span>
+                  </label>
+                </template>
+              </div>
+            </div>
+            <div
+              class="pointer-events-none fixed z-50 w-60 overflow-hidden rounded-lg border border-base-300 bg-base-100 shadow-lg"
+              x-show="hoverOpen"
+              x-cloak
+              :style="hoverStyle"
+            >
+              <div class="relative aspect-[3/4] w-full bg-base-200">
+                <img class="absolute inset-0 h-full w-full object-contain" x-show="hoverPreview" :src="hoverPreview" alt="" />
+                <span class="absolute inset-0 flex items-center justify-center text-sm text-base-content/40" x-show="!hoverPreview">无预览</span>
+              </div>
+            </div>
+            <p class="text-sm leading-6" x-text="parts.title || '未命名笔记'"></p>
+            <div class="border border-base-300" x-show="parts.body" x-cloak>
+              <button
+                class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm font-medium"
+                type="button"
+                :aria-expanded="bodyOpen ? 'true' : 'false'"
+                aria-controls="library-xhs-note-body"
+                @click="bodyOpen = !bodyOpen"
+              >
+                <span class="font-normal text-base-content/70" x-text="bodySummary()"></span>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" class="shrink-0" :class="bodyOpen ? 'rotate-180' : ''"><path d="m6 9 6 6 6-6"></path></svg>
+              </button>
+              <div id="library-xhs-note-body" class="border-t border-base-300 px-3 py-3" x-show="bodyOpen" x-cloak>
+                <div class="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-md bg-base-200 p-2 text-sm leading-6" x-text="parts.body"></div>
+              </div>
+            </div>
+            <p class="text-sm text-error" role="alert" x-show="error" x-text="error"></p>
+            <div class="flex justify-end gap-2">
+              <button class="btn btn-ghost btn-sm" type="button" @click="close()" :disabled="busy">取消</button>
+              <button class="btn btn-primary btn-sm" type="button" @click="onConfirmLearn()" :disabled="busy || !canConfirmLearn">
+                <span x-show="!busy">开始学习</span>
+                <span x-show="busy">正在收录…</span>
+              </button>
+            </div>
+          </div>
+        </template>
+
+        <template x-if="step === 'done'">
+          <div class="flex flex-col gap-3">
+            <p class="text-sm leading-6 text-base-content/70">
+              链接已收录。
+              <span x-show="articleSample">范文已写入资料库。</span>
+              图册若有勾选，请在草稿里确认或放弃。
+            </p>
+            <p class="text-sm text-error" role="alert" x-show="error" x-text="error"></p>
+            <div class="flex justify-end gap-2">
+              <button class="btn btn-ghost btn-sm" type="button" @click="finishDone()">完成</button>
+              <button
+                class="btn btn-primary btn-sm"
+                type="button"
+                x-show="articleSample"
+                @click="goWriteWithSample()"
+              >用这篇写法去写</button>
+            </div>
+          </div>
+        </template>
       </div>
     </div>
   </div>

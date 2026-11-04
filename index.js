@@ -20,6 +20,8 @@ const path = require('node:path');
 const envModule = require('./src/one-post/env');
 /** @type {typeof import('./src/one-post/run')} */
 const runModule = require('./src/one-post/run');
+/** @type {typeof import('./src/xhs-note/register-host')} */
+const registerHost = require('./src/xhs-note/register-host');
 const { fillMissingFromDotEnv } = envModule;
 const { createRunner } = runModule;
 
@@ -66,6 +68,20 @@ module.exports = {
    * @param {AppContext} ctx
    */
   apply(ctx) {
+    // 静默注册 Native Messaging Host；失败不挡插件启动。
+    try {
+      const hostReg = registerHost.ensureNativeHostRegistered({
+        hostScriptPath: path.join(pluginRoot(), 'scripts', 'dexbuddy-native-host.js'),
+      });
+      if (!hostReg.ok && hostReg.message) {
+        console.warn('[xhs-growth] native host register:', hostReg.message);
+      }
+    } catch (err) {
+      console.warn(
+        '[xhs-growth] native host register failed:',
+        err instanceof Error ? err.message : String(err),
+      );
+    }
     const dataDir = ctx && ctx.dirs && ctx.dirs.data ? ctx.dirs.data : pluginRoot();
     const runner = createRunner({
       postsDir: path.join(dataDir, 'output', 'one-post', 'posts'),
@@ -74,6 +90,7 @@ module.exports = {
       userImageRefsDir: path.join(dataDir, 'runtime', 'image-refs'),
       userUploadRefsDir: path.join(dataDir, 'runtime', 'materials', 'upload-refs'),
       userArticleSamplesDir: path.join(dataDir, 'runtime', 'materials', 'article-samples'),
+      userXhsNotesDir: path.join(dataDir, 'runtime', 'materials', 'xhs-notes'),
       // 设置页保存不重跑 apply；真正发请求时再读 pluginEnv / .env。
       readEnv: () => resolveEnv(ctx),
       ctx,
@@ -127,6 +144,18 @@ module.exports = {
        */
       learnAlbum(payload) {
         return runner.learnAlbum(asObject(payload));
+      },
+      /**
+       * @param {unknown} payload
+       */
+      resolveXhsNote(payload) {
+        return runner.resolveXhsNote(asObject(payload));
+      },
+      /**
+       * @param {unknown} payload
+       */
+      importXhsNote(payload) {
+        return runner.importXhsNote(asObject(payload));
       },
       /**
        * @param {unknown} payload

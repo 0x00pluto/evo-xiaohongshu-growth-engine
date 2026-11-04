@@ -301,6 +301,58 @@ function libraryAlbums() {
     },
 
     /**
+     * 外部（小红书笔记进料）直接交 dataUrl 学成草稿。
+     * @param {{ dataUrl?: string; label?: string } | string | undefined} detail
+     */
+    async onLearnDataUrl(detail) {
+      const dataUrl = typeof detail === 'string'
+        ? detail
+        : (detail && typeof detail.dataUrl === 'string' ? detail.dataUrl : '');
+      if (!dataUrl) {
+        window.dispatchEvent(new CustomEvent('library-album-draft-settled', {
+          detail: { action: 'error', message: '没有可学的图' },
+        }));
+        return;
+      }
+      if (!this.hostReady || this.learning || this.committing || this.savingDetail) {
+        window.dispatchEvent(new CustomEvent('library-album-draft-settled', {
+          detail: { action: 'error', message: '图库正忙，请稍后再试' },
+        }));
+        return;
+      }
+      this.error = '';
+      this.learning = true;
+      try {
+        const result = await this.call('learnAlbum', { dataUrl });
+        if (!result || result.ok === false) {
+          const message = (result && result.message) || '学习失败';
+          this.error = message;
+          window.dispatchEvent(new CustomEvent('library-album-draft-settled', {
+            detail: { action: 'error', message },
+          }));
+          return;
+        }
+        this.draft = result.draft;
+        this.draftPrompt = String((result.draft && result.draft.promptTemplate) || '');
+        this.draftOpen = true;
+        this.detailOpen = false;
+        this.detail = null;
+        this.detailSample = '';
+        this.detailPrompt = '';
+        this.detailSavedPrompt = '';
+        this.$nextTick(() => this.syncPromptEditor('draft'));
+      } catch (err) {
+        const message = err && err.message ? err.message : '学习失败';
+        this.error = message;
+        window.dispatchEvent(new CustomEvent('library-album-draft-settled', {
+          detail: { action: 'error', message },
+        }));
+      } finally {
+        this.learning = false;
+      }
+    },
+
+    /**
      * @param {Event} event
      */
     async onFileChange(event) {
@@ -316,27 +368,11 @@ function libraryAlbums() {
         this.error = '参考图太大，请换一张不超过 8MB 的图';
         return;
       }
-      this.learning = true;
       try {
         const dataUrl = await this.readFileAsDataUrl(file);
-        const result = await this.call('learnAlbum', { dataUrl });
-        if (!result || result.ok === false) {
-          this.error = (result && result.message) || '学习失败';
-          return;
-        }
-        this.draft = result.draft;
-        this.draftPrompt = String((result.draft && result.draft.promptTemplate) || '');
-        this.draftOpen = true;
-        this.detailOpen = false;
-        this.detail = null;
-        this.detailSample = '';
-        this.detailPrompt = '';
-        this.detailSavedPrompt = '';
-        this.$nextTick(() => this.syncPromptEditor('draft'));
+        await this.onLearnDataUrl({ dataUrl });
       } catch (err) {
         this.error = err && err.message ? err.message : '学习失败';
-      } finally {
-        this.learning = false;
       }
     },
 
@@ -367,11 +403,15 @@ function libraryAlbums() {
           this.error = (result && result.message) || '写入失败';
           return;
         }
+        const albumId = result && result.id ? String(result.id) : '';
         this.closeEyedropper();
         this.draftOpen = false;
         this.draft = null;
         this.draftPrompt = '';
         this.$dispatch('library-toast', '已写入图库');
+        window.dispatchEvent(new CustomEvent('library-album-draft-settled', {
+          detail: { action: 'commit', id: albumId },
+        }));
         await this.refresh();
       } finally {
         this.committing = false;
@@ -386,6 +426,9 @@ function libraryAlbums() {
       this.draft = null;
       this.draftPrompt = '';
       this.$dispatch('library-toast', '已放弃草稿');
+      window.dispatchEvent(new CustomEvent('library-album-draft-settled', {
+        detail: { action: 'discard' },
+      }));
     },
 
     /**

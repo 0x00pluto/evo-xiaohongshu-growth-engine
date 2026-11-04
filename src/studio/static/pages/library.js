@@ -81,5 +81,12 @@ function libraryPage() {
         this.$dispatch('library-create-article-sample');
       });
     },
+
+    onCreateXhsNote() {
+      this.closeCreate();
+      this.$nextTick(() => {
+        this.$dispatch('library-create-xhs-note');
+      });
+    },
   };
 }

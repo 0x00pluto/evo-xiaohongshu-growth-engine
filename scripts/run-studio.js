@@ -10,6 +10,8 @@ const path = require('node:path');
 const envModule = require('../src/one-post/env');
 /** @type {typeof import('../src/one-post/run')} */
 const runModule = require('../src/one-post/run');
+/** @type {typeof import('../src/xhs-note/register-host')} */
+const registerHost = require('../src/xhs-note/register-host');
 const { fillMissingFromDotEnv } = envModule;
 const { createRunner } = runModule;
 
@@ -33,6 +35,8 @@ const METHODS = new Set([
   'deleteLibraryArticleSample',
   'getAlbumDetail',
   'learnAlbum',
+  'resolveXhsNote',
+  'importXhsNote',
   'commitAlbum',
   'updateAlbumPrompt',
   'discardAlbum',
@@ -182,6 +186,7 @@ function createStudio(options) {
     userImageRefsDir: path.join(root, 'runtime', 'image-refs'),
     userUploadRefsDir: path.join(root, 'runtime', 'materials', 'upload-refs'),
     userArticleSamplesDir: path.join(root, 'runtime', 'materials', 'article-samples'),
+    userXhsNotesDir: path.join(root, 'runtime', 'materials', 'xhs-notes'),
     env,
     // 独立运行没有宿主 ctx.models；把合并后的 .env 交给 bindModels。
     ctx: undefined,
@@ -402,6 +407,19 @@ function startServer(options) {
     const error = /** @type {Error & { code?: string }} */ (new Error('拒绝非本机绑定：请使用 127.0.0.1'));
     error.code = 'HOST_DENIED';
     throw error;
+  }
+  // 静默注册 Native Messaging Host；失败不挡操作台启动。
+  try {
+    const hostReg = registerHost.ensureNativeHostRegistered({
+      hostScriptPath: path.join(ROOT, 'scripts', 'dexbuddy-native-host.js'),
+    });
+    if (!hostReg.ok && hostReg.message) {
+      process.stderr.write(`[studio] native host: ${hostReg.message}\n`);
+    }
+  } catch (err) {
+    process.stderr.write(
+      `[studio] native host register failed: ${errorMessage(err, String(err))}\n`,
+    );
   }
   const runner = options.runner || createStudio(options);
   const staticDir = options.staticDir || STATIC_DIR;

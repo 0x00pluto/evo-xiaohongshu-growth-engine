@@ -935,6 +935,29 @@ function notePage() {
       this.resetBrief();
       this.resetPreview();
       this.phase = 'materials';
+      if (intent && intent.sampleId) {
+        await this.applyLibrarySample(String(intent.sampleId));
+      }
+    },
+
+    /**
+     * 从资料库带一篇范文进「要发什么」。
+     * @param {string} sampleId
+     */
+    async applyLibrarySample(sampleId) {
+      const id = String(sampleId || '').trim();
+      if (!id) return;
+      const data = await this.call('getLibraryArticleSample', { id });
+      if (!data || data.ok === false || !data.sample) {
+        this.errors.sampleBody = (data && data.message) || '读范文失败';
+        this.sampleOpen = true;
+        return;
+      }
+      this.sampleTitle = String(data.sample.title || '').trim();
+      this.sampleBody = String(data.sample.body || '').trim();
+      this.errors.sampleBody = '';
+      this.sampleOpen = false;
+      this.phase = 'materials';
     },
     editorPayload() {
       return {

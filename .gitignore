@@ -8,6 +8,10 @@ cache/
 temp/
 output/
 runtime/
+
+# Native Messaging 包装器（绝对路径，启动时静默生成）
+scripts/dexbuddy-native-host.sh
+scripts/dexbuddy-native-host.cmd
 dist/
 coverage/
 *.log
