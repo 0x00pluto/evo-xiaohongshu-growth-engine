@@ -8,7 +8,7 @@
 - `docs/builtin-workflows/consolidate-memory.md`: 记忆巩固与遗忘（冲突消解 → 情景提纯 → 剪枝）；仅用户显式触发；与反思 / 提取经验互不串联
 - `docs/builtin-workflows/publish-evo-agent-pack.md`: 仅首次 / 改合同时发布或核对 evo_agent_pack.json 工牌；日常发版勿进门；打 tag 改走 cut-release-tag；不做安装器
 - `docs/builtin-workflows/cut-release-tag.md`: 日常发版唯一入口；汇总变更 → upgrades → 对齐工牌与（若有）plugin.manifest 同号 → tag → 推送 → gh 或网页建 Release；major 须人指定
-- `docs/workflows/one-post-studio.md`: 一篇图文操作台与资料库（图库 / 上传参考 / 范文 / 新建小红书笔记进料；6 列竖卡；以前的笔记约 8 列竖卡墙，点卡开左图右文浮层、显示文件/复制/编辑进笔记页、悬停复制；材料页组合灰字+贴底写成笔记；范文单框粘贴首行标题、已选只读；参考≤5；成稿标题超 20 不拦；笔记页七档生图比例一篇共用、未锁定跟图册）；写成笔记与刷图在开始前查买断，购买/登录提示交给工作台；本机命令改页面会自动刷新，与 Dex Buddy 共用页面，插件包范围见 dex-buddy-plugin.pack
+- `docs/workflows/one-post-studio.md`: 一篇图文操作台与资料库（图库 / 上传参考 / 范文 / 新建小红书笔记进料；6 列竖卡；以前的笔记约 8 列竖卡墙，点卡开左图右文浮层、显示文件/复制/编辑进笔记页、悬停复制；材料页组合灰字+贴底写成笔记；范文单框粘贴首行标题、已选只读；参考≤5；成稿标题超 20 不拦；笔记页七档生图比例一篇共用、未锁定跟图册）；写成笔记与刷图在开始前查买断，购买/登录提示交给工作台；本机命令改页面会自动刷新；Dex Buddy 打包版用插件页「加载本地目录」，SDK 1.0.3 接口层 + standalone；插件包范围见 dex-buddy-plugin.pack
 - `specs/prds/prd-00012-learn-xhs-note.md`: 资料库贴小红书链接；解析链接单独入库；正文进范文、首图与一张内页进图册；写稿仍走范文加业务一句
 - `docs/faqs/how-to-native-host-silent-register.md`: Native Host ASCII 安装；按 QuanMediaCrawl 路径算扩展 ID；host exited 排查
 - `docs/workflows/_TEMPLATE.md`: 业务 workflow 六段骨架；新建业务工作流时复制并改名，写完后删掉本行或改成真实条目
