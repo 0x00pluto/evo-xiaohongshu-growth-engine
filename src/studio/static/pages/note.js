@@ -98,6 +98,11 @@ function notePage() {
     referenceEditorText: '',
     referenceEditorNew: false,
     referenceEditorError: '',
+    referenceEditorBusy: false,
+    referencePickOpen: false,
+    referencePickError: '',
+    referencePickBusy: false,
+    referenceLibraryDocs: [],
     galleryCount: 1,
     draft: null,
     emptyCopyDraft: { title: '', body: '', topics: [] },
@@ -198,7 +203,113 @@ function notePage() {
       const label = (text) => `<span class="font-medium text-base-content">${text}</span>`;
       return `${label('身份：')}${persona.identity}${label('语气：')}${persona.tone}${label('目标：')}${goal}`;
     },
-    addReference() {
+    /**
+     * @param {unknown} item
+     * @returns {{ name?: string; body: string } | null}
+     */
+    normalizeReferenceItem(item) {
+      if (typeof item === 'string') {
+        const body = item.trim();
+        return body ? { body } : null;
+      }
+      if (!item || typeof item !== 'object') return null;
+      const body = typeof item.body === 'string' ? item.body.trim() : '';
+      if (!body) return null;
+      const name = typeof item.name === 'string' ? item.name.trim() : '';
+      return name ? { name, body } : { body };
+    },
+    /**
+     * @param {{ name?: string; body: string } | null | undefined} item
+     * @returns {string}
+     */
+    referenceDisplayText(item) {
+      if (!item) return '';
+      const name = String(item.name || '').trim();
+      const body = String(item.body || '').trim();
+      if (name && body) return `${name}\n${body}`;
+      return body || name;
+    },
+    /**
+     * @param {unknown} paste
+     * @returns {{ name: string; body: string }}
+     */
+    splitPasteToDoc(paste) {
+      const raw = String(paste || '').replace(/\r\n/g, '\n').trim();
+      if (!raw) return { name: '', body: '' };
+      const nl = raw.indexOf('\n');
+      if (nl < 0) {
+        const name = Array.from(raw).slice(0, 20).join('');
+        return { name, body: raw };
+      }
+      const name = raw.slice(0, nl).trim();
+      const body = raw.slice(nl + 1).trim();
+      return {
+        name: name || Array.from(body).slice(0, 20).join(''),
+        body: body || name,
+      };
+    },
+    /**
+     * 编辑芯片：有换行才拆名称；无换行保持无名称（旧稿兼容）。
+     * @param {unknown} paste
+     * @returns {{ name?: string; body: string } | null}
+     */
+    parseChipPaste(paste) {
+      const raw = String(paste || '').replace(/\r\n/g, '\n').trim();
+      if (!raw) return null;
+      const nl = raw.indexOf('\n');
+      if (nl < 0) return { body: raw };
+      const name = raw.slice(0, nl).trim();
+      const body = raw.slice(nl + 1).trim();
+      if (!body && !name) return null;
+      if (!body) return { body: name };
+      if (!name) return { body };
+      return { name, body };
+    },
+    /**
+     * 篇内去重：trim 后正文全等即视为已加过。
+     * @param {unknown} body
+     * @param {number} [exceptIndex]
+     * @returns {boolean}
+     */
+    isReferenceAlreadyOnNote(body, exceptIndex) {
+      const target = String(body || '').trim();
+      if (!target) return false;
+      return this.references.some((item, index) => {
+        if (Number.isInteger(exceptIndex) && index === exceptIndex) return false;
+        const normalized = this.normalizeReferenceItem(item);
+        return Boolean(normalized && normalized.body === target);
+      });
+    },
+    /**
+     * @param {unknown[]} docs
+     * @returns {unknown[]}
+     */
+    filterAvailableReferenceDocs(docs) {
+      const list = Array.isArray(docs) ? docs : [];
+      return list.filter((doc) => {
+        if (!doc || typeof doc !== 'object') return false;
+        const body = typeof doc.body === 'string' ? doc.body.trim() : '';
+        // 旧列表回包可能没有 body：先留着，点选 get 后再拦。
+        if (!body) return true;
+        return !this.isReferenceAlreadyOnNote(body);
+      });
+    },
+    openCreateReferenceEditor() {
+      this.referencePickOpen = false;
+      this.referencePickError = '';
+      this.referencePickBusy = false;
+      this.referenceEditorNew = true;
+      this.referenceEditorIndex = this.references.length;
+      this.referenceEditorText = '';
+      this.referenceEditorError = '';
+      this.referenceEditorBusy = false;
+      this.referenceEditorOpen = true;
+      this.$nextTick(() => {
+        const el = this.$refs && this.$refs.referenceEditorText;
+        if (el && typeof el.focus === 'function') el.focus();
+      });
+    },
+    async addReference() {
       if (this.job.running) return;
       if (this.references.length >= REFERENCES_MAX) {
         this.errors.references = `参考资料最多 ${REFERENCES_MAX} 条。`;
@@ -206,11 +317,46 @@ function notePage() {
       }
       this.errors.references = '';
       this.hideReferenceHover();
-      this.referenceEditorNew = true;
-      this.referenceEditorIndex = this.references.length;
-      this.referenceEditorText = '';
-      this.referenceEditorError = '';
-      this.referenceEditorOpen = true;
+      if (!this.hostReady) {
+        this.openCreateReferenceEditor();
+        return;
+      }
+      this.referencePickBusy = true;
+      this.referencePickError = '';
+      try {
+        const data = await this.call('listLibraryReferenceDocs');
+        if (!data || data.ok === false) {
+          this.referencePickError = (data && data.message) || '读库失败';
+          this.referenceLibraryDocs = [];
+          this.openCreateReferenceEditor();
+          this.referenceEditorError = this.referencePickError;
+          return;
+        }
+        const all = Array.isArray(data.docs) ? data.docs : [];
+        this.referenceLibraryDocs = this.filterAvailableReferenceDocs(all);
+        if (this.referenceLibraryDocs.length > 0) {
+          this.referencePickOpen = true;
+          return;
+        }
+        this.openCreateReferenceEditor();
+      } finally {
+        this.referencePickBusy = false;
+      }
+    },
+    closePickReference() {
+      if (this.referencePickBusy) return;
+      this.referencePickOpen = false;
+      this.referencePickError = '';
+      this.referenceLibraryDocs = [];
+    },
+    openCreateReferenceFromPick() {
+      if (this.referencePickBusy || this.job.running) return;
+      if (this.references.length >= REFERENCES_MAX) {
+        this.errors.references = `参考资料最多 ${REFERENCES_MAX} 条。`;
+        this.closePickReference();
+        return;
+      }
+      this.openCreateReferenceEditor();
     },
     removeReference(index) {
       if (this.job.running) return;
@@ -221,7 +367,7 @@ function notePage() {
       this.persist();
     },
     showReferenceHover(index, event) {
-      const text = String(this.references[index] || '').trim();
+      const text = this.referenceDisplayText(this.references[index]);
       this.referenceHoverText = text;
       const rect = event && event.currentTarget && event.currentTarget.getBoundingClientRect
         ? event.currentTarget.getBoundingClientRect()
@@ -250,20 +396,86 @@ function notePage() {
       const i = Number(index);
       if (!Number.isInteger(i) || i < 0 || i >= this.references.length) return;
       this.hideReferenceHover();
+      this.closePickReference();
       this.referenceEditorNew = false;
       this.referenceEditorIndex = i;
-      this.referenceEditorText = String(this.references[i] || '');
+      this.referenceEditorText = this.referenceDisplayText(this.references[i]);
       this.referenceEditorError = '';
+      this.referenceEditorBusy = false;
       this.referenceEditorOpen = true;
+      this.$nextTick(() => {
+        const el = this.$refs && this.$refs.referenceEditorText;
+        if (el && typeof el.focus === 'function') el.focus();
+      });
     },
     closeReferenceEditor() {
+      if (this.referenceEditorBusy) return;
       this.referenceEditorOpen = false;
       this.referenceEditorIndex = -1;
       this.referenceEditorText = '';
       this.referenceEditorNew = false;
       this.referenceEditorError = '';
+      this.referenceEditorBusy = false;
     },
-    confirmReferenceEditor() {
+    /**
+     * @param {{ name?: string; body: string }} snap
+     */
+    pushReferenceSnapshot(snap) {
+      const item = this.normalizeReferenceItem(snap);
+      if (!item) return false;
+      if (this.references.length >= REFERENCES_MAX) {
+        this.errors.references = `参考资料最多 ${REFERENCES_MAX} 条。`;
+        return false;
+      }
+      if (this.isReferenceAlreadyOnNote(item.body)) {
+        this.errors.references = '这篇已经加过相同的参考资料。';
+        return false;
+      }
+      this.references = [...this.references, item];
+      this.errors.references = '';
+      this.persist();
+      return true;
+    },
+    async pickLibraryReference(item) {
+      if (!item || this.referencePickBusy || this.job.running) return;
+      if (this.references.length >= REFERENCES_MAX) {
+        this.errors.references = `参考资料最多 ${REFERENCES_MAX} 条。`;
+        this.closePickReference();
+        return;
+      }
+      this.referencePickBusy = true;
+      this.referencePickError = '';
+      try {
+        const data = await this.call('getLibraryReferenceDoc', { id: item.id });
+        if (!data || data.ok === false || !data.doc) {
+          this.referencePickError = (data && data.message) || '读库失败';
+          return;
+        }
+        const snap = this.normalizeReferenceItem({
+          name: data.doc.name,
+          body: data.doc.body,
+        });
+        if (!snap) {
+          this.referencePickError = '这条参考资料是空的';
+          return;
+        }
+        if (this.isReferenceAlreadyOnNote(snap.body)) {
+          this.referencePickError = '这篇已经加过相同的参考资料。';
+          this.referenceLibraryDocs = this.filterAvailableReferenceDocs(this.referenceLibraryDocs);
+          return;
+        }
+        if (!this.pushReferenceSnapshot(snap)) {
+          this.referencePickError = this.errors.references || '没有加上';
+          return;
+        }
+        this.referencePickBusy = false;
+        this.closePickReference();
+      } finally {
+        this.referencePickBusy = false;
+      }
+    },
+    async confirmReferenceEditor() {
+      if (this.referenceEditorBusy || this.job.running) return;
       const text = String(this.referenceEditorText || '').trim();
       if (!text) {
         this.referenceEditorError = '先写一点事实。空的参考资料不会保存。';
@@ -275,22 +487,78 @@ function notePage() {
           this.closeReferenceEditor();
           return;
         }
-        this.references = [...this.references, text];
-      } else {
-        const i = this.referenceEditorIndex;
-        if (!Number.isInteger(i) || i < 0 || i >= this.references.length) {
-          this.closeReferenceEditor();
+        const { name, body } = this.splitPasteToDoc(text);
+        if (!name) {
+          this.referenceEditorError = '请写上名称（第一行）。';
           return;
         }
-        const next = this.references.slice();
-        next[i] = text;
-        this.references = next;
+        if (!body) {
+          this.referenceEditorError = '请写上正文。';
+          return;
+        }
+        if (Array.from(body).length > 8000) {
+          this.referenceEditorError = '参考资料太长了，先删到 8000 字以内。';
+          return;
+        }
+        if (this.isReferenceAlreadyOnNote(body)) {
+          this.referenceEditorError = '这篇已经加过相同的参考资料。';
+          return;
+        }
+        this.referenceEditorBusy = true;
+        this.referenceEditorError = '';
+        try {
+          const result = await this.call('saveLibraryReferenceDoc', { name, body });
+          if (!result || result.ok === false || !result.doc) {
+            this.referenceEditorError = (result && result.message) || '写入资料库失败';
+            return;
+          }
+          const snap = this.normalizeReferenceItem({
+            name: result.doc.name,
+            body: result.doc.body,
+          });
+          if (!snap) return;
+          if (this.isReferenceAlreadyOnNote(snap.body)) {
+            this.referenceEditorError = '这篇已经加过相同的参考资料。';
+            return;
+          }
+          if (!this.pushReferenceSnapshot(snap)) {
+            this.referenceEditorError = this.errors.references || '没有加上';
+            return;
+          }
+          this.referenceEditorBusy = false;
+          this.closeReferenceEditor();
+        } finally {
+          this.referenceEditorBusy = false;
+        }
+        return;
       }
+      const parsed = this.parseChipPaste(text);
+      if (!parsed) {
+        this.referenceEditorError = '先写一点事实。空的参考资料不会保存。';
+        return;
+      }
+      if (Array.from(parsed.body).length > 8000) {
+        this.referenceEditorError = '参考资料太长了，先删到 8000 字以内。';
+        return;
+      }
+      const i = this.referenceEditorIndex;
+      if (!Number.isInteger(i) || i < 0 || i >= this.references.length) {
+        this.closeReferenceEditor();
+        return;
+      }
+      if (this.isReferenceAlreadyOnNote(parsed.body, i)) {
+        this.referenceEditorError = '这篇已经加过相同的参考资料。';
+        return;
+      }
+      const next = this.references.slice();
+      next[i] = parsed;
+      this.references = next;
       this.errors.references = '';
       this.persist();
       this.closeReferenceEditor();
     },
     deleteReferenceFromEditor() {
+      if (this.referenceEditorBusy) return;
       if (this.referenceEditorNew) {
         this.closeReferenceEditor();
         return;
@@ -694,7 +962,7 @@ function notePage() {
         this.sampleBody = '';
       }
       this.references = Array.isArray(next.references)
-        ? next.references.map((item) => String(item)).filter((item) => item.trim())
+        ? next.references.map((item) => this.normalizeReferenceItem(item)).filter(Boolean)
         : [];
       if (next.articleType === '素人') {
         this.articleType = '涨粉';

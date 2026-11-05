@@ -25,6 +25,8 @@ const uploadRefRules = require('../upload-refs/rules');
 const uploadRefFiles = require('../upload-refs/files');
 /** @type {typeof import('../article-samples/store')} */
 const articleSamplesStore = require('../article-samples/store');
+/** @type {typeof import('../reference-docs/store')} */
+const referenceDocsStore = require('../reference-docs/store');
 /** @type {typeof import('../xhs-note/links')} */
 const xhsNoteLinks = require('../xhs-note/links');
 /** @type {typeof import('../xhs-note/split')} */
@@ -141,6 +143,7 @@ const BUSY_MESSAGE = '正在生成，请等这一轮结束';
  *   userImageRefsDir?: string;
  *   userUploadRefsDir?: string;
  *   userArticleSamplesDir?: string;
+ *   userReferenceDocsDir?: string;
  *   userXhsNotesDir?: string;
  *   userXhsNotesCacheDir?: string;
  *   userMaterialsDir?: string;
@@ -375,6 +378,10 @@ function createRunner(options) {
   const userArticleSamplesDir = typeof options.userArticleSamplesDir === 'string'
     && options.userArticleSamplesDir.trim()
     ? path.resolve(options.userArticleSamplesDir.trim())
+    : '';
+  const userReferenceDocsDir = typeof options.userReferenceDocsDir === 'string'
+    && options.userReferenceDocsDir.trim()
+    ? path.resolve(options.userReferenceDocsDir.trim())
     : '';
   const userXhsNotesDir = typeof options.userXhsNotesDir === 'string'
     && options.userXhsNotesDir.trim()
@@ -872,7 +879,7 @@ function createRunner(options) {
    * @param {{
    *   business: string;
    *   sampleBody: string;
-   *   references: string[];
+   *   references: import('../draft/validate').ReferenceItem[];
    *   galleryCount: number;
    *   articleType: string;
    *   persona: string;
@@ -1269,7 +1276,7 @@ function createRunner(options) {
       state.sampleBody = source.article;
     }
     if (Array.isArray(source.references)) {
-      state.references = source.references.map((item) => String(item));
+      state.references = validateModule.normalizeReferencesInput(source.references);
     }
     if (typeof source.articleType === 'string') {
       state.articleType = isArticleType(source.articleType) ? source.articleType : '涨粉';
@@ -2297,6 +2304,59 @@ function createRunner(options) {
     }
   }
 
+  function listLibraryReferenceDocs() {
+    if (!userReferenceDocsDir) return { ok: true, docs: [] };
+    return {
+      ok: true,
+      docs: referenceDocsStore.listReferenceDocs(userReferenceDocsDir).map((item) => (
+        referenceDocsStore.publicListItem(item)
+      )),
+    };
+  }
+
+  /**
+   * @param {Record<string, unknown>} payload
+   */
+  function getLibraryReferenceDoc(payload) {
+    if (!userReferenceDocsDir) return { ok: false, message: '缺少参考资料库目录' };
+    const id = typeof payload.id === 'string' ? payload.id.trim() : '';
+    const meta = referenceDocsStore.readReferenceDoc(userReferenceDocsDir, id);
+    if (!meta) return { ok: false, message: '库里没有这条参考资料' };
+    return { ok: true, doc: meta };
+  }
+
+  /**
+   * @param {Record<string, unknown>} payload
+   */
+  function saveLibraryReferenceDoc(payload) {
+    if (!userReferenceDocsDir) return { ok: false, message: '缺少参考资料库目录' };
+    try {
+      const saved = referenceDocsStore.saveReferenceDoc(userReferenceDocsDir, {
+        id: typeof payload.id === 'string' ? payload.id : '',
+        name: payload.name,
+        body: payload.body,
+      });
+      // 返回完整条目（含 body），加一条去重后才能用库里的名称快照。
+      return { ok: true, doc: saved };
+    } catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : '保存失败' };
+    }
+  }
+
+  /**
+   * @param {Record<string, unknown>} payload
+   */
+  function deleteLibraryReferenceDoc(payload) {
+    if (!userReferenceDocsDir) return { ok: false, message: '缺少参考资料库目录' };
+    try {
+      const id = typeof payload.id === 'string' ? payload.id : '';
+      referenceDocsStore.deleteReferenceDoc(userReferenceDocsDir, id);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : '删除失败' };
+    }
+  }
+
   /**
    * 打开进料弹层时探测本机 Chrome 扩展取料通道与版本。
    */
@@ -2753,6 +2813,7 @@ function createRunner(options) {
     commitAlbum,
     deleteAlbum,
     deleteLibraryArticleSample,
+    deleteLibraryReferenceDoc,
     deleteLibraryUploadRef,
     deleteUploadRef,
     discardAlbum,
@@ -2762,12 +2823,14 @@ function createRunner(options) {
     generatePrompts,
     getAlbumDetail,
     getLibraryArticleSample,
+    getLibraryReferenceDoc,
     checkXhsNoteBridge,
     importXhsNote,
     saveXhsNoteArticle,
     learnAlbum,
     listAlbums,
     listLibraryArticleSamples,
+    listLibraryReferenceDocs,
     listLibraryUploadRefs,
     listPosts: catalog,
     loadLatest,
@@ -2785,6 +2848,7 @@ function createRunner(options) {
     retryImage,
     saveEditor,
     saveLibraryArticleSample,
+    saveLibraryReferenceDoc,
     saveUploadRefToLibrary,
     setAspectRatio,
     setSlotPick,

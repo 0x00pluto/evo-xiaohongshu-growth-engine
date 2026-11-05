@@ -32,11 +32,12 @@ const PERSONA_FILES = {
 
 /**
  * @typedef {{ system: string; user: string }} DraftMessages
+ * @typedef {{ name?: string; body: string }} ReferenceItem
  * @typedef {{
  *   business: string;
  *   persona?: string;
  *   sampleBody?: string;
- *   references?: string[];
+ *   references?: Array<string | ReferenceItem>;
  * }} DraftPromptVars
  */
 
@@ -95,6 +96,22 @@ function buildSampleBlock(sampleBody) {
 }
 
 /**
+ * @param {unknown} item
+ * @returns {string}
+ */
+function formatReferenceLine(item) {
+  if (typeof item === 'string') {
+    return item.trim();
+  }
+  if (!item || typeof item !== 'object' || Array.isArray(item)) return '';
+  const bag = /** @type {Record<string, unknown>} */ (item);
+  const body = typeof bag.body === 'string' ? bag.body.trim() : '';
+  if (!body) return '';
+  const name = typeof bag.name === 'string' ? bag.name.trim() : '';
+  return name ? `${name}：${body}` : body;
+}
+
+/**
  * @param {string} business
  * @param {unknown} references
  * @returns {string}
@@ -106,7 +123,7 @@ function buildContentBlock(business, references) {
     business,
   ];
   const refs = Array.isArray(references)
-    ? references.map((item) => String(item).trim()).filter(Boolean)
+    ? references.map((item) => formatReferenceLine(item)).filter(Boolean)
     : [];
   if (refs.length > 0) {
     lines.push('');

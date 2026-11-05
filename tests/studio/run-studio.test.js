@@ -55,7 +55,9 @@ test('本机服务的 loadLatest 在空目录返回空态', async () => {
     assert.match(noteHtml, /lucide:file-text/);
     assert.match(noteHtml, /openReferenceEditor/);
     assert.match(noteHtml, /id="add-reference"/);
-    assert.match(noteHtml, /references\.length >= 5/);
+    assert.match(noteHtml, /x-show="references\.length < 5"/);
+    assert.match(noteHtml, /id="reference-pick-library-modal"/);
+    assert.match(noteHtml, /新增资料/);
     assert.match(noteHtml, /id="reference-editor-modal"/);
     assert.doesNotMatch(noteHtml, /事实内容/);
     assert.match(noteHtml, /id="sample-hint"/);
@@ -128,7 +130,14 @@ test('本机服务的 loadLatest 在空目录返回空态', async () => {
     assert.match(noteJs, /REFERENCES_MAX = 5/);
     assert.match(noteJs, /listLibraryArticleSamples/);
     assert.match(noteJs, /saveLibraryArticleSample/);
+    assert.match(noteJs, /listLibraryReferenceDocs/);
+    assert.match(noteJs, /saveLibraryReferenceDoc/);
+    assert.match(noteJs, /pickLibraryReference/);
+    assert.match(noteJs, /isReferenceAlreadyOnNote/);
+    assert.match(noteJs, /filterAvailableReferenceDocs/);
+    assert.match(noteJs, /openCreateReferenceFromPick/);
     assert.match(noteJs, /splitPasteToSample/);
+    assert.match(noteJs, /splitPasteToDoc/);
     assert.match(noteJs, /get canGenerateDraft/);
 
     const libraryFile = await fetch(`${started.url}pages/library.html`);
@@ -141,12 +150,16 @@ test('本机服务的 loadLatest 在空目录返回空态', async () => {
     assert.match(libraryHtml, /@library-toast\.window/);
     assert.doesNotMatch(libraryHtml, /notice && !error/);
     assert.match(libraryHtml, /aria-label="范文"/);
+    assert.match(libraryHtml, /aria-label="参考资料"/);
+    assert.match(libraryHtml, /onCreateReferenceDocs/);
     assert.match(libraryHtml, /aspect-\[3\/4\]/);
     assert.match(libraryHtml, /grid-cols-3 gap-2 sm:grid-cols-6/);
     assert.match(libraryHtml, /whitespace-pre-wrap/);
     assert.match(libraryHtml, /library-article-sample-paste/);
     assert.match(libraryHtml, /library-article-sample-detail-body/);
     assert.match(libraryHtml, /library-article-sample-detail-modal[\s\S]*?h-\[calc\(100dvh-2rem\)\]/);
+    assert.match(libraryHtml, /library-reference-doc-paste/);
+    assert.match(libraryHtml, /library-reference-doc-detail-body/);
     assert.match(libraryHtml, /detailDirty\(\)/);
     assert.match(libraryHtml, /saveDetail\(\)/);
     assert.doesNotMatch(libraryHtml, /editFromDetail/);
@@ -155,6 +168,8 @@ test('本机服务的 loadLatest 在空目录返回空态', async () => {
     const libraryJs = await libraryJsFile.text();
     assert.match(libraryJs, /showToast/);
     assert.match(libraryJs, /toastTimer/);
+    assert.match(libraryJs, /reference-docs/);
+    assert.match(libraryJs, /onCreateReferenceDocs/);
     const albumsFile = await fetch(`${started.url}pages/library/albums.js`);
     assert.equal(albumsFile.status, 200);
     const albumsText = await albumsFile.text();
@@ -171,6 +186,15 @@ test('本机服务的 loadLatest 在空目录返回空态', async () => {
     assert.match(samplesText, /library-toast/);
     assert.doesNotMatch(samplesText, /editFromDetail/);
     assert.doesNotMatch(samplesText, /this\.notice\s*=/);
+    const refsFile = await fetch(`${started.url}pages/library/reference-docs.js`);
+    assert.equal(refsFile.status, 200);
+    const refsText = await refsFile.text();
+    assert.match(refsText, /detailDirty/);
+    assert.match(refsText, /detailBaselineBody/);
+    assert.match(refsText, /unsavedOpen/);
+    assert.match(refsText, /saveLibraryReferenceDoc/);
+    assert.match(refsText, /library-toast/);
+    assert.doesNotMatch(refsText, /this\.notice\s*=/);
     const scanFile = await fetch(`${started.url}animations/image-scan.json`);
     assert.equal(scanFile.status, 200);
 

@@ -3,15 +3,18 @@
 
 const ARTICLE_LIMIT = 8000;
 const REFERENCES_LIMIT = 5;
+const REFERENCE_BODY_LIMIT = 8000;
 const TITLE_LIMIT = 20;
 
 const EMPTY_BUSINESS = '先用一句话说你要发什么。';
 const ARTICLE_TOO_LONG = '贴进来的原文太长了，先删到 8000 字以内。';
 const REFERENCES_TOO_MANY = `参考资料最多 ${REFERENCES_LIMIT} 条。`;
+const REFERENCE_BODY_TOO_LONG = '参考资料太长了，先删到 8000 字以内。';
 const BAD_GALLERY_COUNT = '配图张数要在 0 到 9 之间。';
 const TITLE_TOO_LONG = '标题超过 20 字了';
 
 /**
+ * @typedef {{ name?: string; body: string }} ReferenceItem
  * @typedef {{ title: string; body: string; topics: string[]; coverLine: string }} DraftFace
  * @typedef {{
  *   title: string;
@@ -28,7 +31,7 @@ const TITLE_TOO_LONG = '标题超过 20 字了';
  *   ok: true;
  *   business: string;
  *   sampleBody: string;
- *   references: string[];
+ *   references: ReferenceItem[];
  *   galleryCount: number;
  * } | { ok: false; field: string; message: string }} InputsResult
  */
@@ -71,12 +74,29 @@ function validateGalleryCount(value) {
 }
 
 /**
+ * 旧稿 string[] → { body }；对象保留 name + body。空正文丢掉。
  * @param {unknown} value
- * @returns {string[]}
+ * @returns {ReferenceItem[]}
  */
 function normalizeReferencesInput(value) {
   if (!Array.isArray(value)) return [];
-  return value.map((item) => (typeof item === 'string' ? item : String(item)));
+  /** @type {ReferenceItem[]} */
+  const out = [];
+  for (const item of value) {
+    if (typeof item === 'string') {
+      const body = item.trim();
+      if (body) out.push({ body });
+      continue;
+    }
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+    const bag = /** @type {Record<string, unknown>} */ (item);
+    const body = typeof bag.body === 'string' ? bag.body.trim() : '';
+    if (!body) continue;
+    const name = typeof bag.name === 'string' ? bag.name.trim() : '';
+    if (name) out.push({ name, body });
+    else out.push({ body });
+  }
+  return out;
 }
 
 /**
@@ -102,6 +122,11 @@ function validateInputs(payload) {
   }
   if (references.length > REFERENCES_LIMIT) {
     return { ok: false, field: 'references', message: REFERENCES_TOO_MANY };
+  }
+  for (const item of references) {
+    if (charLength(item.body) > REFERENCE_BODY_LIMIT) {
+      return { ok: false, field: 'references', message: REFERENCE_BODY_TOO_LONG };
+    }
   }
   const count = validateGalleryCount(source.galleryCount);
   if (!count.ok) return count;
@@ -216,6 +241,8 @@ module.exports = {
   ARTICLE_TOO_LONG,
   BAD_GALLERY_COUNT,
   EMPTY_BUSINESS,
+  REFERENCE_BODY_LIMIT,
+  REFERENCE_BODY_TOO_LONG,
   REFERENCES_LIMIT,
   REFERENCES_TOO_MANY,
   TITLE_LIMIT,
@@ -226,6 +253,7 @@ module.exports = {
   formatPost,
   formatTopics,
   normalizeFace,
+  normalizeReferencesInput,
   validateDraftFace,
   validateGalleryCount,
   validateInputs,

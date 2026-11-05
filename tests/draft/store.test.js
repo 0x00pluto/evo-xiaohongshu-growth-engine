@@ -112,9 +112,39 @@ test('已有 sampleBody 时忽略旧 article', () => {
   const state = createStore(latestDir).read();
   assert.equal(state.sampleBody, '');
   assert.equal(state.sampleTitle, '标题');
-  assert.deepEqual(state.references, ['事实一']);
+  assert.deepEqual(state.references, [{ body: '事实一' }]);
   assert.equal(state.articleType, '涨粉');
   assert.equal(state.persona, '素人');
+});
+
+test('参考资料对象保留名称，旧字符串迁成无名称', () => {
+  const latestDir = fs.mkdtempSync(path.join(os.tmpdir(), 'one-post-store-refs-'));
+  fs.mkdirSync(latestDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(latestDir, 'draft.json'),
+    `${JSON.stringify({
+      business: '测',
+      sampleBody: '',
+      references: [
+        '纯字符串事实',
+        { name: '产品 A', body: '卖点' },
+        { body: '  只有正文  ' },
+        { name: '空', body: '  ' },
+      ],
+      articleType: '种草',
+      galleryCount: 1,
+      draft: null,
+      prompts: { cover: '', storyType: '', look: '', gallery: [], galleryLines: [], galleryRoles: [], style: '', stale: false, basis: null },
+      images: { cover: { status: '空', path: '', selected: 0, revisedAt: 0, versions: [] }, gallery: [] },
+      job: { running: false, step: '', error: '' },
+    }, null, 2)}\n`,
+  );
+  const state = createStore(latestDir).read();
+  assert.deepEqual(state.references, [
+    { body: '纯字符串事实' },
+    { name: '产品 A', body: '卖点' },
+    { body: '只有正文' },
+  ]);
 });
 
 test('读写时保留用户图册 look，需带上 userAlbumsDir', () => {

@@ -90,6 +90,7 @@ module.exports = {
       userImageRefsDir: path.join(dataDir, 'runtime', 'image-refs'),
       userUploadRefsDir: path.join(dataDir, 'runtime', 'materials', 'upload-refs'),
       userArticleSamplesDir: path.join(dataDir, 'runtime', 'materials', 'article-samples'),
+      userReferenceDocsDir: path.join(dataDir, 'runtime', 'materials', 'reference-docs'),
       userXhsNotesDir: path.join(dataDir, 'runtime', 'materials', 'xhs-notes'),
       userXhsNotesCacheDir: path.join(dataDir, 'cache', 'xhs-notes'),
       // 设置页保存不重跑 apply；真正发请求时再读 pluginEnv / .env。
@@ -127,6 +128,27 @@ module.exports = {
        */
       deleteLibraryArticleSample(payload) {
         return runner.deleteLibraryArticleSample(asObject(payload));
+      },
+      listLibraryReferenceDocs() {
+        return runner.listLibraryReferenceDocs();
+      },
+      /**
+       * @param {unknown} payload
+       */
+      getLibraryReferenceDoc(payload) {
+        return runner.getLibraryReferenceDoc(asObject(payload));
+      },
+      /**
+       * @param {unknown} payload
+       */
+      saveLibraryReferenceDoc(payload) {
+        return runner.saveLibraryReferenceDoc(asObject(payload));
+      },
+      /**
+       * @param {unknown} payload
+       */
+      deleteLibraryReferenceDoc(payload) {
+        return runner.deleteLibraryReferenceDoc(asObject(payload));
       },
       /**
        * @param {unknown} payload

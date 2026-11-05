@@ -148,8 +148,9 @@
           class="flex h-14 w-14 items-center justify-center rounded-md border border-dashed border-base-300 bg-base-100 text-xl leading-none text-base-content/50 active:scale-95"
           type="button"
           aria-label="加一条参考"
+          x-show="references.length < 5"
           @click="addReference()"
-          :disabled="job.running || references.length >= 5"
+          :disabled="job.running || referencePickBusy"
         >+</button>
       </div>
       <div
@@ -742,6 +743,51 @@
   </div>
 
   <div
+    id="reference-pick-library-modal"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+    x-show="referencePickOpen"
+    x-cloak
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="reference-pick-library-title"
+    @keydown.escape.window="referencePickOpen && closePickReference()"
+  >
+    <button class="absolute inset-0 cursor-default" type="button" aria-label="关闭" @click="closePickReference()"></button>
+    <div class="relative z-10 flex max-h-[calc(100dvh-2rem)] w-full max-w-3xl flex-col gap-3 overflow-hidden rounded-lg border border-base-300 bg-base-100 p-4 shadow-lg" @click.stop>
+      <div class="flex items-center justify-between gap-2">
+        <h3 id="reference-pick-library-title" class="text-base font-medium">从库挑一条参考资料</h3>
+        <button class="btn btn-ghost btn-square btn-sm" type="button" aria-label="关闭" @click="closePickReference()" :disabled="referencePickBusy">×</button>
+      </div>
+      <p class="text-sm text-error" role="alert" x-show="referencePickError" x-text="referencePickError"></p>
+      <div class="min-h-0 flex-1 overflow-y-auto">
+        <div class="grid grid-cols-3 gap-2 sm:grid-cols-6" role="list" aria-label="可选参考资料">
+          <template x-for="item in referenceLibraryDocs" :key="item.id">
+            <button
+              class="relative aspect-[3/4] w-full overflow-hidden rounded-lg bg-base-200 text-left active:scale-95"
+              type="button"
+              role="listitem"
+              :aria-label="'选用参考资料：' + item.name"
+              :disabled="referencePickBusy || job.running"
+              @click="pickLibraryReference(item)"
+            >
+              <div class="absolute inset-0 overflow-hidden p-1.5 pb-8">
+                <p class="h-full overflow-hidden whitespace-pre-wrap break-words text-[10px] leading-[14px] text-base-content/70" x-text="item.preview || '（无预览）'"></p>
+              </div>
+              <span class="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-1.5 pb-1.5 pt-6">
+                <span class="line-clamp-2 text-xs leading-4 text-white" x-text="item.name"></span>
+              </span>
+            </button>
+          </template>
+        </div>
+      </div>
+      <div class="flex shrink-0 justify-end gap-2 border-t border-base-300 pt-3">
+        <button class="btn btn-ghost btn-sm" type="button" @click="closePickReference()" :disabled="referencePickBusy">取消</button>
+        <button class="btn btn-neutral btn-sm" type="button" @click="openCreateReferenceFromPick()" :disabled="referencePickBusy || job.running">新增资料</button>
+      </div>
+    </div>
+  </div>
+
+  <div
     id="reference-editor-modal"
     class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
     x-show="referenceEditorOpen"
@@ -754,26 +800,38 @@
     <button class="absolute inset-0 cursor-default" type="button" aria-label="关闭" @click="closeReferenceEditor()"></button>
     <div class="relative z-10 flex w-full max-w-lg flex-col gap-3 rounded-lg border border-base-300 bg-base-100 p-4 shadow-lg" @click.stop>
       <div class="flex items-start justify-between gap-2">
-        <h3 id="reference-editor-title" class="text-base font-medium" x-text="'参考资料第 ' + (referenceEditorIndex + 1) + ' 条'"></h3>
-        <button class="btn btn-ghost btn-square btn-sm shrink-0" type="button" aria-label="关闭" @click="closeReferenceEditor()">×</button>
+        <h3
+          id="reference-editor-title"
+          class="text-base font-medium"
+          x-text="referenceEditorNew ? '加一条参考资料' : ('参考资料第 ' + (referenceEditorIndex + 1) + ' 条')"
+        ></h3>
+        <button class="btn btn-ghost btn-square btn-sm shrink-0" type="button" aria-label="关闭" @click="closeReferenceEditor()" :disabled="referenceEditorBusy">×</button>
       </div>
       <textarea
         id="reference-editor-text"
         class="textarea min-h-32 w-full resize-none wrap"
+        x-ref="referenceEditorText"
         x-model="referenceEditorText"
-        :disabled="job.running"
+        :disabled="job.running || referenceEditorBusy"
         :aria-invalid="referenceEditorError ? 'true' : 'false'"
         aria-describedby="reference-editor-error"
         aria-label="参考资料正文"
-        placeholder="课程信息、日期、卖点等事实。"
+        :placeholder="referenceEditorNew ? '第一行当名称，其余写事实（课程信息、卖点等）。' : '课程信息、日期、卖点等事实。'"
         @input="referenceEditorError = ''"
       ></textarea>
       <p id="reference-editor-error" class="text-sm text-error" role="alert" x-show="referenceEditorError" x-text="referenceEditorError"></p>
       <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
-        <button class="btn btn-error btn-sm" type="button" @click="deleteReferenceFromEditor()" :disabled="job.running">删除</button>
+        <button
+          class="btn btn-error btn-sm"
+          type="button"
+          @click="deleteReferenceFromEditor()"
+          :disabled="job.running || referenceEditorBusy"
+          x-show="!referenceEditorNew"
+        >删除</button>
+        <span x-show="referenceEditorNew"></span>
         <div class="flex gap-2">
-          <button class="btn btn-ghost btn-sm" type="button" @click="closeReferenceEditor()">取消</button>
-          <button class="btn btn-primary btn-sm" type="button" @click="confirmReferenceEditor()" :disabled="job.running">完成</button>
+          <button class="btn btn-ghost btn-sm" type="button" @click="closeReferenceEditor()" :disabled="referenceEditorBusy">取消</button>
+          <button class="btn btn-primary btn-sm" type="button" @click="confirmReferenceEditor()" :disabled="job.running || referenceEditorBusy">完成</button>
         </div>
       </div>
     </div>

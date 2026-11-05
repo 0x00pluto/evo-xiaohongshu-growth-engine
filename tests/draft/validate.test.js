@@ -43,14 +43,39 @@ test('旧入参 article 仍可当范文正文校验', () => {
 });
 
 test('参考资料超过 5 条拒绝，5 条通过', () => {
-  const refs5 = Array.from({ length: 5 }, (_, i) => `条${i}`);
+  const refs5 = Array.from({ length: 5 }, (_, i) => ({ name: `名${i}`, body: `条${i}` }));
   const ok = validateInputs({ business: '卖课', sampleBody: '', references: refs5, galleryCount: 1 });
   assert.equal(ok.ok, true);
+  assert.deepEqual(ok.references, refs5);
   const refs6 = Array.from({ length: 6 }, (_, i) => `条${i}`);
   const result = validateInputs({ business: '卖课', sampleBody: '', references: refs6, galleryCount: 1 });
   assert.equal(result.ok, false);
   assert.equal(result.field, 'references');
   assert.equal(result.message, REFERENCES_TOO_MANY);
+});
+
+test('参考资料单条正文超 8000 字拒绝；旧字符串迁成无名称', () => {
+  const tooLong = validateInputs({
+    business: '卖课',
+    sampleBody: '',
+    references: [{ name: '课', body: '字'.repeat(8001) }],
+    galleryCount: 1,
+  });
+  assert.equal(tooLong.ok, false);
+  assert.equal(tooLong.field, 'references');
+  assert.match(tooLong.message, /8000/);
+
+  const migrated = validateInputs({
+    business: '卖课',
+    sampleBody: '',
+    references: ['  事实一句  ', { name: '产品', body: '卖点' }, ''],
+    galleryCount: 1,
+  });
+  assert.equal(migrated.ok, true);
+  assert.deepEqual(migrated.references, [
+    { body: '事实一句' },
+    { name: '产品', body: '卖点' },
+  ]);
 });
 
 test('复制话题时补上井号并用空格隔开', () => {

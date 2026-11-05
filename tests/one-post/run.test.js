@@ -2006,6 +2006,42 @@ test('存进库与从库挑复制用法句，挑入后默认勾全槽', async ()
   assert.deepEqual(picked.picks.cover.materialIds, [picked.uploadRef.id]);
 });
 
+test('参考资料库可新建、去重、列表与删除', () => {
+  const root = tempDir();
+  const docsDir = path.join(root, 'runtime', 'materials', 'reference-docs');
+  const runner = createRunner({
+    postsDir: path.join(root, 'posts'),
+    promptsDir: path.join(root, 'prompts'),
+    userReferenceDocsDir: docsDir,
+    complete: async () => '{}',
+  });
+  writePrompts(path.join(root, 'prompts'));
+  const saved = runner.saveLibraryReferenceDoc({
+    name: '早鸟课',
+    body: '9 月开课。\n早鸟价 99。',
+  });
+  assert.equal(saved.ok, true);
+  assert.ok(saved.doc.id);
+  assert.equal(saved.doc.name, '早鸟课');
+  assert.match(saved.doc.body, /早鸟价/);
+  const listed = runner.listLibraryReferenceDocs();
+  assert.equal(listed.ok, true);
+  assert.equal(listed.docs.length, 1);
+  assert.equal(listed.docs[0].name, '早鸟课');
+  const reused = runner.saveLibraryReferenceDoc({
+    name: '另一个名',
+    body: '9 月开课。\n早鸟价 99。',
+  });
+  assert.equal(reused.ok, true);
+  assert.equal(reused.doc.id, saved.doc.id);
+  assert.equal(runner.listLibraryReferenceDocs().docs.length, 1);
+  const got = runner.getLibraryReferenceDoc({ id: saved.doc.id });
+  assert.equal(got.ok, true);
+  assert.equal(got.doc.body, saved.doc.body);
+  assert.equal(runner.deleteLibraryReferenceDoc({ id: saved.doc.id }).ok, true);
+  assert.equal(runner.listLibraryReferenceDocs().docs.length, 0);
+});
+
 test('范文库可新建、列表与删除', () => {
   const root = tempDir();
   const samplesDir = path.join(root, 'runtime', 'materials', 'article-samples');

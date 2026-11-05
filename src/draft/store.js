@@ -47,7 +47,7 @@ const STATUSES = new Set(['空', '生成中', '成功', '失败', '作废']);
  *   business: string;
  *   sampleTitle: string;
  *   sampleBody: string;
- *   references: string[];
+ *   references: import('./validate').ReferenceItem[];
  *   articleType: string;
  *   persona: string;
  *   coverLineSpecified: string;
@@ -345,6 +345,32 @@ function normalizeStringList(value) {
 }
 
 /**
+ * 旧稿 string[] → { body }；对象保留 name + body。空正文丢掉。
+ * @param {unknown} value
+ * @returns {import('./validate').ReferenceItem[]}
+ */
+function normalizeReferences(value) {
+  if (!Array.isArray(value)) return [];
+  /** @type {import('./validate').ReferenceItem[]} */
+  const out = [];
+  for (const item of value) {
+    if (typeof item === 'string') {
+      const body = item.trim();
+      if (body) out.push({ body });
+      continue;
+    }
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+    const bag = /** @type {Record<string, unknown>} */ (item);
+    const body = typeof bag.body === 'string' ? bag.body.trim() : '';
+    if (!body) continue;
+    const name = typeof bag.name === 'string' ? bag.name.trim() : '';
+    if (name) out.push({ name, body });
+    else out.push({ body });
+  }
+  return out;
+}
+
+/**
  * @param {unknown} value
  * @returns {string[]}
  */
@@ -373,9 +399,7 @@ function normalize(raw, promptsDir, userAlbumsDir) {
   } else {
     base.sampleBody = '';
   }
-  base.references = Array.isArray(source.references)
-    ? source.references.map((item) => String(item))
-    : [];
+  base.references = normalizeReferences(source.references);
   base.articleType = normalizeArticleType(source.articleType);
   if (source.articleType === '素人' && (source.persona == null || source.persona === '')) {
     base.persona = '素人';

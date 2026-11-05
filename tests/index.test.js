@@ -25,7 +25,9 @@ test('桥把 onePost 的方法登记到宿主', () => {
   for (const method of [
     'loadLatest', 'listPosts', 'listAlbums', 'listLibraryUploadRefs', 'addLibraryUploadRef',
     'listLibraryArticleSamples', 'getLibraryArticleSample', 'saveLibraryArticleSample',
-    'deleteLibraryArticleSample', 'getAlbumDetail',
+    'deleteLibraryArticleSample',
+    'listLibraryReferenceDocs', 'getLibraryReferenceDoc', 'saveLibraryReferenceDoc',
+    'deleteLibraryReferenceDoc', 'getAlbumDetail',
     'learnAlbum', 'commitAlbum', 'updateAlbumPrompt', 'discardAlbum', 'deleteAlbum',
     'openPost', 'startNew', 'saveEditor', 'generateDraft', 'generatePrompts',
     'chooseImage', 'generateImages', 'retryImage', 'previewImage', 'previewPostCover', 'previewHistoryPost',

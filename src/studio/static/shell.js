@@ -132,6 +132,7 @@
             await loadScript('pages/library/albums.js');
             await loadScript('pages/library/upload-refs.js');
             await loadScript('pages/library/article-samples.js');
+            await loadScript('pages/library/reference-docs.js');
             await loadScript('pages/library/xhs-note.js');
           }
           const response = await fetch(`pages/${id}.html`);

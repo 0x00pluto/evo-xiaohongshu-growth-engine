@@ -70,6 +70,19 @@ test('成稿和图册提示词能装填，长提示词不在 src 里', () => {
   assert.match(withSample, /1\. 9 月 5 日开课/);
   assert.match(withSample, /2\. 早鸟价 99/);
   assert.doesNotMatch(withSample, /无范文，采用该目的基本写法/);
+  const withNamed = buildDraftPrompt(promptsDir, '种草', {
+    business: '卖给上班的人',
+    persona: '素人',
+    sampleBody: '',
+    references: [
+      { name: '早鸟课', body: '9 月开课' },
+      { body: '无名称事实' },
+      { name: '空', body: '  ' },
+    ],
+  });
+  assert.match(withNamed, /1\. 早鸟课：9 月开课/);
+  assert.match(withNamed, /2\. 无名称事实/);
+  assert.doesNotMatch(withNamed, /空：/);
   const messages = buildDraftMessages(promptsDir, '引流', {
     business: '卖给上班的人',
     persona: '素人',

@@ -7,6 +7,7 @@ function libraryPage() {
       { id: 'albums', label: '图库' },
       { id: 'upload-refs', label: '上传参考' },
       { id: 'article-samples', label: '范文' },
+      { id: 'reference-docs', label: '参考资料' },
     ],
     activeTab: 'albums',
     createOpen: false,
@@ -117,6 +118,14 @@ function libraryPage() {
       this.activeTab = 'article-samples';
       this.$nextTick(() => {
         this.$dispatch('library-create-article-sample');
+      });
+    },
+
+    onCreateReferenceDocs() {
+      this.closeCreate();
+      this.activeTab = 'reference-docs';
+      this.$nextTick(() => {
+        this.$dispatch('library-create-reference-doc');
       });
     },
 
