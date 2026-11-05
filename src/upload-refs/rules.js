@@ -79,7 +79,7 @@ function normalizeUploadRefs(raw) {
     const usage = typeof bag.usage === 'string' ? bag.usage.trim() : '';
     if (!id || !fileName || !usage) continue;
     // 只接受服务端生成的文件名
-    if (!/^m-[a-z0-9]+\.(jpg|jpeg|png|webp)$/i.test(fileName)) continue;
+    if (!/^m-[a-z0-9]+\.(jpg|jpeg|jpe|jfif|pjpeg|png|webp|bmp)$/i.test(fileName)) continue;
     if (seen.has(id)) continue;
     seen.add(id);
     /** @type {UploadRefItem} */

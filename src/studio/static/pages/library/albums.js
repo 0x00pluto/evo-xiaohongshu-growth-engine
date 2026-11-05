@@ -291,17 +291,8 @@ function libraryAlbums() {
       }
     },
 
-    onPickImage() {
-      if (!this.hostReady || this.learning || this.committing || this.savingDetail) return;
-      const input = this.$refs && this.$refs.fileInput;
-      if (input) {
-        input.value = '';
-        input.click();
-      }
-    },
-
     /**
-     * 外部（小红书笔记进料）直接交 dataUrl 学成草稿。
+     * 外部（上传框 / 小红书笔记进料）直接交 dataUrl 学成草稿。
      * @param {{ dataUrl?: string; label?: string; source?: Record<string, unknown> } | string | undefined} detail
      */
     async onLearnDataUrl(detail) {
@@ -356,43 +347,6 @@ function libraryAlbums() {
       } finally {
         this.learning = false;
       }
-    },
-
-    /**
-     * @param {Event} event
-     */
-    async onFileChange(event) {
-      const input = event && event.target;
-      const file = input && input.files && input.files[0];
-      if (!file) return;
-      this.error = '';
-      if (!/^image\/(jpeg|png|webp)$/i.test(file.type) && !/\.(jpe?g|png|webp)$/i.test(file.name || '')) {
-        this.error = '只支持 JPEG、PNG、WebP 参考图';
-        return;
-      }
-      if (file.size > 8 * 1024 * 1024) {
-        this.error = '参考图太大，请换一张不超过 8MB 的图';
-        return;
-      }
-      try {
-        const dataUrl = await this.readFileAsDataUrl(file);
-        await this.onLearnDataUrl({ dataUrl });
-      } catch (err) {
-        this.error = err && err.message ? err.message : '学习失败';
-      }
-    },
-
-    /**
-     * @param {File} file
-     * @returns {Promise<string>}
-     */
-    readFileAsDataUrl(file) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result || ''));
-        reader.onerror = () => reject(new Error('读图失败'));
-        reader.readAsDataURL(file);
-      });
     },
 
     async onCommitDraft() {

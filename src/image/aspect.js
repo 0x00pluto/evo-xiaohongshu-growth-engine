@@ -177,12 +177,29 @@ function readWebpSize(bytes) {
 }
 
 /**
+ * @param {Buffer} bytes
+ * @returns {{ width: number; height: number } | null}
+ */
+function readBmpSize(bytes) {
+  if (!Buffer.isBuffer(bytes) || bytes.length < 26) return null;
+  if (bytes[0] !== 0x42 || bytes[1] !== 0x4d) return null;
+  // BITMAPINFOHEADER：宽高在偏移 18 / 22，有符号；高度可为负（顶到底）。
+  const width = bytes.readInt32LE(18);
+  const height = Math.abs(bytes.readInt32LE(22));
+  if (!width || !height) return null;
+  return { width, height };
+}
+
+/**
  * @param {unknown} bytes
  * @returns {{ width: number; height: number } | null}
  */
 function readImageSize(bytes) {
-  if (!Buffer.isBuffer(bytes) || bytes.length < 12) return null;
-  return readPngSize(bytes) || readJpegSize(bytes) || readWebpSize(bytes);
+  if (!Buffer.isBuffer(bytes) || bytes.length < 2) return null;
+  return readPngSize(bytes)
+    || readJpegSize(bytes)
+    || readBmpSize(bytes)
+    || readWebpSize(bytes);
 }
 
 /**

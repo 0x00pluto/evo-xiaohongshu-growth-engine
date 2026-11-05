@@ -90,6 +90,23 @@ test('读 PNG 像素并归档', () => {
   assert.equal(aspectRatioFromImage(path.join(dir, 'missing.png')), DEFAULT_ASPECT_RATIO);
 });
 
+test('读 BMP 像素', () => {
+  const bmp = Buffer.alloc(54, 0);
+  bmp.write('BM', 0);
+  bmp.writeUInt32LE(54, 2);
+  bmp.writeUInt32LE(54, 10);
+  bmp.writeUInt32LE(40, 14);
+  bmp.writeInt32LE(16, 18);
+  bmp.writeInt32LE(9, 22);
+  bmp.writeUInt16LE(1, 26);
+  bmp.writeUInt16LE(24, 28);
+  const bmpSize = readImageSize(bmp);
+  assert.ok(bmpSize);
+  assert.equal(bmpSize.width, 16);
+  assert.equal(bmpSize.height, 9);
+  assert.equal(aspectRatioFromImage(bmp), '16:9');
+});
+
 test('画幅句覆盖与 CSS', () => {
   assert.equal(framePhrase('3:4'), '竖版 3:4');
   assert.equal(framePhrase('1:1'), '方图 1:1');

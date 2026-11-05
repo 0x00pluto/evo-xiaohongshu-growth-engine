@@ -94,21 +94,27 @@ function isKindOrSlug(value) {
  * @returns {{ ext: string; mime: string } | null}
  */
 function detectImageKind(bytes) {
-  if (!Buffer.isBuffer(bytes) || bytes.length < 12) return null;
-  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+  if (!Buffer.isBuffer(bytes) || bytes.length < 2) return null;
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
     return { ext: '.jpg', mime: 'image/jpeg' };
   }
   if (
-    bytes[0] === 0x89
+    bytes.length >= 4
+    && bytes[0] === 0x89
     && bytes[1] === 0x50
     && bytes[2] === 0x4e
     && bytes[3] === 0x47
   ) {
     return { ext: '.png', mime: 'image/png' };
   }
+  // BM
+  if (bytes[0] === 0x42 && bytes[1] === 0x4d) {
+    return { ext: '.bmp', mime: 'image/bmp' };
+  }
   // RIFF....WEBP
   if (
-    bytes.toString('ascii', 0, 4) === 'RIFF'
+    bytes.length >= 12
+    && bytes.toString('ascii', 0, 4) === 'RIFF'
     && bytes.toString('ascii', 8, 12) === 'WEBP'
   ) {
     return { ext: '.webp', mime: 'image/webp' };
@@ -141,7 +147,7 @@ function normalizeReferenceImage(source) {
     throw new Error('参考图太大，请换一张不超过 8MB 的图');
   }
   const kind = detectImageKind(bytes);
-  if (!kind) throw new Error('只支持 JPEG、PNG、WebP 参考图');
+  if (!kind) throw new Error('只支持 JPEG、PNG、WebP、BMP 参考图');
   const dataUrl = `data:${kind.mime};base64,${bytes.toString('base64')}`;
   return { bytes, ext: kind.ext, mime: kind.mime, dataUrl };
 }

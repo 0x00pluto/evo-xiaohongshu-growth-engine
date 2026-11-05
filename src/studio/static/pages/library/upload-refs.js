@@ -68,43 +68,24 @@ function libraryUploadRefs() {
       if (changed) this.previews = next;
     },
 
-    onPickUploadRef() {
+    /**
+     * 上传框交出的 dataUrl → 打开写用法句。
+     * @param {{ dataUrl?: string } | string | undefined} detail
+     */
+    onIntakeDataUrl(detail) {
       if (!this.hostReady || this.uploadBusy || this.deleting) return;
-      const input = this.$refs.uploadRefFileInput;
-      if (input) {
-        input.value = '';
-        input.click();
-      }
-    },
-
-    onUploadRefFileChange(event) {
-      const input = event && event.target;
-      const file = input && input.files && input.files[0];
-      if (!file) return;
-      const allowed = ['image/jpeg', 'image/png', 'image/webp'];
-      if (!allowed.includes(file.type)) {
-        this.error = '只支持 JPEG、PNG、WebP';
-        input.value = '';
+      const dataUrl = typeof detail === 'string'
+        ? detail
+        : (detail && typeof detail.dataUrl === 'string' ? detail.dataUrl : '');
+      if (!dataUrl) {
+        this.error = '没有可上传的图';
         return;
       }
-      if (file.size > 8 * 1024 * 1024) {
-        this.error = '单张不超过 8MB';
-        input.value = '';
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = () => {
-        this.uploadPending = String(reader.result || '');
-        this.uploadUsage = '';
-        this.uploadError = '';
-        this.error = '';
-        this.uploadOpen = true;
-      };
-      reader.onerror = () => {
-        this.error = '读图失败';
-      };
-      reader.readAsDataURL(file);
-      input.value = '';
+      this.uploadPending = dataUrl;
+      this.uploadUsage = '';
+      this.uploadError = '';
+      this.error = '';
+      this.uploadOpen = true;
     },
 
     closeUpload(force) {

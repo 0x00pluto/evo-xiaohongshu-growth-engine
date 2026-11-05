@@ -21,7 +21,7 @@ const ALBUM_KIND_SET = new Set(ALBUM_KINDS);
 /** 用户自加图册从这个序号起；更小的序号整段系统预留（含出厂五本） */
 const USER_ALBUM_SEQ_START = 100000;
 /** @type {ReadonlyArray<string>} */
-const SAMPLE_EXTS = ['.jpg', '.jpeg', '.png', '.webp'];
+const SAMPLE_EXTS = ['.jpg', '.jpeg', '.png', '.webp', '.bmp'];
 
 /**
  * kind / slug：小写英文开头，其后为小写英文、数字或连字符。

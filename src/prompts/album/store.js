@@ -116,7 +116,9 @@ function migrateFlatAlbumsInRoot(albumsRoot) {
     const legacySample = findLegacySample(albumsRoot, id);
     if (legacySample) {
       const ext = path.extname(legacySample).toLowerCase();
-      const safeExt = ext === '.jpeg' ? '.jpg' : ext;
+      const safeExt = (
+        ext === '.jpeg' || ext === '.jpe' || ext === '.jfif' || ext === '.pjpeg'
+      ) ? '.jpg' : ext;
       moveFile(legacySample, path.join(pack, `sample${safeExt}`));
     }
     moved.push(id);
@@ -221,7 +223,14 @@ function commitAlbumDraft(userAlbumsDir, draft, promptsDir) {
   const mdPath = albumPromptPath(pack);
   const sampleMdPath = albumCopySamplePath(pack);
   const ext = typeof draft.sampleExt === 'string' && draft.sampleExt.startsWith('.')
-    ? (draft.sampleExt === '.jpeg' ? '.jpg' : draft.sampleExt)
+    ? (
+      draft.sampleExt === '.jpeg'
+        || draft.sampleExt === '.jpe'
+        || draft.sampleExt === '.jfif'
+        || draft.sampleExt === '.pjpeg'
+        ? '.jpg'
+        : draft.sampleExt
+    )
     : '.jpg';
   const samplePath = path.join(pack, `sample${ext}`);
 

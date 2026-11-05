@@ -6,7 +6,56 @@
   @library-albums-busy.window="onAlbumsBusy($event.detail)"
   @library-toast.window="onLibraryToast($event.detail)"
   @library-select-tab.window="selectTab($event.detail)"
+  @paste.window="intakeOpen && onIntakePaste($event)"
 >
+  <input
+    class="hidden"
+    type="file"
+    accept="image/jpeg,image/png,image/webp,image/bmp,.jpg,.jpeg,.jpe,.jfif,.png,.webp,.bmp"
+    x-ref="intakeFileInput"
+    @change="onIntakeFileChange($event)"
+  />
+
+  <div
+    id="library-intake-modal"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+    x-show="intakeOpen"
+    x-cloak
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="library-intake-title"
+    @keydown.escape.window="intakeOpen && closeIntake()"
+  >
+    <button class="absolute inset-0 cursor-default" type="button" aria-label="取消" @click="closeIntake()"></button>
+    <div class="relative z-10 flex w-full max-w-md flex-col gap-3 rounded-lg border border-base-300 bg-base-100 p-4 shadow-lg" @click.stop>
+      <h3 id="library-intake-title" class="text-base font-medium">上传图片</h3>
+      <button
+        type="button"
+        class="flex min-h-56 w-full flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed border-base-300 px-4 py-8 text-center"
+        :class="intakeDragOver ? 'border-base-content bg-base-200' : ''"
+        x-ref="intakeZone"
+        aria-label="上传图片，可拖入、粘贴或从本机选择"
+        @click="clickIntakeZone()"
+        @dragenter="onIntakeDragEnter($event)"
+        @dragover="onIntakeDragOver($event)"
+        @dragleave="onIntakeDragLeave($event)"
+        @drop="onIntakeDrop($event)"
+        :disabled="intakeBusy"
+      >
+        <iconify-icon icon="lucide:plus" width="36" height="36" class="text-base-content/50" aria-hidden="true"></iconify-icon>
+        <div class="flex flex-col gap-1">
+          <p class="text-sm font-medium text-base-content">把图片放进来</p>
+          <p class="text-sm leading-6 text-base-content/60">拖到这里，或 Ctrl+V / ⌘V 粘贴。点击从本机选择。</p>
+          <p class="text-xs leading-5 text-base-content/50">JPEG、PNG、WebP、BMP，一次一张，不超过 8MB。</p>
+          <p class="text-sm text-error" role="alert" x-show="intakeError" x-text="intakeError"></p>
+        </div>
+      </button>
+      <div class="flex justify-end">
+        <button class="btn btn-ghost btn-sm" type="button" @click="closeIntake()" :disabled="intakeBusy">取消</button>
+      </div>
+    </div>
+  </div>
+
   <template x-if="toast">
     <div class="toast toast-top toast-center z-[70]">
       <div class="alert bg-base-100 text-base-content shadow" role="status">
@@ -90,17 +139,8 @@
     x-init="init()"
     role="tabpanel"
     aria-labelledby="library-tab-albums"
-    @library-pick-image.window="onPickImage()"
     @library-learn-album-dataurl.window="onLearnDataUrl($event.detail)"
   >
-    <input
-      class="hidden"
-      type="file"
-      accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
-      x-ref="fileInput"
-      @change="onFileChange($event)"
-    />
-
     <div class="relative min-h-0 flex-1">
       <div class="absolute inset-0 overflow-y-auto px-4 py-3 lg:px-6">
         <p class="mb-3 text-sm text-error" role="alert" x-show="error" x-text="error"></p>
@@ -377,15 +417,8 @@
     x-init="init()"
     role="tabpanel"
     aria-labelledby="library-tab-upload-refs"
-    @library-pick-upload-ref.window="onPickUploadRef()"
+    @library-intake-upload-ref.window="onIntakeDataUrl($event.detail)"
   >
-    <input
-      class="hidden"
-      type="file"
-      accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
-      x-ref="uploadRefFileInput"
-      @change="onUploadRefFileChange($event)"
-    />
 
     <div class="min-h-0 flex-1 overflow-y-auto px-4 py-3 lg:px-6">
       <p class="mb-3 text-sm text-error" role="alert" x-show="error" x-text="error"></p>

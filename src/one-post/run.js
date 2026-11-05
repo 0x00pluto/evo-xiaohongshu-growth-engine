@@ -1593,7 +1593,9 @@ function createRunner(options) {
     const ext = path.extname(abs).toLowerCase();
     const mime = ext === '.png'
       ? 'image/png'
-      : (ext === '.webp' ? 'image/webp' : 'image/jpeg');
+      : (ext === '.webp'
+        ? 'image/webp'
+        : (ext === '.bmp' ? 'image/bmp' : 'image/jpeg'));
     return { ok: true, dataUrl: `data:${mime};base64,${bytes.toString('base64')}` };
   }
 

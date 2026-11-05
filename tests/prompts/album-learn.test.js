@@ -31,6 +31,20 @@ const JPEG_BYTES = Buffer.from([
   0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0xff, 0xd9,
 ]);
 
+/** 最小合法 BMP 头（2×2，无像素数据也够魔数与尺寸） */
+const BMP_BYTES = (() => {
+  const buf = Buffer.alloc(54, 0);
+  buf.write('BM', 0);
+  buf.writeUInt32LE(54, 2);
+  buf.writeUInt32LE(54, 10);
+  buf.writeUInt32LE(40, 14);
+  buf.writeInt32LE(2, 18);
+  buf.writeInt32LE(2, 22);
+  buf.writeUInt16LE(1, 26);
+  buf.writeUInt16LE(24, 28);
+  return buf;
+})();
+
 function sheetPrompt() {
   return [
     '竖版 3:4，测试风格。',
@@ -180,6 +194,11 @@ test('参考图按文件头校验，不合格不进模型', () => {
     dataUrl: `data:image/jpeg;base64,${JPEG_BYTES.toString('base64')}`,
   });
   assert.equal(ok.ext, '.jpg');
+  const bmp = normalizeReferenceImage({
+    dataUrl: `data:image/bmp;base64,${BMP_BYTES.toString('base64')}`,
+  });
+  assert.equal(bmp.ext, '.bmp');
+  assert.equal(bmp.mime, 'image/bmp');
 });
 
 test('识图请求走 chat 渠道且图在 user 消息里', async () => {
@@ -356,8 +375,9 @@ test('runner 学习写入删除：失败零落盘；出厂拒绝', async () => {
     },
   });
 
+  // TIFF 等未开放格式：能过 data URL 解析，文件头不认则拒绝且不调识图。
   const bad = await runner.learnAlbum({
-    dataUrl: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+    dataUrl: `data:image/tiff;base64,${Buffer.from([0x49, 0x49, 0x2a, 0x00]).toString('base64')}`,
   });
   assert.equal(bad.ok, false);
   assert.equal(visionCalls, 0);

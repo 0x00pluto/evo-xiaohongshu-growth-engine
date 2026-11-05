@@ -1368,9 +1368,10 @@ function notePage() {
       const input = event && event.target;
       const file = input && input.files && input.files[0];
       if (!file) return;
-      const allowed = ['image/jpeg', 'image/png', 'image/webp'];
-      if (!allowed.includes(file.type)) {
-        this.notice = '只支持 JPEG、PNG、WebP';
+      const mimeOk = /^image\/(jpeg|jpg|pjpeg|png|webp|bmp|x-ms-bmp)$/i.test(file.type || '');
+      const extOk = /\.(jpe?g|jfif|pjpeg|png|webp|bmp)$/i.test(file.name || '');
+      if (!mimeOk && !extOk) {
+        this.notice = '只支持 JPEG、PNG、WebP、BMP';
         input.value = '';
         return;
       }

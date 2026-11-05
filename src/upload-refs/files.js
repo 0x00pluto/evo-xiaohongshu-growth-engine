@@ -21,9 +21,35 @@ const { newUploadRefId, validateUsage } = rulesModule;
  */
 function normalizeExt(ext) {
   const lower = String(ext || '').toLowerCase();
-  if (lower === '.jpeg') return '.jpg';
-  if (lower === '.jpg' || lower === '.png' || lower === '.webp') return lower;
+  if (
+    lower === '.jpeg'
+    || lower === '.jpe'
+    || lower === '.jfif'
+    || lower === '.pjpeg'
+  ) {
+    return '.jpg';
+  }
+  if (
+    lower === '.jpg'
+    || lower === '.png'
+    || lower === '.webp'
+    || lower === '.bmp'
+  ) {
+    return lower;
+  }
   return '.jpg';
+}
+
+/**
+ * @param {string} ext
+ * @returns {string}
+ */
+function mimeFromExt(ext) {
+  const normalized = normalizeExt(ext);
+  if (normalized === '.png') return 'image/png';
+  if (normalized === '.webp') return 'image/webp';
+  if (normalized === '.bmp') return 'image/bmp';
+  return 'image/jpeg';
 }
 
 /**
@@ -64,7 +90,7 @@ function migratePostUploadRefsLayout(postDir) {
       continue;
     }
     if (!stat.isFile()) continue;
-    if (!/^m-[a-z0-9]+\.(jpg|jpeg|png|webp)$/i.test(name)) continue;
+    if (!/^m-[a-z0-9]+\.(jpg|jpeg|jpe|jfif|pjpeg|png|webp|bmp)$/i.test(name)) continue;
     fs.mkdirSync(nextDir, { recursive: true });
     const dest = path.join(nextDir, name);
     if (fs.existsSync(dest)) {
@@ -188,10 +214,7 @@ function readPostUploadRefPreview(postDir, fileName) {
   }
   if (!fs.existsSync(abs)) return null;
   const bytes = fs.readFileSync(abs);
-  const ext = path.extname(fileName).toLowerCase();
-  const mime = ext === '.png'
-    ? 'image/png'
-    : (ext === '.webp' ? 'image/webp' : 'image/jpeg');
+  const mime = mimeFromExt(path.extname(fileName));
   return { mime, dataUrl: `data:${mime};base64,${bytes.toString('base64')}` };
 }
 
@@ -280,7 +303,7 @@ function saveUploadRefToLibrary(libraryDir, postDir, ref) {
   return writeLibraryUploadRef(libraryDir, {
     bytes,
     ext,
-    mime: ext === '.png' ? 'image/png' : (ext === '.webp' ? 'image/webp' : 'image/jpeg'),
+    mime: mimeFromExt(ext),
     dataUrl: '',
   }, checked.usage);
 }
@@ -351,10 +374,7 @@ function readLibraryUploadRefPreview(libraryDir, id) {
     const abs = libraryImagePath(libraryDir, trimmed, fileName);
     if (!fs.existsSync(abs)) return null;
     const bytes = fs.readFileSync(abs);
-    const ext = path.extname(fileName).toLowerCase();
-    const mime = ext === '.png'
-      ? 'image/png'
-      : (ext === '.webp' ? 'image/webp' : 'image/jpeg');
+    const mime = mimeFromExt(path.extname(fileName));
     return {
       mime,
       usage,
@@ -388,6 +408,7 @@ module.exports = {
   listLibraryUploadRefs,
   migrateLibraryUploadRefsLayout,
   migratePostUploadRefsLayout,
+  mimeFromExt,
   normalizeExt,
   pickLibraryUploadRefIntoPost,
   postUploadRefPath,
