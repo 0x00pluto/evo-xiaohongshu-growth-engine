@@ -121,14 +121,14 @@ function libraryXhsNote() {
         this.checkStatus = code === 'VERSION_LOW' ? 'version_low' : 'bridge_down';
         this.checkMessage = (result && result.message)
           || (code === 'VERSION_LOW'
-            ? '当前 Chrome 扩展版本过低，需 ≥ 0.9.0 才支持取料。'
-            : '连不上本机取料通道。请安装或打开内部特供版，并打开「允许 Dex Buddy 连接」。');
+            ? '当前 Chrome 扩展版本过低，需 ≥ 0.9.0 才支持读取。'
+            : '连不上本机读取通道。请安装或打开内部特供版，并打开「允许 Dex Buddy 连接」。');
         this.extensionVersion = result && result.version ? String(result.version) : '';
       } catch (err) {
         this.checkStatus = 'bridge_down';
         this.checkMessage = err && err.message
           ? String(err.message)
-          : '连不上本机取料通道。请安装或打开内部特供版，并打开「允许 Dex Buddy 连接」。';
+          : '连不上本机读取通道。请安装或打开内部特供版，并打开「允许 Dex Buddy 连接」。';
       }
     },
 
@@ -188,7 +188,7 @@ function libraryXhsNote() {
       try {
         const result = await this.call('resolveXhsNote', { url });
         if (!result || result.ok === false) {
-          this.error = (result && result.message) || '取料失败';
+          this.error = (result && result.message) || '读取失败';
           return;
         }
         this.inputUrl = String(result.inputUrl || url);
@@ -212,7 +212,7 @@ function libraryXhsNote() {
         this.hideInnerHover();
         this.step = 'choose';
       } catch (err) {
-        this.error = err && err.message ? err.message : '取料失败';
+        this.error = err && err.message ? err.message : '读取失败';
       } finally {
         this.busy = false;
       }
@@ -245,7 +245,7 @@ function libraryXhsNote() {
           })),
         });
         if (!result || result.ok === false) {
-          this.error = (result && result.message) || '收录失败';
+          this.error = (result && result.message) || '保存失败';
           return;
         }
         this.link = result.link || null;
@@ -265,7 +265,7 @@ function libraryXhsNote() {
             note: this.note,
           });
           if (!articleResult || articleResult.ok === false) {
-            this.error = (articleResult && articleResult.message) || '写入范文失败';
+            this.error = (articleResult && articleResult.message) || '写入对标文案失败';
             this.step = 'done';
             this.open = true;
             return;
@@ -275,14 +275,14 @@ function libraryXhsNote() {
         this.step = 'done';
         this.open = true;
       } catch (err) {
-        this.error = err && err.message ? err.message : '收录失败';
+        this.error = err && err.message ? err.message : '保存失败';
       } finally {
         this.busy = false;
       }
     },
 
     /**
-     * 串行：切到图库 Tab → 交 dataUrl 学草稿 → 等确定/放弃。
+     * 串行：切到风格 Tab → 交 dataUrl 学草稿 → 等确定/放弃。
      */
     async runImageQueue() {
       const queue = this.imageQueue.slice();

@@ -15,7 +15,7 @@ function libraryUploadRefs() {
     uploadUsage: '',
     uploadError: '',
     uploadBusy: false,
-    usagePlaceholder: '人物照片。按 Hero 放在画面中央，锁脸。',
+    usagePlaceholder: '我们的 logo，放在右上角。',
 
     call(method, payload) {
       return window.studioHost.call(method, payload);
@@ -69,7 +69,7 @@ function libraryUploadRefs() {
     },
 
     /**
-     * 上传框交出的 dataUrl → 打开写用法句。
+     * 上传框交出的 dataUrl → 打开写图片用法。
      * @param {{ dataUrl?: string } | string | undefined} detail
      */
     onIntakeDataUrl(detail) {
@@ -106,7 +106,7 @@ function libraryUploadRefs() {
       try {
         const result = await this.call('draftUploadRefUsage', { dataUrl: this.uploadPending });
         if (!result || result.ok === false) {
-          this.uploadError = (result && result.message) || '识图失败';
+          this.uploadError = (result && result.message) || '自动识别失败';
           return;
         }
         this.uploadUsage = String(result.usage || '');
@@ -120,7 +120,7 @@ function libraryUploadRefs() {
       if (!this.uploadPending || this.uploadBusy) return;
       const usage = String(this.uploadUsage || '').trim();
       if (!usage) {
-        this.uploadError = '请写上用法句';
+        this.uploadError = '请写上图片用法';
         return;
       }
       this.uploadBusy = true;
@@ -136,7 +136,7 @@ function libraryUploadRefs() {
           return;
         }
         this.closeUpload(true);
-        this.$dispatch('library-toast', '已写入资料库');
+        this.$dispatch('library-toast', '已保存');
         await this.refresh();
       } finally {
         this.uploadBusy = false;
@@ -199,7 +199,7 @@ function libraryUploadRefs() {
         if (this.detailTarget && this.detailTarget.id === deletedId) {
           this.closeDetail();
         }
-        this.$dispatch('library-toast', '已从库里拿走');
+        this.$dispatch('library-toast', '已删除');
         await this.refresh();
       } finally {
         this.deleting = false;

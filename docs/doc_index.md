@@ -8,13 +8,14 @@
 - `docs/builtin-workflows/consolidate-memory.md`: 记忆巩固与遗忘（冲突消解 → 情景提纯 → 剪枝）；仅用户显式触发；与反思 / 提取经验互不串联
 - `docs/builtin-workflows/publish-evo-agent-pack.md`: 仅首次 / 改合同时发布或核对 evo_agent_pack.json 工牌；日常发版勿进门；打 tag 改走 cut-release-tag；不做安装器
 - `docs/builtin-workflows/cut-release-tag.md`: 日常发版唯一入口；汇总变更 → upgrades → 对齐工牌与（若有）plugin.manifest 同号 → tag → 推送 → gh 或网页建 Release；major 须人指定
-- `docs/workflows/one-post-studio.md`: 一篇图文操作台与资料库（图库 / 上传参考 / 范文 / 参考资料 / 新建小红书笔记进料；新建图库与上传参考先出虚线上传框，可拖入、粘贴或点击选本机（JPEG/PNG/WebP/BMP）；6 列竖卡；以前的笔记约 8 列竖卡墙，点卡开左图右文浮层、显示文件/复制/编辑进笔记页、悬停复制；材料页组合灰字+贴底写成笔记；范文单框粘贴首行标题、已选只读；参考资料本机库；加一条先卡墙选库或写新、篇内去重、满 5 隐藏加号；参考≤5；成稿标题超 20 不拦；笔记页七档生图比例一篇共用、未锁定跟图册）；写成笔记与刷图在开始前查买断，购买/登录提示交给工作台；本机命令改页面会自动刷新；Dex Buddy 打包版用插件页「加载本地目录」，SDK 1.0.3 接口层 + standalone；插件包范围见 dex-buddy-plugin.pack
+- `docs/workflows/one-post-studio.md`: 一篇图文操作台与资料库（风格 / 我们的图 / 对标文案 / 产品资料 / 新建对标笔记进料；新建风格与我们的图先出虚线上传框，可拖入、粘贴或点击选本机（JPEG/PNG/WebP/BMP）；6 列竖卡；以前的笔记约 8 列竖卡墙，点卡开左图右文浮层、打开文件/复制/编辑进笔记页、悬停复制；材料页无人设目的组合灰字+贴底写成笔记；对标文案单框粘贴首行标题、已选只读；产品资料本机库；加一条先卡墙选库或写新、篇内去重、满 5 隐藏加号；产品资料≤5；成稿标题超 20 不拦；笔记页七档生图比例一篇共用、未锁定跟风格）；写成笔记与刷图在开始前查买断，购买/登录提示交给工作台；本机命令改页面会自动刷新；Dex Buddy 打包版用插件页「加载本地目录」，SDK 1.0.3 接口层 + standalone；插件包范围见 dex-buddy-plugin.pack
 - `specs/prds/prd-00012-learn-xhs-note.md`: 资料库贴小红书链接；解析链接单独入库；正文进范文、首图与一张内页进图册；写稿仍走范文加业务一句
 - `specs/prds/prd-00013-library-paste-image.md`: 资料库新建图库与上传参考先出虚线上传框；拖入、粘贴或点击从本机选一张，再交回现有学草稿与写用法句
 - `specs/prds/prd-00014-reference-library.md`: 参考资料本机库；加一条可卡墙选库或写新入库并快照；篇内去重；工程 accepted
+- `specs/prds/prd-00015-studio-plain-copy.md`: 资料库与写笔记可见文案统一成运营能懂的一套词；删说明书灰字；不改交互与模型提示词
 - `docs/faqs/how-to-native-host-silent-register.md`: Native Host ASCII 安装；按 QuanMediaCrawl 路径算扩展 ID；host exited 排查
 - `docs/workflows/_TEMPLATE.md`: 业务 workflow 六段骨架；新建业务工作流时复制并改名，写完后删掉本行或改成真实条目
-- `docs/DESIGN.md`: 页侧视觉事实源（HTML、Alpine、daisyUI 5；配色为 Cal 色板；页头默认 text-xl / py-3；写一篇笔记 / 以前的笔记 / 资料库同档；以前的笔记约 8 列竖卡墙与小红书式详情浮层；笔记页比例/图册风格同款展开条、预览画框跟有效比例、图册格 contain；排版含壳与侧栏 Lucide 图标/大屏收起、间距、两屏和手机框；等待用 Lottie 浮层；要发什么紧凑贴底 CTA；范文/参考资料库同图库 6 列竖卡；加一条参考资料卡墙选库或写新、满 5 隐藏加号；新建图库/上传参考先出虚线上传框；新建含小红书笔记进料；学图册用 image-scan + 轮播文案）；改外观前先读
+- `docs/DESIGN.md`: 页侧视觉事实源（HTML、Alpine、daisyUI 5；配色为 Cal 色板；页头默认 text-xl / py-3；写笔记 / 以前的笔记 / 资料库同档；以前的笔记约 8 列竖卡墙与小红书式详情浮层；笔记页比例/风格/画面内容/我们的图同款展开条、预览画框跟有效比例、风格格 contain；排版含壳与侧栏 Lucide 图标/大屏收起、间距、两屏和手机框；等待用 Lottie 浮层；要发什么紧凑贴底 CTA、无人设目的说明书；对标文案/产品资料库同风格 6 列竖卡；加一条产品资料卡墙选库或写新、满 5 隐藏加号；新建风格/我们的图先出虚线上传框；新建含对标笔记进料；学风格用 image-scan + 轮播人话）；改外观前先读
 - `docs/references/xhs-prompt-taxonomy.md`: 人设×目的×形式提示词分类与组合校验原文，供操作台释义与写稿对照
 - `specs/prds/prd-wiki-index.md`: PRD 索引，不计入序号；产品经理追加一行，工程验收官可回写状态
 - `.cursor/commands/team/product-manager.md`: 产品经理，`/team:product-manager`，写 PRD

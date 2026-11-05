@@ -7,7 +7,7 @@ const MAX_UPLOAD_REFS_PER_POST = 48;
 const MAX_APPLIED_UPLOAD_REFS = 9;
 const MAX_USAGE_CHARS = 240;
 const NON_SUBJECT_MARKER = '角落小标，不占主体';
-const USAGE_PLACEHOLDER = '人物照片。按 Hero 放在画面中央，锁脸。';
+const USAGE_PLACEHOLDER = '我们的 logo，放在右上角。';
 const APPLY_LIMIT_MESSAGE = `一张图最多勾 ${MAX_APPLIED_UPLOAD_REFS} 张上传参考`;
 
 /**
@@ -42,12 +42,12 @@ function emptyPicks(galleryCount) {
  */
 function validateUsage(usage) {
   if (typeof usage !== 'string') {
-    return { ok: false, message: '请写上用法句' };
+    return { ok: false, message: '请写上图片用法' };
   }
   const text = usage.trim();
-  if (!text) return { ok: false, message: '请写上用法句' };
+  if (!text) return { ok: false, message: '请写上图片用法' };
   if (text.length > MAX_USAGE_CHARS) {
-    return { ok: false, message: `用法句最多 ${MAX_USAGE_CHARS} 字` };
+    return { ok: false, message: `图片用法最多 ${MAX_USAGE_CHARS} 字` };
   }
   return { ok: true, usage: text };
 }

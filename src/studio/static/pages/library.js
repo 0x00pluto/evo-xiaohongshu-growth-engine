@@ -4,10 +4,10 @@ function libraryPage() {
   return {
     hostReady: window.studioHost.ready,
     tabs: [
-      { id: 'albums', label: '图库' },
-      { id: 'upload-refs', label: '上传参考' },
-      { id: 'article-samples', label: '范文' },
-      { id: 'reference-docs', label: '参考资料' },
+      { id: 'albums', label: '风格' },
+      { id: 'upload-refs', label: '我们的图' },
+      { id: 'article-samples', label: '对标文案' },
+      { id: 'reference-docs', label: '产品资料' },
     ],
     activeTab: 'albums',
     createOpen: false,

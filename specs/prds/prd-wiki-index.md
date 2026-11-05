@@ -18,3 +18,4 @@
 | 00012 | `specs/prds/prd-00012-learn-xhs-note.md` | 资料库贴小红书链接；解析链接单独入库；正文进范文、首图与一张内页进图册；写稿仍走范文。工程 accepted |
 | 00013 | `specs/prds/prd-00013-library-paste-image.md` | 资料库新建图库与上传参考先出虚线上传框；拖入、粘贴或点击从本机选一张，再交回现有学草稿与写用法句。工程 accepted |
 | 00014 | `specs/prds/prd-00014-reference-library.md` | 参考资料本机库；加一条可从库挑或写一次即入库；快照进笔记。工程 accepted |
+| 00015 | `specs/prds/prd-00015-studio-plain-copy.md` | 资料库与写笔记可见文案统一成运营能懂的一套词；删说明书灰字；不改交互与模型提示词；工程 accepted |

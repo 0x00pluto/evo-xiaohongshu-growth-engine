@@ -90,7 +90,7 @@
       pageError: '',
       navCollapsed: readNavCollapsed(),
       menu: [
-        { id: 'note', label: '生成笔记', ready: true, icon: 'lucide:notebook-pen' },
+        { id: 'note', label: '写笔记', ready: true, icon: 'lucide:notebook-pen' },
         { id: 'library', label: '资料库', ready: true, icon: 'lucide:library' },
         { id: 'topics', label: '选题', ready: false, icon: 'lucide:lightbulb' },
         { id: 'role', label: '角色', ready: false, icon: 'lucide:user-round' },

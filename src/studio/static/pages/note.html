@@ -1,7 +1,7 @@
 <div class="flex min-h-0 flex-1 flex-col overflow-hidden" x-data="notePage()">
   <header class="shrink-0">
     <div class="flex items-center justify-between gap-3 px-4 py-3 lg:px-6">
-      <h1 class="text-xl font-medium">写一篇笔记</h1>
+      <h1 class="text-xl font-medium">写笔记</h1>
       <div class="flex items-center gap-1">
         <button
           id="write-new-note"
@@ -48,16 +48,7 @@
     </div>
     <div class="grid grid-cols-2 gap-3">
       <div class="flex min-w-0 flex-col gap-1">
-        <div class="flex items-center gap-1">
-          <label class="text-sm font-medium" for="persona">人设</label>
-          <span
-            class="tooltip tooltip-right"
-            :data-tip="personaHelp(persona)"
-          >
-            <iconify-icon icon="lucide:circle-help" width="14" height="14" class="text-base-content/50" aria-hidden="true"></iconify-icon>
-            <span class="sr-only" x-text="personaHelp(persona)"></span>
-          </span>
-        </div>
+        <label class="text-sm font-medium" for="persona">人设</label>
         <select
           id="persona"
           class="select select-bordered select-sm w-full"
@@ -66,21 +57,12 @@
           @change="persist()"
         >
           <template x-for="name in personaOptions" :key="name">
-            <option :value="name" :title="personaHelp(name)" x-text="name"></option>
+            <option :value="name" x-text="name"></option>
           </template>
         </select>
       </div>
       <div class="flex min-w-0 flex-col gap-1">
-        <div class="flex items-center gap-1">
-          <label class="text-sm font-medium" for="article-type">目的</label>
-          <span
-            class="tooltip tooltip-left"
-            :data-tip="goalHelp(articleType)"
-          >
-            <iconify-icon icon="lucide:circle-help" width="14" height="14" class="text-base-content/50" aria-hidden="true"></iconify-icon>
-            <span class="sr-only" x-text="goalHelp(articleType)"></span>
-          </span>
-        </div>
+        <label class="text-sm font-medium" for="article-type">目的</label>
         <select
           id="article-type"
           class="select select-bordered select-sm w-full"
@@ -89,12 +71,11 @@
           @change="persist()"
         >
           <template x-for="name in goalOptions" :key="name">
-            <option :value="name" :title="goalHelp(name)" x-text="goalOptionLabel(name)"></option>
+            <option :value="name" x-text="goalOptionLabel(name)"></option>
           </template>
         </select>
       </div>
     </div>
-    <p id="combo-brief" class="text-sm leading-6 text-base-content/60" x-html="comboBriefHtml()"></p>
     <div class="flex flex-col gap-1">
       <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <label class="text-sm font-medium" for="business">这篇想讲什么</label>
@@ -116,13 +97,10 @@
     </div>
     <div class="flex flex-col gap-2">
       <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <span class="text-sm font-medium">参考资料</span>
-          <p class="text-sm text-base-content/60">事实材料。点文档看详情，最多 5 条，可空。</p>
-        </div>
+        <span class="text-sm font-medium">产品资料</span>
         <p class="text-sm text-base-content/60" x-show="references.length >= 4" x-text="'已加 ' + references.length + '/5'"></p>
       </div>
-      <div class="flex flex-wrap gap-2" role="list" aria-label="参考资料">
+      <div class="flex flex-wrap gap-2" role="list" aria-label="产品资料">
         <template x-for="(item, index) in references" :key="'ref-' + index">
           <div
             class="group relative"
@@ -134,7 +112,7 @@
               class="relative flex h-14 w-14 items-center justify-center rounded-md border border-base-300 bg-base-200 active:scale-95"
               type="button"
               :id="'reference-' + index"
-              :aria-label="'参考资料第 ' + (index + 1) + ' 条，点击编辑'"
+              :aria-label="'产品资料第 ' + (index + 1) + ' 条，点击编辑'"
               :disabled="job.running"
               @click="openReferenceEditor(index)"
             >
@@ -147,7 +125,7 @@
           id="add-reference"
           class="flex h-14 w-14 items-center justify-center rounded-md border border-dashed border-base-300 bg-base-100 text-xl leading-none text-base-content/50 active:scale-95"
           type="button"
-          aria-label="加一条参考"
+          aria-label="加一条产品资料"
           x-show="references.length < 5"
           @click="addReference()"
           :disabled="job.running || referencePickBusy"
@@ -165,10 +143,7 @@
     </div>
     <div class="flex flex-col gap-2">
       <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-        <div class="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
-          <span class="text-sm font-medium">范文</span>
-          <p id="sample-hint" class="text-sm text-base-content/60">可选。从库挑一篇仿写，抓住重点，不复述原文结构。</p>
-        </div>
+        <span class="text-sm font-medium">对标文案</span>
         <div id="sample-actions" class="flex shrink-0 flex-wrap justify-end gap-2">
           <template x-if="!sampleTitle && !sampleLength">
             <div class="flex flex-wrap gap-2">
@@ -197,7 +172,7 @@
     </div>
     <div class="flex flex-col gap-1">
       <div class="flex flex-wrap items-center gap-3">
-        <label class="text-sm font-medium" for="gallery-count">封面之外还要几张</label>
+        <label class="text-sm font-medium" for="gallery-count">笔记内图数量</label>
         <div class="join">
           <button id="gallery-dec" class="btn btn-sm join-item" type="button" aria-label="少一张" @click="galleryCount = Math.max(0, Number(galleryCount) - 1); onCountChange()" :disabled="job.running || Number(galleryCount) <= 0">−</button>
           <input
@@ -253,7 +228,7 @@
               type="button"
               @click="onReveal(activeSlot)"
               :disabled="!hostReady || !activeSlot"
-            >显示文件</button>
+            >打开文件</button>
           </div>
           <div class="flex gap-2 overflow-x-auto p-1">
             <template x-for="item in slots" :key="drawKey(item)">
@@ -361,7 +336,7 @@
                   type="button"
                   :aria-expanded="albumStyleOpen ? 'true' : 'false'"
                   aria-controls="album-style-panel"
-                  aria-label="图册风格"
+                  aria-label="风格"
                   @click="toggleAlbumStyle()"
                   :disabled="job.running"
                 >
@@ -382,7 +357,7 @@
                   x-show="albumStyleOpen"
                   x-cloak
                 >
-                  <div class="max-h-64 overflow-y-auto" role="list" aria-label="图册风格">
+                  <div class="max-h-64 overflow-y-auto" role="list" aria-label="风格">
                     <div class="grid grid-cols-3 gap-2 sm:grid-cols-6">
                       <template x-for="album in albums" :key="album.id">
                         <button
@@ -404,7 +379,7 @@
                       </template>
                     </div>
                   </div>
-                  <p class="mt-2 text-sm text-base-content/60" x-show="!albums.length">还没有读到图册列表</p>
+                  <p class="mt-2 text-sm text-base-content/60" x-show="!albums.length">还没有读到风格列表</p>
                 </div>
               </div>
 
@@ -417,11 +392,11 @@
                 :disabled="!canOpenSlotPrompt"
                 :aria-expanded="canOpenSlotPrompt && slotPromptExpanded ? 'true' : 'false'"
                 aria-controls="slot-prompt-panel"
-                aria-label="提示词"
+                aria-label="画面内容"
                 @click="toggleSlotPromptExpanded()"
               >
                 <iconify-icon icon="lucide:text" width="14" height="14" class="shrink-0" aria-hidden="true"></iconify-icon>
-                <span>提示词</span>
+                <span>画面内容</span>
                 <iconify-icon
                   icon="lucide:chevron-down"
                   width="14"
@@ -438,12 +413,12 @@
                 type="button"
                 :aria-expanded="uploadRefsPanelOpen ? 'true' : 'false'"
                 aria-controls="upload-refs-panel"
-                aria-label="参考图"
+                aria-label="我们的图"
                 @click="toggleUploadRefsPanel()"
                 :disabled="job.running"
               >
                 <iconify-icon icon="lucide:image" width="14" height="14" class="shrink-0" aria-hidden="true"></iconify-icon>
-                <span>参考图</span>
+                <span>我们的图</span>
                 <span class="tabular-nums text-base-content/60" x-text="slotUploadRefSelectedCount() + '/9'"></span>
                 <iconify-icon
                   icon="lucide:chevron-down"
@@ -462,9 +437,9 @@
               x-show="activeSlot && canOpenSlotPrompt && slotPromptExpanded"
               x-cloak
             >
-              <label class="sr-only" :for="'slot-prompt-' + activeKey">这张的提示词</label>
+              <label class="sr-only" :for="'slot-prompt-' + activeKey">这张的画面内容</label>
               <textarea class="textarea min-h-56 w-full wrap" :id="'slot-prompt-' + activeKey" :value="activeSlot ? activeSlot.prompt : ''" :readonly="job.running" @input="activeSlot && (activeSlot.prompt = $event.target.value, setSlotPrompt(activeSlot))" @blur="persist()"></textarea>
-              <p class="mt-2 text-sm" x-show="activeSlot && !String(activeSlot.prompt || '').trim()">还没有这一张的提示词</p>
+              <p class="mt-2 text-sm" x-show="activeSlot && !String(activeSlot.prompt || '').trim()">还没有这一张的画面内容</p>
             </div>
 
             <div
@@ -473,8 +448,7 @@
               x-show="uploadRefsPanelOpen"
               x-cloak
             >
-              <p class="text-sm text-base-content/60">可囤多张，当前图最多勾 9 张。点 + 上传或从库挑；点方块勾到当前图，悬停看用法。</p>
-              <div class="grid grid-cols-[repeat(auto-fill,minmax(3.5rem,3.5rem))] gap-2" role="list" aria-label="上传参考图">
+              <div class="grid grid-cols-[repeat(auto-fill,minmax(3.5rem,3.5rem))] gap-2" role="list" aria-label="我们的图">
                 <template x-for="(item, index) in postUploadRefs" :key="item.id">
                   <div
                     class="group relative"
@@ -487,7 +461,7 @@
                       type="button"
                       :class="slotHasUploadRef(item.id) ? 'ring-2 ring-base-content' : ''"
                       :aria-pressed="slotHasUploadRef(item.id) ? 'true' : 'false'"
-                      :aria-label="'参考 ' + (index + 1) + '，点击勾选到当前图'"
+                      :aria-label="'我们的图 ' + (index + 1) + '，点击勾选到当前图'"
                       :disabled="job.running || !activeSlot"
                       @click="toggleSlotUploadRef(item)"
                     >
@@ -505,7 +479,7 @@
                     <button
                       class="btn btn-ghost btn-xs absolute -right-1 -top-1 flex h-6 min-h-0 w-6 items-center justify-center rounded-full border border-base-300 bg-base-100 p-0 shadow opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto focus-visible:opacity-100 focus-visible:pointer-events-auto"
                       type="button"
-                      aria-label="编辑用法"
+                      aria-label="编辑图片用法"
                       :disabled="job.running"
                       @click.stop="openUploadRefEditor(item)"
                     >
@@ -517,7 +491,7 @@
                   <button
                     class="flex h-14 w-14 items-center justify-center rounded-md border border-dashed border-base-300 bg-base-100 text-xl leading-none text-base-content/50 active:scale-95"
                     type="button"
-                    aria-label="添加上传参考图"
+                    aria-label="添加我们的图"
                     aria-haspopup="menu"
                     :aria-expanded="uploadRefAddMenuOpen ? 'true' : 'false'"
                     :disabled="!hostReady || job.running"
@@ -701,11 +675,11 @@
   >
     <button class="absolute inset-0 cursor-default" type="button" aria-label="取消" @click="closeUploadRefUpload()"></button>
     <div class="relative z-10 flex w-full max-w-md flex-col gap-3 rounded-lg border border-base-300 bg-base-100 p-4 shadow-lg" @click.stop>
-      <h3 id="upload-ref-upload-title" class="text-base font-medium">写上用法句</h3>
+      <h3 id="upload-ref-upload-title" class="text-base font-medium">图片用法</h3>
       <div class="flex aspect-[3/4] max-h-48 items-center justify-center overflow-hidden rounded-md bg-base-200">
         <img class="max-h-full max-w-full object-contain" x-show="uploadPending" :src="uploadPending" alt="" />
       </div>
-      <label class="text-sm" for="upload-ref-usage-input">用法句（必填）</label>
+      <label class="text-sm" for="upload-ref-usage-input">图片用法（必填）</label>
       <textarea
         id="upload-ref-usage-input"
         class="textarea min-h-20 w-full"
@@ -716,7 +690,7 @@
       <p class="text-sm text-error" role="alert" x-show="uploadError" x-text="uploadError"></p>
       <div class="flex justify-end gap-2">
         <button class="btn btn-ghost btn-sm" type="button" @click="closeUploadRefUpload()" :disabled="uploadRefUploading">取消</button>
-        <button class="btn btn-primary btn-sm" type="button" @click="confirmUploadRefUpload()" :disabled="uploadRefUploading || !String(uploadUsage || '').trim()">确认上传</button>
+        <button class="btn btn-primary btn-sm" type="button" @click="confirmUploadRefUpload()" :disabled="uploadRefUploading || !String(uploadUsage || '').trim()">保存</button>
       </div>
     </div>
   </div>
@@ -733,11 +707,11 @@
   >
     <button class="absolute inset-0 cursor-default" type="button" aria-label="取消" @click="cancelDeleteUploadRef()"></button>
     <div class="relative z-10 w-full max-w-sm rounded-lg border border-base-300 bg-base-100 p-4 shadow-lg" @click.stop>
-      <h3 id="upload-ref-delete-title" class="text-base font-medium">拿走这条上传参考？</h3>
+      <h3 id="upload-ref-delete-title" class="text-base font-medium">删除这张我们的图？</h3>
       <p class="mt-2 text-sm leading-6 text-base-content/70">文件会从这篇删掉；之后生成不再带上它。</p>
       <div class="mt-4 flex justify-end gap-2">
         <button class="btn btn-ghost btn-sm" type="button" @click="cancelDeleteUploadRef()" :disabled="uploadRefDeleting">取消</button>
-        <button class="btn btn-error btn-sm" type="button" @click="confirmDeleteUploadRef()" :disabled="uploadRefDeleting">拿走</button>
+        <button class="btn btn-error btn-sm" type="button" @click="confirmDeleteUploadRef()" :disabled="uploadRefDeleting">删除</button>
       </div>
     </div>
   </div>
@@ -755,18 +729,18 @@
     <button class="absolute inset-0 cursor-default" type="button" aria-label="关闭" @click="closePickReference()"></button>
     <div class="relative z-10 flex max-h-[calc(100dvh-2rem)] w-full max-w-3xl flex-col gap-3 overflow-hidden rounded-lg border border-base-300 bg-base-100 p-4 shadow-lg" @click.stop>
       <div class="flex items-center justify-between gap-2">
-        <h3 id="reference-pick-library-title" class="text-base font-medium">从库挑一条参考资料</h3>
+        <h3 id="reference-pick-library-title" class="text-base font-medium">从库挑一条产品资料</h3>
         <button class="btn btn-ghost btn-square btn-sm" type="button" aria-label="关闭" @click="closePickReference()" :disabled="referencePickBusy">×</button>
       </div>
       <p class="text-sm text-error" role="alert" x-show="referencePickError" x-text="referencePickError"></p>
       <div class="min-h-0 flex-1 overflow-y-auto">
-        <div class="grid grid-cols-3 gap-2 sm:grid-cols-6" role="list" aria-label="可选参考资料">
+        <div class="grid grid-cols-3 gap-2 sm:grid-cols-6" role="list" aria-label="可选产品资料">
           <template x-for="item in referenceLibraryDocs" :key="item.id">
             <button
               class="relative aspect-[3/4] w-full overflow-hidden rounded-lg bg-base-200 text-left active:scale-95"
               type="button"
               role="listitem"
-              :aria-label="'选用参考资料：' + item.name"
+              :aria-label="'选用产品资料：' + item.name"
               :disabled="referencePickBusy || job.running"
               @click="pickLibraryReference(item)"
             >
@@ -782,7 +756,7 @@
       </div>
       <div class="flex shrink-0 justify-end gap-2 border-t border-base-300 pt-3">
         <button class="btn btn-ghost btn-sm" type="button" @click="closePickReference()" :disabled="referencePickBusy">取消</button>
-        <button class="btn btn-neutral btn-sm" type="button" @click="openCreateReferenceFromPick()" :disabled="referencePickBusy || job.running">新增资料</button>
+        <button class="btn btn-neutral btn-sm" type="button" @click="openCreateReferenceFromPick()" :disabled="referencePickBusy || job.running">新建产品资料</button>
       </div>
     </div>
   </div>
@@ -803,7 +777,7 @@
         <h3
           id="reference-editor-title"
           class="text-base font-medium"
-          x-text="referenceEditorNew ? '加一条参考资料' : ('参考资料第 ' + (referenceEditorIndex + 1) + ' 条')"
+          x-text="referenceEditorNew ? '加一条产品资料' : ('产品资料第 ' + (referenceEditorIndex + 1) + ' 条')"
         ></h3>
         <button class="btn btn-ghost btn-square btn-sm shrink-0" type="button" aria-label="关闭" @click="closeReferenceEditor()" :disabled="referenceEditorBusy">×</button>
       </div>
@@ -815,7 +789,7 @@
         :disabled="job.running || referenceEditorBusy"
         :aria-invalid="referenceEditorError ? 'true' : 'false'"
         aria-describedby="reference-editor-error"
-        aria-label="参考资料正文"
+        aria-label="产品资料正文"
         :placeholder="referenceEditorNew ? '第一行当名称，其余写事实（课程信息、卖点等）。' : '课程信息、日期、卖点等事实。'"
         @input="referenceEditorError = ''"
       ></textarea>
@@ -855,10 +829,10 @@
       </div>
       <div class="flex min-h-0 flex-col gap-3 overflow-auto p-4">
         <div class="flex items-start justify-between gap-2">
-          <h3 id="upload-ref-editor-title" class="text-base font-medium">上传参考</h3>
+          <h3 id="upload-ref-editor-title" class="text-base font-medium">我们的图</h3>
           <button class="btn btn-ghost btn-square btn-sm shrink-0" type="button" aria-label="关闭" @click="closeUploadRefEditor()">×</button>
         </div>
-        <label class="text-sm font-medium" for="upload-ref-editor-usage">放哪里 / 怎么用</label>
+        <label class="text-sm font-medium" for="upload-ref-editor-usage">图片用法</label>
         <textarea
           id="upload-ref-editor-usage"
           class="textarea min-h-24 w-full"
@@ -875,12 +849,12 @@
               x-show="uploadRefEditorTarget && !uploadRefEditorTarget.libraryId"
               @click="openSaveToLibraryFromEditor()"
               :disabled="uploadRefEditorBusy || job.running"
-            >存进库</button>
+            >保存到资料库</button>
             <button class="btn btn-error btn-sm" type="button" @click="askDeleteFromEditor()" :disabled="uploadRefEditorBusy || job.running">删除</button>
           </div>
           <div class="flex gap-2">
             <button class="btn btn-ghost btn-sm" type="button" @click="closeUploadRefEditor()" :disabled="uploadRefEditorBusy">取消</button>
-            <button class="btn btn-primary btn-sm" type="button" @click="confirmUploadRefEditor()" :disabled="uploadRefEditorBusy || job.running || !String(uploadRefEditorUsage || '').trim()">保存用法</button>
+            <button class="btn btn-primary btn-sm" type="button" @click="confirmUploadRefEditor()" :disabled="uploadRefEditorBusy || job.running || !String(uploadRefEditorUsage || '').trim()">保存</button>
           </div>
         </div>
       </div>
@@ -899,8 +873,8 @@
   >
     <button class="absolute inset-0 cursor-default" type="button" aria-label="取消" @click="closeSaveToLibrary()"></button>
     <div class="relative z-10 flex w-full max-w-md flex-col gap-3 rounded-lg border border-base-300 bg-base-100 p-4 shadow-lg" @click.stop>
-      <h3 id="upload-ref-save-library-title" class="text-base font-medium">存进资料库</h3>
-      <label class="text-sm" for="upload-ref-save-usage">用法句</label>
+      <h3 id="upload-ref-save-library-title" class="text-base font-medium">保存到资料库</h3>
+      <label class="text-sm" for="upload-ref-save-usage">图片用法</label>
       <textarea
         id="upload-ref-save-usage"
         class="textarea min-h-20 w-full"
@@ -909,10 +883,10 @@
       ></textarea>
       <p class="text-sm text-error" role="alert" x-show="saveToLibraryError" x-text="saveToLibraryError"></p>
       <div class="flex flex-wrap justify-between gap-2">
-        <button class="btn btn-ghost btn-sm" type="button" @click="draftSaveUsage()" :disabled="saveToLibraryBusy">识图起草</button>
+        <button class="btn btn-ghost btn-sm" type="button" @click="draftSaveUsage()" :disabled="saveToLibraryBusy">自动识别</button>
         <div class="flex gap-2">
           <button class="btn btn-ghost btn-sm" type="button" @click="closeSaveToLibrary()" :disabled="saveToLibraryBusy">放弃</button>
-          <button class="btn btn-primary btn-sm" type="button" @click="confirmSaveToLibrary()" :disabled="saveToLibraryBusy || !String(saveToLibraryUsage || '').trim()">确认入库</button>
+          <button class="btn btn-primary btn-sm" type="button" @click="confirmSaveToLibrary()" :disabled="saveToLibraryBusy || !String(saveToLibraryUsage || '').trim()">保存</button>
         </div>
       </div>
     </div>
@@ -931,10 +905,10 @@
     <button class="absolute inset-0 cursor-default" type="button" aria-label="关闭" @click="closePickSample()"></button>
     <div class="relative z-10 flex max-h-[calc(100dvh-2rem)] w-full max-w-3xl flex-col gap-3 overflow-hidden rounded-lg border border-base-300 bg-base-100 p-4 shadow-lg" @click.stop>
       <div class="flex items-center justify-between gap-2">
-        <h3 id="sample-pick-library-title" class="text-base font-medium">从库挑一篇范文</h3>
+        <h3 id="sample-pick-library-title" class="text-base font-medium">从库挑一篇对标文案</h3>
         <button class="btn btn-ghost btn-square btn-sm" type="button" aria-label="关闭" @click="closePickSample()">×</button>
       </div>
-      <p class="text-sm text-base-content/60" x-show="!libraryArticleSamples.length && !pickSampleError">资料库还没有范文。可先「新建到库」。</p>
+      <p class="text-sm text-base-content/60" x-show="!libraryArticleSamples.length && !pickSampleError">还没有对标文案。</p>
       <p class="text-sm text-error" role="alert" x-show="pickSampleError" x-text="pickSampleError"></p>
       <div class="min-h-0 flex-1 overflow-y-auto">
         <div class="grid grid-cols-3 gap-2 sm:grid-cols-6">
@@ -942,7 +916,7 @@
             <button
               class="relative aspect-[3/4] w-full overflow-hidden rounded-lg bg-base-200 text-left active:scale-95"
               type="button"
-              :aria-label="'选用范文：' + item.title"
+              :aria-label="'选用对标文案：' + item.title"
               :disabled="pickSampleBusy"
               @click="confirmPickSample(item)"
             >
@@ -972,7 +946,7 @@
     <button class="absolute inset-0 cursor-default" type="button" aria-label="关闭" @click="closeCreateSample()"></button>
     <div class="relative z-10 flex w-full max-w-lg flex-col gap-3 rounded-lg border border-base-300 bg-base-100 p-4 shadow-lg" @click.stop>
       <div class="flex items-start justify-between gap-2">
-        <h3 id="sample-create-title" class="text-base font-medium">新建范文到库</h3>
+        <h3 id="sample-create-title" class="text-base font-medium">新建对标文案</h3>
         <button class="btn btn-ghost btn-square btn-sm shrink-0" type="button" aria-label="关闭" @click="closeCreateSample()">×</button>
       </div>
       <label class="text-sm" for="sample-create-paste">整篇粘贴（第一行当标题，其余当正文）</label>
@@ -986,7 +960,7 @@
       <p class="text-sm text-error" role="alert" x-show="createSampleError" x-text="createSampleError"></p>
       <div class="flex justify-end gap-2">
         <button class="btn btn-ghost btn-sm" type="button" @click="closeCreateSample()" :disabled="createSampleBusy">取消</button>
-        <button class="btn btn-primary btn-sm" type="button" @click="confirmCreateSample()" :disabled="createSampleBusy">确认入库并选用</button>
+        <button class="btn btn-primary btn-sm" type="button" @click="confirmCreateSample()" :disabled="createSampleBusy">保存并选用</button>
       </div>
     </div>
   </div>
@@ -1007,7 +981,7 @@
         <h3 id="upload-ref-pick-library-title" class="text-base font-medium">从库挑进这篇</h3>
         <button class="btn btn-ghost btn-square btn-sm" type="button" aria-label="关闭" @click="closePickFromLibrary()">×</button>
       </div>
-      <p class="text-sm text-base-content/60" x-show="!libraryUploadRefs.length">资料库还没有上传参考。可先在这篇上传后「存进库」。</p>
+      <p class="text-sm text-base-content/60" x-show="!libraryUploadRefs.length">还没有我们的图。</p>
       <p class="text-sm text-error" role="alert" x-show="pickFromLibraryError" x-text="pickFromLibraryError"></p>
       <div class="min-h-0 flex-1 overflow-y-auto">
         <div class="grid grid-cols-3 gap-2">
@@ -1015,7 +989,7 @@
             <button
               class="relative aspect-square w-full overflow-hidden rounded-md bg-base-200 text-left active:scale-95"
               type="button"
-              :aria-label="'从库挑：' + (item.usage || '上传参考')"
+              :aria-label="'从库挑：' + (item.usage || '我们的图')"
               :disabled="pickFromLibraryBusy || postUploadRefs.length >= 48"
               @click="confirmPickFromLibrary(item)"
             >

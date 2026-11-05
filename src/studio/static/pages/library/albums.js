@@ -11,10 +11,10 @@ function libraryAlbums() {
   let eyedropperSampler = null;
 
   const LEARNING_LINES = [
-    '正在端详这张参考图…',
-    '提炼配色、构图与字体气质…',
-    '把风格拆成可复用的题词…',
-    '马上生成你的图册草稿…',
+    '正在看这张图',
+    '在看配色和排版',
+    '在整理这套风格',
+    '马上出一套草稿',
   ];
   const LEARNING_LINE_MS = 3500;
 
@@ -193,7 +193,7 @@ function libraryAlbums() {
       const data = await this.call('listAlbums');
       if (!data || data.ok === false || !Array.isArray(data.albums)) {
         this.albums = [];
-        this.error = (data && data.message) || '没有读到图册列表';
+        this.error = (data && data.message) || '没有读到风格列表';
         return;
       }
       this.albums = data.albums;
@@ -285,7 +285,7 @@ function libraryAlbums() {
         this.detailSavedPrompt = String(this.detailPrompt || '');
         this.detail.promptTemplate = this.detailSavedPrompt;
         this.syncPromptEditor('detail');
-        this.$dispatch('library-toast', '已保存题词');
+        this.$dispatch('library-toast', '已保存怎么画');
       } finally {
         this.savingDetail = false;
       }
@@ -310,7 +310,7 @@ function libraryAlbums() {
       }
       if (!this.hostReady || this.learning || this.committing || this.savingDetail) {
         window.dispatchEvent(new CustomEvent('library-album-draft-settled', {
-          detail: { action: 'error', message: '图库正忙，请稍后再试' },
+          detail: { action: 'error', message: '风格正忙，请稍后再试' },
         }));
         return;
       }
@@ -368,8 +368,8 @@ function libraryAlbums() {
         this.draftOpen = false;
         this.draft = null;
         this.draftPrompt = '';
-        this.$dispatch('library-toast', '已写入图库');
-        // 先清 committing，再派 settled，避免下一张学图命中「图库正忙」
+        this.$dispatch('library-toast', '已保存风格');
+        // 先清 committing，再派 settled，避免下一张学图命中「风格正忙」
         this.committing = false;
         window.dispatchEvent(new CustomEvent('library-album-draft-settled', {
           detail: { action: 'commit', id: albumId },
@@ -523,7 +523,7 @@ function libraryAlbums() {
         this.detailSample = '';
         this.detailPrompt = '';
         this.detailSavedPrompt = '';
-        this.$dispatch('library-toast', '已删除这本图册');
+        this.$dispatch('library-toast', '已删除这套风格');
         const nextSamples = { ...this.albumSamples };
         delete nextSamples[id];
         this.albumSamples = nextSamples;

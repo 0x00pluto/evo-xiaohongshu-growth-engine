@@ -10,66 +10,6 @@ function notePage() {
     员工: ['种草', '引流', '搜索', '转化'],
   };
 
-  const PERSONA_HELP = {
-    素人: '真实体验口吻，像身边朋友随手分享，少官腔。',
-    KOC: '有一点垂直经验的真实用户，能讲清对比与取舍。',
-    达人: '领域熟练者，结构清晰、有方法或清单感。',
-    官号: '品牌/机构官方口径，稳、可信、信息完整。',
-    创始人: '以当事人身份讲判断与故事，带温度也带立场。',
-    店主: '一线卖货视角，讲库存、价格、到店/下单路径。',
-    员工: '一线服务或交付视角，讲真实接待与答疑。',
-  };
-
-  const GOAL_HELP = {
-    种草: '让人想试、想买：共鸣 + 具体好处，轻推行动。',
-    引流: '把人引到私信/外链/群：说清下一步怎么联系。',
-    涨粉: '让人想关注你：人设记忆点 + 持续看下去的理由。',
-    曝光: '拉开覆盖面：话题更宽、钩子更强、适合传播。',
-    搜索: '覆盖查询意图：标题与正文对准用户会搜的词。',
-    转化: '推动下单或报名：卖点、价格/名额、行动指令清楚。',
-  };
-
-  /** 与 docs/references/xhs-prompt-taxonomy.md 对齐；标签在 comboBriefHtml 里加粗 */
-  const PERSONA_BRIEF = {
-    素人: {
-      identity: '普通用户，低粉，不是博主。',
-      tone: '第一人称，口语化，可以吐槽、带情绪。给人的感觉是「我在用，顺便告诉你」，不是「我特意来推荐」。',
-    },
-    KOC: {
-      identity: '某个领域有经验的普通博主，半专业。',
-      tone: '像朋友，但有自己的判断；可用 emoji 帮排版。',
-    },
-    达人: {
-      identity: '测评师、从业者等专业博主。',
-      tone: '理性、敢下结论，术语要翻成白话。',
-    },
-    官号: {
-      identity: '代表品牌或机构，要有统一人格。',
-      tone: '调性统一，不发空洞口号，要讲具体场景。',
-    },
-    创始人: {
-      identity: '品牌创始人/主理人，真人出镜。',
-      tone: '真实、有观点，可客观点评竞品但不能贬低。',
-    },
-    店主: {
-      identity: '本地门店老板。',
-      tone: '讲亮点、环境、单品与人均，不留站外联系方式。',
-    },
-    员工: {
-      identity: '一线服务或交付同事。',
-      tone: '像帮客户办事，讲真实接待、答疑与落地细节。',
-    },
-  };
-
-  const GOAL_BRIEF = {
-    种草: '建立信任，让读者产生想试、想买的欲望。',
-    引流: '把有意向的人引到站内入口（私信、群聊、店铺、留资）。',
-    涨粉: '让人收藏、评论、关注，愿意持续看你。',
-    曝光: '让读者知道这个品牌是谁、和别人有什么不同。',
-    搜索: '靠长尾关键词获得长期的搜索流量。',
-    转化: '面向正在做购买决定的用户，推动下单或报名。',
-  };
-
   const REFERENCES_MAX = 5;
 
   return {
@@ -177,7 +117,7 @@ function notePage() {
     pickFromLibraryBusy: false,
     libraryUploadRefs: [],
     libraryPreviews: {},
-    usagePlaceholder: '人物照片。按 Hero 放在画面中央，锁脸。',
+    usagePlaceholder: '我们的 logo，放在右上角。',
 
     hostReady: window.studioHost.ready,
     get sampleLength() {
@@ -189,19 +129,6 @@ function notePage() {
     },
     goalOptionLabel(goal) {
       return this.isRecommendedCombo(this.persona, goal) ? `★ ${goal}` : goal;
-    },
-    personaHelp(name) {
-      return PERSONA_HELP[name] || '';
-    },
-    goalHelp(name) {
-      return GOAL_HELP[name] || '';
-    },
-    comboBriefHtml() {
-      const persona = PERSONA_BRIEF[this.persona];
-      const goal = GOAL_BRIEF[this.articleType] || '';
-      if (!persona || !goal) return '';
-      const label = (text) => `<span class="font-medium text-base-content">${text}</span>`;
-      return `${label('身份：')}${persona.identity}${label('语气：')}${persona.tone}${label('目标：')}${goal}`;
     },
     /**
      * @param {unknown} item
@@ -249,7 +176,7 @@ function notePage() {
       };
     },
     /**
-     * 编辑芯片：有换行才拆名称；无换行保持无名称（旧稿兼容）。
+     * 编辑产品资料：有换行才拆名称；无换行保持无名称（旧稿兼容）。
      * @param {unknown} paste
      * @returns {{ name?: string; body: string } | null}
      */
@@ -312,7 +239,7 @@ function notePage() {
     async addReference() {
       if (this.job.running) return;
       if (this.references.length >= REFERENCES_MAX) {
-        this.errors.references = `参考资料最多 ${REFERENCES_MAX} 条。`;
+        this.errors.references = `产品资料最多 ${REFERENCES_MAX} 条。`;
         return;
       }
       this.errors.references = '';
@@ -352,7 +279,7 @@ function notePage() {
     openCreateReferenceFromPick() {
       if (this.referencePickBusy || this.job.running) return;
       if (this.references.length >= REFERENCES_MAX) {
-        this.errors.references = `参考资料最多 ${REFERENCES_MAX} 条。`;
+        this.errors.references = `产品资料最多 ${REFERENCES_MAX} 条。`;
         this.closePickReference();
         return;
       }
@@ -424,11 +351,11 @@ function notePage() {
       const item = this.normalizeReferenceItem(snap);
       if (!item) return false;
       if (this.references.length >= REFERENCES_MAX) {
-        this.errors.references = `参考资料最多 ${REFERENCES_MAX} 条。`;
+        this.errors.references = `产品资料最多 ${REFERENCES_MAX} 条。`;
         return false;
       }
       if (this.isReferenceAlreadyOnNote(item.body)) {
-        this.errors.references = '这篇已经加过相同的参考资料。';
+        this.errors.references = '这篇已经加过相同的产品资料。';
         return false;
       }
       this.references = [...this.references, item];
@@ -439,7 +366,7 @@ function notePage() {
     async pickLibraryReference(item) {
       if (!item || this.referencePickBusy || this.job.running) return;
       if (this.references.length >= REFERENCES_MAX) {
-        this.errors.references = `参考资料最多 ${REFERENCES_MAX} 条。`;
+        this.errors.references = `产品资料最多 ${REFERENCES_MAX} 条。`;
         this.closePickReference();
         return;
       }
@@ -456,11 +383,11 @@ function notePage() {
           body: data.doc.body,
         });
         if (!snap) {
-          this.referencePickError = '这条参考资料是空的';
+          this.referencePickError = '这条产品资料是空的';
           return;
         }
         if (this.isReferenceAlreadyOnNote(snap.body)) {
-          this.referencePickError = '这篇已经加过相同的参考资料。';
+          this.referencePickError = '这篇已经加过相同的产品资料。';
           this.referenceLibraryDocs = this.filterAvailableReferenceDocs(this.referenceLibraryDocs);
           return;
         }
@@ -478,12 +405,12 @@ function notePage() {
       if (this.referenceEditorBusy || this.job.running) return;
       const text = String(this.referenceEditorText || '').trim();
       if (!text) {
-        this.referenceEditorError = '先写一点事实。空的参考资料不会保存。';
+        this.referenceEditorError = '先写一点事实。空的产品资料不会保存。';
         return;
       }
       if (this.referenceEditorNew) {
         if (this.references.length >= REFERENCES_MAX) {
-          this.errors.references = `参考资料最多 ${REFERENCES_MAX} 条。`;
+          this.errors.references = `产品资料最多 ${REFERENCES_MAX} 条。`;
           this.closeReferenceEditor();
           return;
         }
@@ -497,11 +424,11 @@ function notePage() {
           return;
         }
         if (Array.from(body).length > 8000) {
-          this.referenceEditorError = '参考资料太长了，先删到 8000 字以内。';
+          this.referenceEditorError = '产品资料太长了，先删到 8000 字以内。';
           return;
         }
         if (this.isReferenceAlreadyOnNote(body)) {
-          this.referenceEditorError = '这篇已经加过相同的参考资料。';
+          this.referenceEditorError = '这篇已经加过相同的产品资料。';
           return;
         }
         this.referenceEditorBusy = true;
@@ -518,7 +445,7 @@ function notePage() {
           });
           if (!snap) return;
           if (this.isReferenceAlreadyOnNote(snap.body)) {
-            this.referenceEditorError = '这篇已经加过相同的参考资料。';
+            this.referenceEditorError = '这篇已经加过相同的产品资料。';
             return;
           }
           if (!this.pushReferenceSnapshot(snap)) {
@@ -534,11 +461,11 @@ function notePage() {
       }
       const parsed = this.parseChipPaste(text);
       if (!parsed) {
-        this.referenceEditorError = '先写一点事实。空的参考资料不会保存。';
+        this.referenceEditorError = '先写一点事实。空的产品资料不会保存。';
         return;
       }
       if (Array.from(parsed.body).length > 8000) {
-        this.referenceEditorError = '参考资料太长了，先删到 8000 字以内。';
+        this.referenceEditorError = '产品资料太长了，先删到 8000 字以内。';
         return;
       }
       const i = this.referenceEditorIndex;
@@ -547,7 +474,7 @@ function notePage() {
         return;
       }
       if (this.isReferenceAlreadyOnNote(parsed.body, i)) {
-        this.referenceEditorError = '这篇已经加过相同的参考资料。';
+        this.referenceEditorError = '这篇已经加过相同的产品资料。';
         return;
       }
       const next = this.references.slice();
@@ -624,7 +551,7 @@ function notePage() {
       try {
         const data = await this.call('getLibraryArticleSample', { id: item.id });
         if (!data || data.ok === false || !data.sample) {
-          this.pickSampleError = (data && data.message) || '读范文失败';
+          this.pickSampleError = (data && data.message) || '读对标文案失败';
           return;
         }
         this.sampleTitle = String(data.sample.title || item.title || '').trim();
@@ -934,11 +861,11 @@ function notePage() {
       if (!String(this.business || '').trim()) this.errors.business = '先用一句话说你要发什么。';
       if (this.sampleLength > 8000) this.errors.sampleBody = '贴进来的原文太长了，先删到 8000 字以内。';
       if (this.references.length > REFERENCES_MAX) {
-        this.errors.references = `参考资料最多 ${REFERENCES_MAX} 条。`;
+        this.errors.references = `产品资料最多 ${REFERENCES_MAX} 条。`;
       }
       const count = Number(this.galleryCount);
       if (!Number.isInteger(count) || count < 0 || count > 9) {
-        this.errors.galleryCount = '配图张数要在 0 到 9 之间。';
+        this.errors.galleryCount = '笔记内图数量要在 0 到 9 之间。';
       }
       const first = ['business', 'sampleBody', 'references', 'galleryCount'].find((field) => this.errors[field]);
       if (!first) return true;
@@ -1236,7 +1163,7 @@ function notePage() {
     },
 
     /**
-     * 从资料库带一篇范文进「要发什么」。
+     * 从资料库带一篇对标文案进「要发什么」。
      * @param {string} sampleId
      */
     async applyLibrarySample(sampleId) {
@@ -1244,7 +1171,7 @@ function notePage() {
       if (!id) return;
       const data = await this.call('getLibraryArticleSample', { id });
       if (!data || data.ok === false || !data.sample) {
-        this.errors.sampleBody = (data && data.message) || '读范文失败';
+        this.errors.sampleBody = (data && data.message) || '读对标文案失败';
         this.sampleOpen = true;
         return;
       }
@@ -1359,7 +1286,7 @@ function notePage() {
         || !this.draft;
     },
     drawLabel(item) {
-      return item.image && item.image.status === '成功' ? '再抽一张' : '生成这张';
+      return item.image && item.image.status === '成功' ? '再画一张' : '画这张';
     },
     async onDraw(item) {
       if (!item || this.slotDrawDisabled(item)) return;
@@ -1469,7 +1396,7 @@ function notePage() {
     async onCountChange() {
       const count = Number(this.galleryCount);
       if (!Number.isInteger(count) || count < 0 || count > 9) {
-        this.errors.galleryCount = '配图张数要在 0 到 9 之间。';
+        this.errors.galleryCount = '笔记内图数量要在 0 到 9 之间。';
         this.focusField('galleryCount');
         return;
       }
@@ -1527,7 +1454,7 @@ function notePage() {
         delete overrides[item.id];
       } else {
         if (materialIds.length >= 9) {
-          this.notice = '一张图最多勾 9 张上传参考';
+          this.notice = '一张图最多 9 张我们的图';
           return;
         }
         materialIds.push(item.id);
@@ -1598,7 +1525,7 @@ function notePage() {
       if (!this.uploadRefEditorTarget || this.uploadRefEditorBusy) return;
       const usage = String(this.uploadRefEditorUsage || '').trim();
       if (!usage) {
-        this.uploadRefEditorError = '请写上用法句';
+        this.uploadRefEditorError = '请写上图片用法';
         return;
       }
       this.uploadRefEditorBusy = true;
@@ -1699,7 +1626,7 @@ function notePage() {
       if (this.uploadRefUploading || !this.uploadPending) return;
       const usage = String(this.uploadUsage || '').trim();
       if (!usage) {
-        this.uploadError = '请写上用法句';
+        this.uploadError = '请写上图片用法';
         return;
       }
       this.uploadRefUploading = true;
@@ -1778,7 +1705,7 @@ function notePage() {
       try {
         const result = await this.call('draftUploadRefUsage', { dataUrl });
         if (!result || result.ok === false) {
-          this.saveToLibraryError = (result && result.message) || '识图失败';
+          this.saveToLibraryError = (result && result.message) || '自动识别失败';
           return;
         }
         this.saveToLibraryUsage = String(result.usage || '');
@@ -1790,7 +1717,7 @@ function notePage() {
       if (!this.saveToLibraryTarget || this.saveToLibraryBusy) return;
       const usage = String(this.saveToLibraryUsage || '').trim();
       if (!usage) {
-        this.saveToLibraryError = '请写上用法句';
+        this.saveToLibraryError = '请写上图片用法';
         return;
       }
       this.saveToLibraryBusy = true;
@@ -1801,11 +1728,11 @@ function notePage() {
           usage,
         });
         if (!result || result.ok === false) {
-          this.saveToLibraryError = (result && result.message) || '存进库失败';
+          this.saveToLibraryError = (result && result.message) || '保存到资料库失败';
           return;
         }
         if (Array.isArray(result.uploadRefs)) this.postUploadRefs = result.uploadRefs;
-        this.notice = '已存进资料库';
+        this.notice = '已保存到资料库';
         this.closeSaveToLibrary(true);
       } finally {
         this.saveToLibraryBusy = false;

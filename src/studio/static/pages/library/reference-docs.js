@@ -113,7 +113,7 @@ function libraryReferenceDocs() {
           return;
         }
         this.closeEditor(true);
-        this.$dispatch('library-toast', '已写入资料库');
+        this.$dispatch('library-toast', '已保存');
         await this.refresh();
       } finally {
         this.busy = false;
@@ -237,7 +237,7 @@ function libraryReferenceDocs() {
         if (this.detailTarget && this.detailTarget.id === deletedId) {
           this.forceCloseDetail();
         }
-        this.$dispatch('library-toast', '已从库里拿走');
+        this.$dispatch('library-toast', '已删除');
         await this.refresh();
       } finally {
         this.deleting = false;
