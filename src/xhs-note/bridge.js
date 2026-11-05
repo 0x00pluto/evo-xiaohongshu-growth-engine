@@ -4,6 +4,8 @@
 /** 侧通道默认端口；可用环境变量 DEX_BUDDY_NATIVE_BRIDGE_PORT 覆盖 */
 const DEFAULT_BRIDGE_PORT = 18769;
 const DEFAULT_HOST_NAME = 'com.zhiying.dexbuddy.host';
+/** 取料能力最低扩展版本（含） */
+const MIN_EXTENSION_VERSION = '0.9.0';
 
 /**
  * @returns {number}
@@ -64,7 +66,9 @@ function humanError(code, fallback) {
     case 'TIMEOUT':
       return '取料超时，请稍后再试';
     case 'BRIDGE_DOWN':
-      return '连不上本机取料通道。请确认内部特供版已加载，并打开「Dex Buddy → 允许 Dex Buddy 连接」。';
+      return '连不上本机取料通道。请在 Chrome 加载内部特供版（灯笼小红书），打开「允许 Dex Buddy 连接」后重试。';
+    case 'VERSION_LOW':
+      return `当前 Chrome 扩展版本过低，需 ≥ ${MIN_EXTENSION_VERSION} 才支持从小红书笔记取料。请升级内部特供版后重试。`;
     case 'ALREADY':
       return '这篇笔记已经收录过了';
     case 'IMPORTING':
@@ -74,11 +78,45 @@ function humanError(code, fallback) {
   }
 }
 
+/**
+ * 解析 semver 主.次.补（忽略前缀 v、后缀预发布段）。
+ * @param {unknown} raw
+ * @returns {[number, number, number] | null}
+ */
+function parseSemverTriple(raw) {
+  const text = typeof raw === 'string' ? raw.trim() : '';
+  if (!text) return null;
+  const match = text.replace(/^v/i, '').match(/^(\d+)\.(\d+)\.(\d+)/);
+  if (!match) return null;
+  return [Number(match[1]), Number(match[2]), Number(match[3])];
+}
+
+/**
+ * @param {unknown} version
+ * @param {string} [minimum]
+ * @returns {boolean}
+ */
+function isExtensionVersionAtLeast(version, minimum) {
+  const got = parseSemverTriple(version);
+  const need = parseSemverTriple(minimum || MIN_EXTENSION_VERSION);
+  if (!got || !need) return false;
+  for (let i = 0; i < 3; i += 1) {
+    const a = got[i] || 0;
+    const b = need[i] || 0;
+    if (a > b) return true;
+    if (a < b) return false;
+  }
+  return true;
+}
+
 module.exports = {
   DEFAULT_BRIDGE_PORT,
   DEFAULT_HOST_NAME,
+  MIN_EXTENSION_VERSION,
   bridgePort,
   hostName,
   humanError,
+  isExtensionVersionAtLeast,
   mapBridgeError,
+  parseSemverTriple,
 };

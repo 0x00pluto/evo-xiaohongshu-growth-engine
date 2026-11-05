@@ -8,8 +8,11 @@ const path = require('node:path');
 const sheetModule = require('./sheet');
 /** @type {typeof import('../../image/aspect')} */
 const aspectModule = require('../../image/aspect');
+/** @type {typeof import('../../xhs-note/provenance')} */
+const xhsProvenance = require('../../xhs-note/provenance');
 const { normalizePromptSheetVersion } = sheetModule;
 const { normalizeAspectRatio } = aspectModule;
+const { normalizeXhsProvenance } = xhsProvenance;
 
 /** @type {ReadonlyArray<string>} */
 const ALBUM_KINDS = ['magazine', 'scrapbook', 'conceptual', 'card', 'infographic'];
@@ -49,6 +52,7 @@ function isAlbumToken(value) {
  *   aspectRatio: string;
  *   source: 'factory' | 'user';
  *   home: string;
+ *   learnedFrom?: import('../../xhs-note/provenance').XhsNoteProvenance;
  * }} AlbumMeta
  * @typedef {{
  *   promptsDir: string;
@@ -159,7 +163,8 @@ function normalizeMeta(raw, fileId) {
   const promptSheetVersion = normalizePromptSheetVersion(source.promptSheetVersion);
   // 缺字段时留空，由 ensureAlbumAspectRatio 按样图补算；非法串忽略。
   const aspectRatio = normalizeAspectRatio(source.aspectRatio);
-  return {
+  /** @type {AlbumMeta} */
+  const meta = {
     id,
     kind,
     slug,
@@ -174,6 +179,10 @@ function normalizeMeta(raw, fileId) {
     source: 'factory',
     home: '',
   };
+  // 文件里的 source 对象是小红书溯源；目录扫描后再改写为 factory|user
+  const learnedFrom = normalizeXhsProvenance(source.source);
+  if (learnedFrom) meta.learnedFrom = learnedFrom;
+  return meta;
 }
 
 /**

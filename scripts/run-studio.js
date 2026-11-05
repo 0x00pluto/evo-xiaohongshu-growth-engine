@@ -36,7 +36,9 @@ const METHODS = new Set([
   'getAlbumDetail',
   'learnAlbum',
   'resolveXhsNote',
+  'checkXhsNoteBridge',
   'importXhsNote',
+  'saveXhsNoteArticle',
   'commitAlbum',
   'updateAlbumPrompt',
   'discardAlbum',
@@ -187,6 +189,7 @@ function createStudio(options) {
     userUploadRefsDir: path.join(root, 'runtime', 'materials', 'upload-refs'),
     userArticleSamplesDir: path.join(root, 'runtime', 'materials', 'article-samples'),
     userXhsNotesDir: path.join(root, 'runtime', 'materials', 'xhs-notes'),
+    userXhsNotesCacheDir: path.join(root, 'cache', 'xhs-notes'),
     env,
     // 独立运行没有宿主 ctx.models；把合并后的 .env 交给 bindModels。
     ctx: undefined,

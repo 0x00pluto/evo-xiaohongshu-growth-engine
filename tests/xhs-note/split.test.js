@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
+  isTagOnlyBody,
   normalizeNotePayload,
   pickInnerImage,
   splitNoteParts,
@@ -53,4 +54,10 @@ test('normalizeNotePayload 拒绝无 sourceUrl', () => {
   });
   assert.equal(ok?.sourceUrl, 'https://www.xiaohongshu.com/explore/x');
   assert.deepEqual(ok?.tags, ['a']);
+});
+
+test('isTagOnlyBody 识别纯话题标签正文', () => {
+  assert.equal(isTagOnlyBody('#护肤# #种草# #好物分享#'), true);
+  assert.equal(isTagOnlyBody('今天试了这款精华 #护肤#'), false);
+  assert.equal(isTagOnlyBody(''), false);
 });

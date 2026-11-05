@@ -5,13 +5,22 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 
+const { normalizeXhsProvenance, provenanceToJson } = require('../xhs-note/provenance');
+
 const BODY_LIMIT = 8000;
 const EMPTY_TITLE = '请写上标题';
 const EMPTY_BODY = '请写上正文';
 const BODY_TOO_LONG = '贴进来的原文太长了，先删到 8000 字以内。';
 
 /**
- * @typedef {{ id: string; title: string; body: string; updatedAt: number }} ArticleSampleMeta
+ * @typedef {import('../xhs-note/provenance').XhsNoteProvenance} XhsNoteProvenance
+ * @typedef {{
+ *   id: string;
+ *   title: string;
+ *   body: string;
+ *   updatedAt: number;
+ *   source?: XhsNoteProvenance;
+ * }} ArticleSampleMeta
  */
 
 /**
@@ -75,12 +84,16 @@ function parseMeta(raw) {
   const body = typeof bag.body === 'string' ? bag.body : '';
   const updatedAt = Number(bag.updatedAt);
   if (!id || !title || !String(body).trim()) return null;
-  return {
+  /** @type {ArticleSampleMeta} */
+  const meta = {
     id,
     title,
     body,
     updatedAt: Number.isFinite(updatedAt) ? updatedAt : 0,
   };
+  const source = normalizeXhsProvenance(bag.source);
+  if (source) meta.source = source;
+  return meta;
 }
 
 /**
@@ -124,7 +137,7 @@ function readArticleSample(libraryDir, id) {
 
 /**
  * @param {string} libraryDir
- * @param {{ id?: string; title: unknown; body: unknown }} input
+ * @param {{ id?: string; title: unknown; body: unknown; source?: unknown }} input
  * @returns {ArticleSampleMeta}
  */
 function saveArticleSample(libraryDir, input) {
@@ -133,8 +146,10 @@ function saveArticleSample(libraryDir, input) {
   if (!checked.ok) throw new Error(checked.message);
   const existingId = typeof input.id === 'string' ? input.id.trim() : '';
   const id = existingId || newArticleSampleId();
+  /** @type {ArticleSampleMeta | null} */
+  let prev = null;
   if (existingId) {
-    const prev = readArticleSample(libraryDir, existingId);
+    prev = readArticleSample(libraryDir, existingId);
     if (!prev) throw new Error('库里没有这篇范文');
   }
   /** @type {ArticleSampleMeta} */
@@ -144,9 +159,22 @@ function saveArticleSample(libraryDir, input) {
     body: checked.body,
     updatedAt: Date.now(),
   };
+  const nextSource = input.source !== undefined
+    ? normalizeXhsProvenance(input.source)
+    : (prev && prev.source ? prev.source : null);
+  if (nextSource) meta.source = nextSource;
+  /** @type {Record<string, unknown>} */
+  const out = {
+    id: meta.id,
+    title: meta.title,
+    body: meta.body,
+    updatedAt: meta.updatedAt,
+  };
+  const sourceJson = provenanceToJson(meta.source || null);
+  if (sourceJson) out.source = sourceJson;
   const dir = entryDir(libraryDir, id);
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(metaPath(libraryDir, id), `${JSON.stringify(meta, null, 2)}\n`);
+  fs.writeFileSync(metaPath(libraryDir, id), `${JSON.stringify(out, null, 2)}\n`);
   return meta;
 }
 
@@ -195,12 +223,15 @@ function publicListItem(meta) {
     .replace(/\n{3,}/g, '\n\n')
     .trim()
     .slice(0, 400);
-  return {
+  /** @type {{ id: string; title: string; updatedAt: number; preview: string; source?: XhsNoteProvenance }} */
+  const item = {
     id: meta.id,
     title: meta.title,
     updatedAt: meta.updatedAt,
     preview,
   };
+  if (meta.source) item.source = meta.source;
+  return item;
 }
 
 module.exports = {

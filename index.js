@@ -91,6 +91,7 @@ module.exports = {
       userUploadRefsDir: path.join(dataDir, 'runtime', 'materials', 'upload-refs'),
       userArticleSamplesDir: path.join(dataDir, 'runtime', 'materials', 'article-samples'),
       userXhsNotesDir: path.join(dataDir, 'runtime', 'materials', 'xhs-notes'),
+      userXhsNotesCacheDir: path.join(dataDir, 'cache', 'xhs-notes'),
       // 设置页保存不重跑 apply；真正发请求时再读 pluginEnv / .env。
       readEnv: () => resolveEnv(ctx),
       ctx,
@@ -151,11 +152,20 @@ module.exports = {
       resolveXhsNote(payload) {
         return runner.resolveXhsNote(asObject(payload));
       },
+      checkXhsNoteBridge() {
+        return runner.checkXhsNoteBridge();
+      },
       /**
        * @param {unknown} payload
        */
       importXhsNote(payload) {
         return runner.importXhsNote(asObject(payload));
+      },
+      /**
+       * @param {unknown} payload
+       */
+      saveXhsNoteArticle(payload) {
+        return runner.saveXhsNoteArticle(asObject(payload));
       },
       /**
        * @param {unknown} payload

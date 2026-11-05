@@ -2,15 +2,19 @@
 name: prd-00012-learn-xhs-note
 sequence: 12
 description: 资料库粘贴小红书笔记链接；解析后的链接单独入库；正文进范文、首图与一张内页进图册；写稿仍走范文加业务一句。
-status: backlog
+status: accepted
 created: 2026-11-04T08:23:59Z
+last_accepted_at: 2026-11-05T07:01:19Z
+accepted_commit: 0235a9548955344dcdeb7b030aa033c1648afcfc
+accepted_branch: dev
+accepted_scope: R0
 ---
 
 # PRD: 从小红书笔记学进现有柜子
 
 | 属性 | 值 |
 |------|----|
-| 状态 | 工程：backlog |
+| 状态 | 工程：accepted（见文末「工程验收状态」） |
 | 范围 | 资料库进料。Release 0 |
 | 顺序号 | 00012 |
 | 关联文档 | `docs/workflows/one-post-studio.md`、`docs/DESIGN.md`、`AGENTS.md`、扩展仓 `docs/dex-buddy-native-messaging.md`、`specs/prds/prd-00005-album-library.md`、`specs/prds/prd-00007-note-style-samples.md`、`specs/prds/prd-00009-sdk-entitlement-gates.md` |
@@ -170,3 +174,58 @@ stateDiagram-v2
 | 日期 | 说明 |
 |------|------|
 | 2026-11-04 | 首版：链接资源去重；拆进范文与图册；无浏览 Tab |
+| 2026-11-05 | 工程验收：R0 accepted；实现含 noteId 去重、cache 优先取料、串行学图、双向溯源等产品迭代 |
+
+## 1. 工程验收状态
+
+> 由 `/team:prd-accept` 维护；勿手工编造「通过」。最后更新：2026-11-05T07:01:19Z，dev@0235a9548955344dcdeb7b030aa033c1648afcfc，范围：R0（PRD 声明无 R1）。
+
+### 总览
+
+- 工程状态：`accepted`
+- 验收判定：Release 0 用户故事与进料主路径均有代码与单测证据；人已确认本轮可用并要求关闭
+- 最近验收：2026-11-05T07:01:19Z / `dev` / `0235a95`（工作区尚有未提交实现，以当前树为准）
+- 摘要：
+  1. 资料库「新建 → 小红书笔记」弹层：连通探测、取料、勾选、写链接、串行学图、再写范文
+  2. Native Host + `resolveXhsNote` / `importXhsNote` / `saveXhsNoteArticle` / `checkXhsNoteBridge`
+  3. 去重按笔记 ID；`cache/xhs-notes/<noteId>` 命中则取这篇不打插件
+  4. 范文 / 图册可挂 `source`，链接 meta 记 `learned`（产品后加，覆盖原稿「不挂链接」非目标）
+  5. `tests/xhs-note/*` 覆盖链接、noteId、取料/cache、桥探测、拆分；**不必再为关单补测**
+
+### Release 交付
+
+| Release | 状态 | 说明 |
+|---------|------|------|
+| R0 | 通过 | 进料闭环可验收 |
+| R1 | 范围外 | PRD 写明无 Release 1 |
+
+### 功能验收清单（Agent 优先读此表）
+
+| ID | 能力摘要 | Release | 状态 | 证据 |
+|----|----------|---------|------|------|
+| S1 | 新建菜单「小红书笔记」+ 非法 URL 人话 | R0 | 通过 | `src/studio/static/pages/library.html`；`src/studio/static/pages/library/xhs-note.js`；`src/xhs-note/bridge.js` `INVALID_URL` |
+| S2 | 已收录去重；短链同篇停；不重复学 | R0 | 通过 | `src/xhs-note/links.js`（noteId）；`src/one-post/run.js` `resolveXhsNote` ALREADY；`tests/xhs-note/links.test.js`、`run-import.test.js` |
+| S3 | 勾选文章/首图/一张内页；缺项禁用 | R0 | 通过 | `library.html` choose；`xhs-note.js` `canConfirmLearn` |
+| S4 | 范文进库；图草稿确认后才进 `runtime/albums` | R0 | 通过 | `importXhsNote` + `saveXhsNoteArticle`；`library-learn-album-dataurl` → `learnAlbum`/`commitAlbum`；`tests/xhs-note/run-import.test.js` |
+| S5 | 「用这篇写法去写」带范文进笔记页 | R0 | 通过 | `xhs-note.js` `goWriteWithSample` → `studioHost.go('note', { sampleId })` |
+| H1 | Native Host / ping·fetchNote / 错误码 | R0 | 通过 | `scripts/dexbuddy-native-host.js`；`src/xhs-note/fetch.js`；`docs/faqs/how-to-native-host-silent-register.md` |
+| H2 | 弹层探测扩展 ≥0.9.0；失败禁用输入 | R0 | 通过 | `checkXhsNoteBridge`；`library.html` 底栏状态；`tests/xhs-note/bridge-check.test.js` |
+| H3 | cache 优先：有 payload 取这篇不调插件 | R0 | 通过 | `resolveXhsNote` + `src/xhs-note/cache.js`；`run-import.test.js` cache 用例 |
+| D1 | 页面服从 DESIGN | R0 | 通过 | `docs/DESIGN.md` 已记弹层探测与 Lucide 绿勾；`library.html` |
+
+### 未完成与遗留
+
+- PRD 正文仍写「只比链接字符串」「不改范文/图册挂链接」「流程图文章先于图」——实现已按后续产品决定改为 noteId 去重、双向 `source`/`learned`、首图→内页→范文；**关单不阻塞**，若要文档真相源可另开小修订改 PRD 正文。
+- 无独立「链接资源浏览 Tab」（非目标，本期不做）。
+- `register-host` 单测在沙盒写 Chrome 清单目录会 EPERM，与本功能验收无关；本机有权限时可跑。
+
+### 质量检查
+
+| 检查项 | 状态 |
+|--------|------|
+| 测试 | 本仓无统一 `pnpm test` 脚本；`node --test tests/xhs-note/*.test.js` 业务用例通过。关单**不要求**再补测 |
+| Lint | 本仓无 lint 命令，记 N/A；`pnpm run check:types` 可用于改过的 JS |
+| 文档与 OpenAPI | 无 OpenAPI；workflow / FAQ / DESIGN 已跟进，跳过 OpenAPI |
+
+---
+统计：通过 9 / 部分 0 / 未实现 0 / 范围外 1（R1）

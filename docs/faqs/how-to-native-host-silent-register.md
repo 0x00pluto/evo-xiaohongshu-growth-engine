@@ -45,7 +45,7 @@ cat "$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.zh
 
 3. `chrome://extensions` **重载**内部特供版。
 4. 打开「允许连接」后：`lsof -nP -iTCP:18769 -sTCP:LISTEN`
-5. 操作台 → 资料库 → 新建 → 小红书笔记 → 取这篇。
+5. 操作台 → 资料库 → 新建 → 小红书笔记：弹层会先探测取料通道与扩展版本（需 ≥ 0.9.0）；通过后显示「Chrome插件连接正常」，再粘贴链接取这篇。同 `noteId` 若 `cache/xhs-notes/` 已有 payload，取这篇不走插件。
 
 可选手动注册：
 

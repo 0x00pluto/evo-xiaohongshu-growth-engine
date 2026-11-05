@@ -42,6 +42,7 @@ const USER_ALBUM_SEQ_START = 100000;
  *   sampleBytes: Buffer;
  *   sampleDataUrl: string;
  *   aspectRatio: string;
+ *   learnedFrom?: import('../../xhs-note/provenance').XhsNoteProvenance;
  * }} AlbumDraft
  */
 

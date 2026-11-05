@@ -115,7 +115,23 @@ function pickInnerImage(parts, innerIndex) {
   return parts.inners[index] || null;
 }
 
+/**
+ * 正文是否几乎只有话题标签（仍允许用户勾选学习）。
+ * @param {unknown} body
+ * @returns {boolean}
+ */
+function isTagOnlyBody(body) {
+  const text = typeof body === 'string' ? body.trim() : '';
+  if (!text) return false;
+  const withoutTags = text
+    .replace(/#[^\s#]+#?/g, ' ')
+    .replace(/\s+/g, '')
+    .trim();
+  return withoutTags.length === 0;
+}
+
 module.exports = {
+  isTagOnlyBody,
   normalizeNotePayload,
   pickInnerImage,
   splitNoteParts,

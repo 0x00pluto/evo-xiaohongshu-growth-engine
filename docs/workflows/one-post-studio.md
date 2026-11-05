@@ -65,11 +65,12 @@ node scripts/run-studio.js --open
 - `runtime/image-refs/`：用户参考图角色说明包（与图册四件套分开；gitignore）
 - `runtime/materials/upload-refs/`：账号级上传参考库（文件 + 用法句；gitignore）
 - `runtime/materials/article-samples/`：账号级范文库（每条一夹 `meta.json`：标题 + 正文；gitignore）
-- `runtime/materials/xhs-notes/`：解析过的小红书笔记链接（每条一夹 `meta.json`：`sourceUrl` / `inputUrls` / 标题正文与图片 URL；gitignore；本期无浏览 Tab）
+- `runtime/materials/xhs-notes/`：小红书笔记链接身份（每条一夹瘦 `meta.json`：`noteId` / `sourceUrl` / `inputUrls` / `learned` 双向引用；按笔记 ID 去重；gitignore；本期无浏览 Tab）
+- `cache/xhs-notes/<noteId>/`：取料原始快照（`payload.json` + `images/*`；可清；同次学习优先用预览 dataUrl，避免二次拉 CDN）
 - 笔记目录下 `materials/upload-refs/`：这篇上传或从库挑来的参考文件；清单与按张勾选写在同篇 `draft.json` 的 `uploadRefs` / `picks`（新上传默认勾进全部槽）
 - 同篇 `draft.json` 的 `sampleBody` / `sampleTitle` / `references`：这篇粘贴的范文快照与参考资料（旧字段 `article` 读时迁入 `sampleBody`）
 
-本机命令写在仓库里。装进 Dex Buddy 之后笔记在 `plugin-data/app-dexbuddy-xiaohongshu-standard-editor/output/one-post/posts/`，用户图册、参考图角色包、上传参考库、范文库与链接资源在同 data 下的 `runtime/albums/`、`runtime/image-refs/`、`runtime/materials/upload-refs/`、`runtime/materials/article-samples/`、`runtime/materials/xhs-notes/`。仓库里如果还有旧的 `output/one-post/latest/`，第一次打开会抄进历史并删掉那个目录。
+本机命令写在仓库里。装进 Dex Buddy 之后笔记在 `plugin-data/app-dexbuddy-xiaohongshu-standard-editor/output/one-post/posts/`，用户图册、参考图角色包、上传参考库、范文库与链接资源在同 data 下的 `runtime/albums/`、`runtime/image-refs/`、`runtime/materials/upload-refs/`、`runtime/materials/article-samples/`、`runtime/materials/xhs-notes/`，原始笔记缓存在 `cache/xhs-notes/`。学成顺序：首图入库 → 内页入库 → 再写范文；范文 `meta.json` / 图册 `album.json` 可带 `source` 指回笔记，链接 `learned` 指回范文与图册。仓库里如果还有旧的 `output/one-post/latest/`，第一次打开会抄进历史并删掉那个目录。
 
 ## 失败排查
 
@@ -85,7 +86,7 @@ node scripts/run-studio.js --open
 | 文章目的 / 人设不在允许列表 | 写成笔记前就拒绝，不调用模型。目的：种草、引流、涨粉、曝光、搜索、转化；人设：素人、KOC、达人、官号、创始人、店主、员工 |
 | 故事类型或图册不在允许列表 | 提示词这一步停住，标题、正文、话题还在，不开始生图。回到「要发什么」，再点「写成笔记」 |
 | 学习失败 / 参考图不合格 | 资料库「图库」Tab 停在选择或卡片墙，人话错误可见；`runtime/albums/` 与出厂 `assets/.../albums|samples` 文件集合不变。可换图再试 |
-| 连不上本机取料通道 / host not found | 先启动一次操作台或加载插件（静默写清单），再重载内部特供版；`lsof` 看 18769；打开「允许连接」；本机 Chrome 登录小红书。详见 faqs/how-to-native-host-silent-register |
+| 连不上本机取料通道 / host not found / 扩展版本过低 | 进料弹层会先探测通道与扩展 ≥0.9.0，未通过则禁用粘贴；先启动操作台或加载插件（静默写清单），重载内部特供版，`lsof` 看 18769，打开「允许连接」。详见 faqs/how-to-native-host-silent-register |
 | 这篇笔记已经收录过了 | 同一 `sourceUrl` 或曾用过的粘贴串不再取料、不再学；删掉学出的范文/图册后链接记录仍在 |
 | 保存题词失败 / 出厂不能改 | 用户册须保留 11 槽（v2）与占位符；出厂详情无保存。接口会拒绝改 assets |
 | 出厂图册不能删除 | 出厂五本无删除按钮；接口也会拒绝 |

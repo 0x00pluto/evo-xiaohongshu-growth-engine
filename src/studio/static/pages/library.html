@@ -690,18 +690,37 @@
               type="url"
               x-ref="urlInput"
               x-model="url"
-              :disabled="busy"
+              :disabled="busy || !bridgeOk"
               placeholder="https://www.xiaohongshu.com/explore/… 或 xhslink"
-              @keydown.enter.prevent="onResolve()"
+              @keydown.enter.prevent="bridgeOk && onResolve()"
             />
-            <p class="text-sm text-base-content/60">需要本机 Chrome 已登录小红书，并打开内部特供版「允许 Dex Buddy 连接」。</p>
             <p class="text-sm text-error" role="alert" x-show="error" x-text="error"></p>
-            <div class="flex justify-end gap-2">
-              <button class="btn btn-ghost btn-sm" type="button" @click="close()" :disabled="busy">取消</button>
-              <button class="btn btn-primary btn-sm" type="button" @click="onResolve()" :disabled="busy || !String(url || '').trim()">
-                <span x-show="!busy">取这篇</span>
-                <span x-show="busy">正在取料…</span>
-              </button>
+            <div class="flex items-center justify-between gap-2">
+              <div class="min-w-0 flex-1 text-sm">
+                <p class="text-base-content/60" x-show="checkStatus === 'checking' || checkStatus === 'idle'">
+                  正在检测 Chrome 插件连接…
+                </p>
+                <p class="flex items-center gap-1.5" x-show="checkStatus === 'ok'">
+                  <iconify-icon icon="lucide:circle-check" width="16" height="16" class="shrink-0 text-success" aria-hidden="true"></iconify-icon>
+                  <span class="text-success">Chrome插件连接正常</span>
+                </p>
+                <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-error" role="alert" x-show="checkStatus === 'bridge_down' || checkStatus === 'version_low'">
+                  <span class="truncate" x-text="checkMessage"></span>
+                  <span class="text-xs text-base-content/60" x-show="checkStatus === 'bridge_down'">打开扩展并允许连接后重试</span>
+                  <span class="text-xs text-base-content/60" x-show="checkStatus === 'version_low'">
+                    需 ≥ 0.9.0
+                    <span x-show="extensionVersion">（当前 <span x-text="extensionVersion"></span>）</span>
+                  </span>
+                  <button class="btn btn-ghost btn-xs h-6 min-h-0 px-1" type="button" @click="runBridgeCheck()" :disabled="checkStatus === 'checking'">重试</button>
+                </div>
+              </div>
+              <div class="flex shrink-0 justify-end gap-2">
+                <button class="btn btn-ghost btn-sm" type="button" @click="close()" :disabled="busy">取消</button>
+                <button class="btn btn-primary btn-sm" type="button" @click="onResolve()" :disabled="busy || !bridgeOk || !String(url || '').trim()">
+                  <span x-show="!busy">取这篇</span>
+                  <span x-show="busy">正在取料…</span>
+                </button>
+              </div>
             </div>
           </div>
         </template>
@@ -712,10 +731,11 @@
               <legend class="sr-only">选择学习内容</legend>
               <label
                 class="flex cursor-pointer items-center gap-2 text-sm"
-                :title="!parts.body ? '这篇没有正文' : ''"
+                :title="!parts.body ? '这篇没有正文' : (parts.tagOnlyBody ? '正文主要是话题标签' : '')"
               >
                 <input class="checkbox checkbox-sm" type="checkbox" x-model="learnArticle" :disabled="busy || !parts.body" />
                 <span class="font-medium">学习文章</span>
+                <span class="text-xs text-base-content/50" x-show="parts.body && parts.tagOnlyBody">（正文主要是话题标签）</span>
               </label>
               <label
                 class="flex cursor-pointer items-center gap-2 text-sm"

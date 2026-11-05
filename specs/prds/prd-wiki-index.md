@@ -15,4 +15,4 @@
 | 00009 | `specs/prds/prd-00009-sdk-entitlement-gates.md` | 换成 Dex Buddy SDK 1.0.0；写成笔记与刷图在任务开始前由插件触发买断，购买提示交给工作台弹框。工程 accepted |
 | 00010 | `specs/prds/prd-00010-image-prompt-on-refresh.md` | 写成笔记只出文；点风格即选中；刷新才套整套提示词并生当前张；同风格不重算；提示词框只留可改段。 |
 | 00011 | `specs/prds/prd-00011-image-aspect-ratio.md` | 一篇一个生图比例；七档可选；未改跟图册样图最近档；学图不再焊死 3:4；生图前整篇选定。工程 accepted |
-| 00012 | `specs/prds/prd-00012-learn-xhs-note.md` | 资料库贴小红书链接；解析链接单独入库；正文进范文、首图与一张内页进图册；写稿仍走范文。 |
+| 00012 | `specs/prds/prd-00012-learn-xhs-note.md` | 资料库贴小红书链接；解析链接单独入库；正文进范文、首图与一张内页进图册；写稿仍走范文。工程 accepted |

@@ -246,6 +246,7 @@ function commitAlbumDraft(userAlbumsDir, draft, promptsDir) {
   const written = [];
   try {
     fs.mkdirSync(pack, { recursive: true });
+    /** @type {Record<string, unknown>} */
     const meta = {
       id,
       kind: draft.kind,
@@ -258,6 +259,17 @@ function commitAlbumDraft(userAlbumsDir, draft, promptsDir) {
       promptSheetVersion: PROMPT_SHEET_VERSION,
       aspectRatio,
     };
+    if (draft.learnedFrom && draft.learnedFrom.kind === 'xhs-note') {
+      /** @type {Record<string, string>} */
+      const source = {
+        kind: draft.learnedFrom.kind,
+        noteId: draft.learnedFrom.noteId,
+        linkId: draft.learnedFrom.linkId,
+      };
+      if (draft.learnedFrom.role) source.role = draft.learnedFrom.role;
+      // album.json 用 source 存小红书溯源；内存 AlbumMeta.source 仍是 factory|user
+      meta.source = source;
+    }
     fs.writeFileSync(jsonPath, `${JSON.stringify(meta, null, 2)}\n`, 'utf8');
     written.push(jsonPath);
     fs.writeFileSync(mdPath, `${promptMd}\n`, 'utf8');

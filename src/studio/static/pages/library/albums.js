@@ -302,12 +302,15 @@ function libraryAlbums() {
 
     /**
      * 外部（小红书笔记进料）直接交 dataUrl 学成草稿。
-     * @param {{ dataUrl?: string; label?: string } | string | undefined} detail
+     * @param {{ dataUrl?: string; label?: string; source?: Record<string, unknown> } | string | undefined} detail
      */
     async onLearnDataUrl(detail) {
       const dataUrl = typeof detail === 'string'
         ? detail
         : (detail && typeof detail.dataUrl === 'string' ? detail.dataUrl : '');
+      const source = typeof detail === 'object' && detail && detail.source
+        ? detail.source
+        : undefined;
       if (!dataUrl) {
         window.dispatchEvent(new CustomEvent('library-album-draft-settled', {
           detail: { action: 'error', message: '没有可学的图' },
@@ -323,7 +326,10 @@ function libraryAlbums() {
       this.error = '';
       this.learning = true;
       try {
-        const result = await this.call('learnAlbum', { dataUrl });
+        /** @type {Record<string, unknown>} */
+        const payload = { dataUrl };
+        if (source) payload.source = source;
+        const result = await this.call('learnAlbum', payload);
         if (!result || result.ok === false) {
           const message = (result && result.message) || '学习失败';
           this.error = message;
@@ -409,6 +415,8 @@ function libraryAlbums() {
         this.draft = null;
         this.draftPrompt = '';
         this.$dispatch('library-toast', '已写入图库');
+        // 先清 committing，再派 settled，避免下一张学图命中「图库正忙」
+        this.committing = false;
         window.dispatchEvent(new CustomEvent('library-album-draft-settled', {
           detail: { action: 'commit', id: albumId },
         }));
@@ -426,6 +434,7 @@ function libraryAlbums() {
       this.draft = null;
       this.draftPrompt = '';
       this.$dispatch('library-toast', '已放弃草稿');
+      this.committing = false;
       window.dispatchEvent(new CustomEvent('library-album-draft-settled', {
         detail: { action: 'discard' },
       }));
