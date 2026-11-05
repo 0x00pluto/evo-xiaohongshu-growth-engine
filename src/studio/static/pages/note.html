@@ -762,9 +762,13 @@
         class="textarea min-h-32 w-full resize-none wrap"
         x-model="referenceEditorText"
         :disabled="job.running"
+        :aria-invalid="referenceEditorError ? 'true' : 'false'"
+        aria-describedby="reference-editor-error"
         aria-label="参考资料正文"
         placeholder="课程信息、日期、卖点等事实。"
+        @input="referenceEditorError = ''"
       ></textarea>
+      <p id="reference-editor-error" class="text-sm text-error" role="alert" x-show="referenceEditorError" x-text="referenceEditorError"></p>
       <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
         <button class="btn btn-error btn-sm" type="button" @click="deleteReferenceFromEditor()" :disabled="job.running">删除</button>
         <div class="flex gap-2">

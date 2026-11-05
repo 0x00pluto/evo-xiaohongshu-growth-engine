@@ -96,6 +96,8 @@ function notePage() {
     referenceEditorOpen: false,
     referenceEditorIndex: -1,
     referenceEditorText: '',
+    referenceEditorNew: false,
+    referenceEditorError: '',
     galleryCount: 1,
     draft: null,
     emptyCopyDraft: { title: '', body: '', topics: [] },
@@ -203,9 +205,12 @@ function notePage() {
         return;
       }
       this.errors.references = '';
-      this.references = [...this.references, ''];
-      this.persist();
-      this.openReferenceEditor(this.references.length - 1);
+      this.hideReferenceHover();
+      this.referenceEditorNew = true;
+      this.referenceEditorIndex = this.references.length;
+      this.referenceEditorText = '';
+      this.referenceEditorError = '';
+      this.referenceEditorOpen = true;
     },
     removeReference(index) {
       if (this.job.running) return;
@@ -245,29 +250,51 @@ function notePage() {
       const i = Number(index);
       if (!Number.isInteger(i) || i < 0 || i >= this.references.length) return;
       this.hideReferenceHover();
+      this.referenceEditorNew = false;
       this.referenceEditorIndex = i;
       this.referenceEditorText = String(this.references[i] || '');
+      this.referenceEditorError = '';
       this.referenceEditorOpen = true;
     },
     closeReferenceEditor() {
       this.referenceEditorOpen = false;
       this.referenceEditorIndex = -1;
       this.referenceEditorText = '';
+      this.referenceEditorNew = false;
+      this.referenceEditorError = '';
     },
     confirmReferenceEditor() {
-      const i = this.referenceEditorIndex;
-      if (!Number.isInteger(i) || i < 0 || i >= this.references.length) {
-        this.closeReferenceEditor();
+      const text = String(this.referenceEditorText || '').trim();
+      if (!text) {
+        this.referenceEditorError = '先写一点事实。空的参考资料不会保存。';
         return;
       }
-      const next = this.references.slice();
-      next[i] = String(this.referenceEditorText || '');
-      this.references = next;
+      if (this.referenceEditorNew) {
+        if (this.references.length >= REFERENCES_MAX) {
+          this.errors.references = `参考资料最多 ${REFERENCES_MAX} 条。`;
+          this.closeReferenceEditor();
+          return;
+        }
+        this.references = [...this.references, text];
+      } else {
+        const i = this.referenceEditorIndex;
+        if (!Number.isInteger(i) || i < 0 || i >= this.references.length) {
+          this.closeReferenceEditor();
+          return;
+        }
+        const next = this.references.slice();
+        next[i] = text;
+        this.references = next;
+      }
       this.errors.references = '';
       this.persist();
       this.closeReferenceEditor();
     },
     deleteReferenceFromEditor() {
+      if (this.referenceEditorNew) {
+        this.closeReferenceEditor();
+        return;
+      }
       const i = this.referenceEditorIndex;
       this.closeReferenceEditor();
       if (Number.isInteger(i) && i >= 0) this.removeReference(i);
@@ -667,7 +694,7 @@ function notePage() {
         this.sampleBody = '';
       }
       this.references = Array.isArray(next.references)
-        ? next.references.map((item) => String(item))
+        ? next.references.map((item) => String(item)).filter((item) => item.trim())
         : [];
       if (next.articleType === '素人') {
         this.articleType = '涨粉';
