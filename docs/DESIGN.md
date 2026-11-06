@@ -10,6 +10,7 @@
 - 圆角和按钮尺寸跟随 daisyUI 5 浅色主题的默认控件，不另写一套。
 - 图标用 Iconify Web Component + Lucide（`lucide:`），壳层加载 `iconify-icon`；不手画产品图标、不叠第二套图标库。
 - 长等待（`job.running`）用 Lottie 浮层盖在「要发什么」表单或「这篇笔记」浅灰工具卡上（CDN `lottie-player` + `animations/job-running.json`），浮层下用 `stepText` 说明进度；不用顶栏「进行中：…」一行。点「写成笔记」立刻切到第二页现成骨架（空图槽、空标题正文、手机框），成稿未回也出这套卡，不留「笔记还在写」一行字。写文时浮层为「正在写这篇笔记」；刷新定画面为「正在定这一套图」；生图为「正在用{图册名}画封面」或「正在用{图册名}画第 N 张」（没有图册名则「正在画封面 / 正在画第 N 张」）。出图路径不出现「写这篇笔记」。小图右下角刷图转圈保留。
+- 运营可读错误与短反馈统一用 daisyUI toast（`lib/studio-toast.js` 的 `createStudioToast`）：`toast toast-top toast-center` 内一层 `max-w-md` 白底阴影卡；错误左侧 `bg-error/15` 圆 + `lucide:circle-alert` 感叹号，成功左侧 `bg-success/15` 圆 + `lucide:circle-check` 绿对勾；入场约 200ms 下落淡入、离场约 150ms 上滑淡出（`motion-reduce:transition-none`）；约 2s 消失，长文案约 4s。禁止无图标纯字条、禁止页顶 / 弹层内赤裸 `text-error` 长句钉死。字数超限计数变红、删除 `btn-error`、风格安全盾 icon、资料库 flagged 色块状态条不算这类提示，可保留。
 - 不上构建链，不上 Next.js，不上 htmx。读写走 JSON。
 - Dex Buddy 把插件页面开在隔离窗口里。按钮走 `window.dex.call`。
 

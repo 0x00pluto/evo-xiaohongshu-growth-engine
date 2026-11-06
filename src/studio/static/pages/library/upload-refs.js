@@ -41,6 +41,7 @@ function libraryUploadRefs() {
       if (!data || data.ok === false) {
         this.uploadRefs = [];
         this.error = (data && data.message) || '读库失败';
+        if (this.error) this.$dispatch('library-toast', this.error);
         return;
       }
       this.uploadRefs = Array.isArray(data.uploadRefs) ? data.uploadRefs : [];
@@ -79,6 +80,7 @@ function libraryUploadRefs() {
         : (detail && typeof detail.dataUrl === 'string' ? detail.dataUrl : '');
       if (!dataUrl) {
         this.error = '没有可上传的图';
+        if (this.error) this.$dispatch('library-toast', this.error);
         return;
       }
       this.uploadPending = dataUrl;
@@ -107,6 +109,7 @@ function libraryUploadRefs() {
         const result = await this.call('draftUploadRefUsage', { dataUrl: this.uploadPending });
         if (!result || result.ok === false) {
           this.uploadError = (result && result.message) || '自动识别失败';
+          if (this.uploadError) this.$dispatch('library-toast', this.uploadError);
           return;
         }
         this.uploadUsage = String(result.usage || '');
@@ -121,6 +124,7 @@ function libraryUploadRefs() {
       const usage = String(this.uploadUsage || '').trim();
       if (!usage) {
         this.uploadError = '请写上图片用法';
+        if (this.uploadError) this.$dispatch('library-toast', this.uploadError);
         return;
       }
       this.uploadBusy = true;
@@ -133,10 +137,11 @@ function libraryUploadRefs() {
         });
         if (!result || result.ok === false) {
           this.uploadError = (result && result.message) || '入库失败';
+          if (this.uploadError) this.$dispatch('library-toast', this.uploadError);
           return;
         }
         this.closeUpload(true);
-        this.$dispatch('library-toast', '已保存');
+        this.$dispatch('library-toast', { message: '已保存', type: 'success' });
         await this.refresh();
       } finally {
         this.uploadBusy = false;
@@ -191,6 +196,7 @@ function libraryUploadRefs() {
         const result = await this.call('deleteLibraryUploadRef', { id: this.deleteTarget.id });
         if (!result || result.ok === false) {
           this.error = (result && result.message) || '删除失败';
+          if (this.error) this.$dispatch('library-toast', this.error);
           return;
         }
         const deletedId = this.deleteTarget.id;
@@ -199,7 +205,7 @@ function libraryUploadRefs() {
         if (this.detailTarget && this.detailTarget.id === deletedId) {
           this.closeDetail();
         }
-        this.$dispatch('library-toast', '已删除');
+        this.$dispatch('library-toast', { message: '已删除', type: 'success' });
         await this.refresh();
       } finally {
         this.deleting = false;

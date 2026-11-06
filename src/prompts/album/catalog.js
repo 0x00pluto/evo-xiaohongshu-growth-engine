@@ -38,6 +38,7 @@ function isAlbumToken(value) {
  *   modules?: RangeConstraint;
  *   steps?: RangeConstraint;
  * }} AlbumConstraints
+ * @typedef {'passed' | 'flagged'} AlbumSafetyStatus
  * @typedef {{
  *   id: string;
  *   kind: string;
@@ -52,6 +53,8 @@ function isAlbumToken(value) {
  *   aspectRatio: string;
  *   source: 'factory' | 'user';
  *   home: string;
+ *   safetyStatus: AlbumSafetyStatus;
+ *   safetyProbed: boolean;
  *   learnedFrom?: import('../../xhs-note/provenance').XhsNoteProvenance;
  * }} AlbumMeta
  * @typedef {{
@@ -163,6 +166,11 @@ function normalizeMeta(raw, fileId) {
   const promptSheetVersion = normalizePromptSheetVersion(source.promptSheetVersion);
   // 缺字段时留空，由 ensureAlbumAspectRatio 按样图补算；非法串忽略。
   const aspectRatio = normalizeAspectRatio(source.aspectRatio);
+  // 历史册无 safetyStatus：语义 passed、不显示脚标（safetyProbed=false）。
+  const safetyProbed = Object.prototype.hasOwnProperty.call(source, 'safetyStatus');
+  const safetyRaw = source.safetyStatus;
+  /** @type {AlbumSafetyStatus} */
+  const safetyStatus = safetyRaw === 'flagged' ? 'flagged' : 'passed';
   /** @type {AlbumMeta} */
   const meta = {
     id,
@@ -178,6 +186,8 @@ function normalizeMeta(raw, fileId) {
     aspectRatio,
     source: 'factory',
     home: '',
+    safetyStatus,
+    safetyProbed,
   };
   // 文件里的 source 对象是小红书溯源；目录扫描后再改写为 factory|user
   const learnedFrom = normalizeXhsProvenance(source.source);
@@ -365,6 +375,9 @@ function loadAlbumCatalog(promptsDir, userAlbumsDir) {
     throw new Error('图册目录里没有可用图册');
   }
   const idList = metas.map((item) => item.id);
+  const selectableIds = metas
+    .filter((item) => item.safetyStatus !== 'flagged')
+    .map((item) => item.id);
 
   /** @type {AlbumCatalog} */
   const catalog = {
@@ -384,7 +397,8 @@ function loadAlbumCatalog(promptsDir, userAlbumsDir) {
       const mapped = legacyMap.get(look);
       return typeof mapped === 'string' ? mapped : '';
     },
-    pick: (random) => pickOne(idList, random),
+    // 随机抽风格跳过审核未通过的册；若全是 flagged 则退回全部（避免空池崩）。
+    pick: (random) => pickOne(selectableIds.length > 0 ? selectableIds : idList, random),
   };
 
   CACHE.set(key, catalog);

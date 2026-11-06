@@ -12,12 +12,18 @@ const {
   parseLearnResult,
   readLearnSystemPrompt,
 } = require('../../src/prompts/album/learn');
-const { commitAlbumDraft, deleteAlbumFiles } = require('../../src/prompts/album/store');
+const {
+  commitAlbumDraft,
+  commitFlaggedAlbumDraft,
+  deleteAlbumFiles,
+} = require('../../src/prompts/album/store');
 const {
   clearAlbumCatalogCache,
   isBuiltinAlbum,
   listAlbums,
+  loadAlbumCatalog,
   normalizeFrame,
+  pickAlbum,
   renderAlbumPrompt,
 } = require('../../src/prompts/fill');
 const { createLlm } = require('../../src/llm/client');
@@ -364,11 +370,18 @@ test('runner 学习写入删除：失败零落盘；出厂拒绝', async () => {
   fs.mkdirSync(postsDir, { recursive: true });
 
   let visionCalls = 0;
+  let probeCalls = 0;
   const runner = createRunner({
     postsDir,
     promptsDir,
     userAlbumsDir,
     env: { DEX_BUDDY_API_KEY: 'k' },
+    generateImage: async ({ outputPath }) => {
+      probeCalls += 1;
+      fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+      fs.writeFileSync(outputPath, 'png');
+      return outputPath;
+    },
     completeVision: async () => {
       visionCalls += 1;
       return JSON.stringify(learnPayload({ slug: `run-${visionCalls}` }));
@@ -381,12 +394,16 @@ test('runner 学习写入删除：失败零落盘；出厂拒绝', async () => {
   });
   assert.equal(bad.ok, false);
   assert.equal(visionCalls, 0);
+  assert.equal(probeCalls, 0);
 
   const learned = await runner.learnAlbum({
     dataUrl: `data:image/jpeg;base64,${JPEG_BYTES.toString('base64')}`,
   });
   assert.equal(learned.ok, true);
+  assert.equal(learned.safetyStatus, 'passed');
   assert.ok(learned.draft);
+  assert.equal(probeCalls, 1);
+  assert.equal(visionCalls, 1);
   assert.equal(fs.existsSync(path.join(promptsDir, 'albums', learned.draft.id, 'album.json')), false);
   assert.equal(fs.existsSync(path.join(userAlbumsDir, learned.draft.id, 'album.json')), false);
 
@@ -394,10 +411,24 @@ test('runner 学习写入删除：失败零落盘；出厂拒绝', async () => {
   assert.equal(committed.ok, true);
   assert.ok(fs.existsSync(path.join(userAlbumsDir, committed.id, 'album.json')));
   assert.equal(fs.existsSync(path.join(promptsDir, 'albums', committed.id, 'album.json')), false);
+  const committedMeta = JSON.parse(
+    fs.readFileSync(path.join(userAlbumsDir, committed.id, 'album.json'), 'utf8'),
+  );
+  assert.equal(committedMeta.safetyStatus, 'passed');
 
   const listed = runner.listAlbums();
-  assert.ok(listed.albums.some((item) => item.id === committed.id && item.deletable === true));
-  assert.ok(listed.albums.some((item) => item.id.startsWith('000001') && item.deletable === false));
+  assert.ok(listed.albums.some((item) => (
+    item.id === committed.id
+    && item.deletable === true
+    && item.safetyStatus === 'passed'
+    && item.safetyProbed === true
+  )));
+  assert.ok(listed.albums.some((item) => (
+    item.id.startsWith('000001')
+    && item.deletable === false
+    && item.safetyStatus === 'passed'
+    && item.safetyProbed === false
+  )));
 
   const refuseBuiltin = runner.deleteAlbum({ id: '000001.magazine.seed' });
   assert.equal(refuseBuiltin.ok, false);
@@ -420,6 +451,11 @@ test('commit 可带改过的题词；用户册可 update；出厂拒绝', async 
     promptsDir,
     userAlbumsDir,
     env: { DEX_BUDDY_API_KEY: 'k' },
+    generateImage: async ({ outputPath }) => {
+      fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+      fs.writeFileSync(outputPath, 'png');
+      return outputPath;
+    },
     completeVision: async () => JSON.stringify(learnPayload({
       slug: 'edit-me',
       promptMd: sheetPrompt().replace('2. 色彩：黑', '2. 色彩：主文字 #112233'),
@@ -650,4 +686,89 @@ test('五种版式文案区不用出厂口号时仍能 renderAlbumPrompt', () =>
       assert.match(rendered.prompt, pattern, `${item.id} 应含 ${pattern}`);
     }
   }
+});
+
+test('探针 CONTENT_FLAGGED：落盘 flagged、不识图；历史无字段仍可选', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'album-probe-flag-'));
+  const postsDir = path.join(dir, 'posts');
+  const promptsDir = path.join(dir, 'prompts');
+  const userAlbumsDir = path.join(dir, 'runtime', 'albums');
+  seedFactoryAlbums(promptsDir);
+  fs.mkdirSync(postsDir, { recursive: true });
+
+  let visionCalls = 0;
+  const runner = createRunner({
+    postsDir,
+    promptsDir,
+    userAlbumsDir,
+    env: { DEX_BUDDY_API_KEY: 'k' },
+    generateImage: async () => {
+      const err = new Error('敏感');
+      /** @type {{ code?: string }} */ (err).code = 'CONTENT_FLAGGED';
+      throw err;
+    },
+    completeVision: async () => {
+      visionCalls += 1;
+      return JSON.stringify(learnPayload({ slug: 'should-not-run' }));
+    },
+  });
+
+  const flagged = await runner.learnAlbum({
+    dataUrl: `data:image/jpeg;base64,${JPEG_BYTES.toString('base64')}`,
+  });
+  assert.equal(flagged.ok, true);
+  assert.equal(flagged.safetyStatus, 'flagged');
+  assert.equal(visionCalls, 0);
+  assert.equal(flagged.draft, undefined);
+  assert.ok(flagged.album && flagged.album.id);
+  assert.ok(fs.existsSync(path.join(userAlbumsDir, flagged.album.id, 'album.json')));
+  const meta = JSON.parse(
+    fs.readFileSync(path.join(userAlbumsDir, flagged.album.id, 'album.json'), 'utf8'),
+  );
+  assert.equal(meta.safetyStatus, 'flagged');
+
+  const listed = runner.listAlbums();
+  const flaggedRow = listed.albums.find((item) => item.id === flagged.album.id);
+  assert.ok(flaggedRow);
+  assert.equal(flaggedRow.safetyStatus, 'flagged');
+  assert.equal(flaggedRow.safetyProbed, true);
+  const history = listed.albums.find((item) => item.id.startsWith('000001'));
+  assert.ok(history);
+  assert.equal(history.safetyStatus, 'passed');
+  assert.equal(history.safetyProbed, false);
+
+  clearAlbumCatalogCache(promptsDir, userAlbumsDir);
+  const picked = pickAlbum(promptsDir, () => 0, userAlbumsDir);
+  assert.notEqual(picked, flagged.album.id);
+
+  const detail = runner.getAlbumDetail({ id: flagged.album.id });
+  assert.equal(detail.ok, true);
+  assert.equal(detail.editable, false);
+  assert.equal(detail.safetyStatus, 'flagged');
+
+  const refuseUpdate = runner.updateAlbumPrompt({
+    id: flagged.album.id,
+    promptTemplate: sheetPrompt(),
+  });
+  assert.equal(refuseUpdate.ok, false);
+});
+
+test('commitFlaggedAlbumDraft 写入后 catalog 可读；无 safetyStatus 归一为 passed', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'album-flagged-commit-'));
+  const userDir = path.join(dir, 'runtime', 'albums');
+  seedFactoryAlbums(dir);
+  const saved = commitFlaggedAlbumDraft(
+    userDir,
+    { sampleBytes: JPEG_BYTES, sampleExt: '.jpg' },
+    dir,
+  );
+  assert.equal(saved.safetyStatus, 'flagged');
+  clearAlbumCatalogCache(dir, userDir);
+  const catalog = loadAlbumCatalog(dir, userDir);
+  const meta = catalog.get(saved.id);
+  assert.equal(meta.safetyStatus, 'flagged');
+  assert.equal(meta.safetyProbed, true);
+  const factory = catalog.get('000001.magazine.seed');
+  assert.equal(factory.safetyStatus, 'passed');
+  assert.equal(factory.safetyProbed, false);
 });

@@ -182,6 +182,7 @@ function libraryXhsNote() {
       const url = String(this.url || '').trim();
       if (!url) {
         this.error = '请粘贴小红书笔记链接';
+        if (this.error) this.$dispatch('library-toast', this.error);
         return;
       }
       this.busy = true;
@@ -189,6 +190,7 @@ function libraryXhsNote() {
         const result = await this.call('resolveXhsNote', { url });
         if (!result || result.ok === false) {
           this.error = (result && result.message) || '读取失败';
+          if (this.error) this.$dispatch('library-toast', this.error);
           return;
         }
         this.inputUrl = String(result.inputUrl || url);
@@ -213,6 +215,7 @@ function libraryXhsNote() {
         this.step = 'choose';
       } catch (err) {
         this.error = err && err.message ? err.message : '读取失败';
+        if (this.error) this.$dispatch('library-toast', this.error);
       } finally {
         this.busy = false;
       }
@@ -246,6 +249,7 @@ function libraryXhsNote() {
         });
         if (!result || result.ok === false) {
           this.error = (result && result.message) || '保存失败';
+          if (this.error) this.$dispatch('library-toast', this.error);
           return;
         }
         this.link = result.link || null;
@@ -266,6 +270,7 @@ function libraryXhsNote() {
           });
           if (!articleResult || articleResult.ok === false) {
             this.error = (articleResult && articleResult.message) || '写入对标文案失败';
+            if (this.error) this.$dispatch('library-toast', this.error);
             this.step = 'done';
             this.open = true;
             return;
@@ -276,6 +281,7 @@ function libraryXhsNote() {
         this.open = true;
       } catch (err) {
         this.error = err && err.message ? err.message : '保存失败';
+        if (this.error) this.$dispatch('library-toast', this.error);
       } finally {
         this.busy = false;
       }

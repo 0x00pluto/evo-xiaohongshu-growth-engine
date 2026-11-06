@@ -47,7 +47,6 @@
           <p class="text-sm font-medium text-base-content">把图片放进来</p>
           <p class="text-sm leading-6 text-base-content/60">拖到这里，或 Ctrl+V / ⌘V 粘贴。点击从本机选择。</p>
           <p class="text-xs leading-5 text-base-content/50">JPEG、PNG、WebP、BMP，一次一张，不超过 8MB。</p>
-          <p class="text-sm text-error" role="alert" x-show="intakeError" x-text="intakeError"></p>
         </div>
       </button>
       <div class="flex justify-end">
@@ -56,13 +55,36 @@
     </div>
   </div>
 
-  <template x-if="toast">
-    <div class="toast toast-top toast-center z-[70]">
-      <div class="alert bg-base-100 text-base-content shadow" role="status">
-        <span x-text="toast"></span>
-      </div>
+  <div
+    class="toast toast-top toast-center z-[70] pointer-events-none"
+    x-show="toastText"
+    x-cloak
+  >
+    <div
+      class="pointer-events-auto flex max-w-md items-start gap-3 rounded-box bg-base-100 px-4 py-3 shadow-lg"
+      :role="toastType === 'success' ? 'status' : 'alert'"
+      x-show="toastOpen"
+      x-transition:enter="transition ease-out duration-200 motion-reduce:transition-none"
+      x-transition:enter-start="opacity-0 -translate-y-2"
+      x-transition:enter-end="opacity-100 translate-y-0"
+      x-transition:leave="transition ease-in duration-150 motion-reduce:transition-none"
+      x-transition:leave-start="opacity-100 translate-y-0"
+      x-transition:leave-end="opacity-0 -translate-y-2"
+    >
+      <span
+        class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+        :class="toastType === 'success' ? 'bg-success/15 text-success' : 'bg-error/15 text-error'"
+      >
+        <iconify-icon
+          :icon="toastType === 'success' ? 'lucide:circle-check' : 'lucide:circle-alert'"
+          width="20"
+          height="20"
+          aria-hidden="true"
+        ></iconify-icon>
+      </span>
+      <span class="text-sm leading-5 text-base-content" x-text="toastText"></span>
     </div>
-  </template>
+  </div>
   <div class="flex shrink-0 flex-col gap-2 border-b border-base-300 px-4 py-3 lg:px-6">
     <div class="flex items-center justify-between gap-3">
       <h1 class="text-xl font-medium">资料库</h1>
@@ -148,7 +170,6 @@
   >
     <div class="relative min-h-0 flex-1">
       <div class="absolute inset-0 overflow-y-auto px-4 py-3 lg:px-6">
-        <p class="mb-3 text-sm text-error" role="alert" x-show="error" x-text="error"></p>
 
         <div class="flex flex-col gap-4" x-show="!albums.length && !learning">
           <div class="rounded-lg bg-base-200 p-4">
@@ -176,6 +197,27 @@
               >
                 <img class="absolute inset-0 h-full w-full object-contain" x-show="albumSamplePreview(album)" :src="albumSamplePreview(album)" alt="" />
                 <span class="absolute inset-0 flex items-center justify-center text-[10px] text-base-content/40" x-show="!albumSamplePreview(album)">无样图</span>
+                <span
+                  class="pointer-events-none absolute bottom-1.5 right-1.5 z-[1] flex h-5 w-5 items-center justify-center rounded-full bg-base-100/90 shadow-sm"
+                  :aria-label="album.safetyStatus === 'flagged' ? '审核未通过' : '已通过安全检查'"
+                >
+                  <iconify-icon
+                    x-show="album.safetyStatus !== 'flagged'"
+                    icon="lucide:shield-check"
+                    width="14"
+                    height="14"
+                    class="text-success"
+                    aria-hidden="true"
+                  ></iconify-icon>
+                  <iconify-icon
+                    x-show="album.safetyStatus === 'flagged'"
+                    icon="lucide:shield-x"
+                    width="14"
+                    height="14"
+                    class="text-error"
+                    aria-hidden="true"
+                  ></iconify-icon>
+                </span>
                 <span class="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-1.5 pb-1.5 pt-6">
                   <span class="line-clamp-2 text-xs leading-4 text-white" x-text="album.label"></span>
                 </span>
@@ -235,6 +277,11 @@
           <span class="text-sm text-base-content/40" x-show="!detailSample">无样图</span>
         </div>
         <div class="flex min-h-0 flex-col gap-3 overflow-hidden p-4">
+          <p
+            class="shrink-0 rounded-md bg-error/10 px-2.5 py-2 text-sm leading-5 text-error"
+            x-show="detail && detail.safetyStatus === 'flagged'"
+            role="status"
+          >这张图未通过安全审核，不能用于生图。</p>
           <div class="flex shrink-0 items-start justify-between gap-3">
             <h3 id="library-detail-title" class="min-w-0 text-base font-medium" x-text="detail && detail.label"></h3>
             <button class="btn btn-ghost btn-square btn-sm shrink-0" type="button" aria-label="关闭" @click="closeDetail()">×</button>
@@ -294,7 +341,14 @@
           </div>
           <p class="shrink-0 text-sm leading-6 text-base-content/70" x-text="draft && draft.hint"></p>
           <div class="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
-            <p class="shrink-0 text-sm font-medium">怎么画</p>
+            <div class="flex shrink-0 flex-col gap-1">
+              <p class="text-sm font-medium">怎么画</p>
+              <p
+                class="text-xs leading-5 text-base-content/60"
+                x-show="draftRewriteSummary()"
+                x-text="draftRewriteSummary()"
+              ></p>
+            </div>
             <div
               class="prompt-editor min-h-0 flex-1 overflow-auto rounded-md border border-base-300 bg-base-100 p-3 text-xs leading-5"
               x-ref="draftPromptEditor"
@@ -421,7 +475,6 @@
   >
 
     <div class="min-h-0 flex-1 overflow-y-auto px-4 py-3 lg:px-6">
-      <p class="mb-3 text-sm text-error" role="alert" x-show="error" x-text="error"></p>
 
       <div class="flex flex-col gap-4" x-show="!uploadRefs.length">
         <div class="rounded-lg bg-base-200 p-4">
@@ -477,7 +530,6 @@
           :placeholder="usagePlaceholder"
           :disabled="uploadBusy"
         ></textarea>
-        <p class="text-sm text-error" role="alert" x-show="uploadError" x-text="uploadError"></p>
         <div class="flex flex-wrap justify-between gap-2">
           <button class="btn btn-ghost btn-sm" type="button" @click="draftUploadUsage()" :disabled="uploadBusy || !uploadPending">自动识别</button>
           <div class="flex gap-2">
@@ -554,7 +606,6 @@
     @library-create-article-sample.window="onCreateArticleSample()"
   >
     <div class="min-h-0 flex-1 overflow-y-auto px-4 py-3 lg:px-6">
-      <p class="mb-3 text-sm text-error" role="alert" x-show="error" x-text="error"></p>
 
       <div class="flex flex-col gap-4" x-show="!samples.length">
         <div class="rounded-lg bg-base-200 p-4">
@@ -611,7 +662,6 @@
           :disabled="busy"
           placeholder="标题写在第一行&#10;下面贴正文…"
         ></textarea>
-        <p class="text-sm text-error" role="alert" x-show="editorError" x-text="editorError"></p>
         <div class="flex justify-end gap-2">
           <button class="btn btn-ghost btn-sm" type="button" @click="closeEditor()" :disabled="busy">放弃</button>
           <button class="btn btn-primary btn-sm" type="button" @click="confirmEditor()" :disabled="busy">保存</button>
@@ -642,7 +692,6 @@
           :disabled="savingDetail || deleting"
           aria-label="对标文案正文"
         ></textarea>
-        <p class="shrink-0 text-sm text-error" role="alert" x-show="detailError" x-text="detailError"></p>
         <div class="flex shrink-0 justify-end gap-2 pt-2">
           <button class="btn btn-error btn-sm" type="button" @click="askDeleteFromDetail()" :disabled="deleting || savingDetail || detailDirty()">删除</button>
           <button class="btn btn-primary btn-sm" type="button" @click="saveDetail()" :disabled="savingDetail || !detailDirty()">保存</button>
@@ -705,7 +754,6 @@
     @library-create-reference-doc.window="onCreateReferenceDoc()"
   >
     <div class="min-h-0 flex-1 overflow-y-auto px-4 py-3 lg:px-6">
-      <p class="mb-3 text-sm text-error" role="alert" x-show="error" x-text="error"></p>
 
       <div class="flex flex-col gap-4" x-show="!docs.length">
         <div class="rounded-lg bg-base-200 p-4">
@@ -763,7 +811,6 @@
           :disabled="busy"
           placeholder="名称写在第一行&#10;下面贴事实…"
         ></textarea>
-        <p class="text-sm text-error" role="alert" x-show="editorError" x-text="editorError"></p>
         <div class="flex justify-end gap-2">
           <button class="btn btn-ghost btn-sm" type="button" @click="closeEditor()" :disabled="busy">放弃</button>
           <button class="btn btn-primary btn-sm" type="button" @click="confirmEditor()" :disabled="busy">保存</button>
@@ -794,7 +841,6 @@
           :disabled="savingDetail || deleting"
           aria-label="产品资料正文"
         ></textarea>
-        <p class="shrink-0 text-sm text-error" role="alert" x-show="detailError" x-text="detailError"></p>
         <div class="flex shrink-0 justify-end gap-2 pt-2">
           <button class="btn btn-error btn-sm" type="button" @click="askDeleteFromDetail()" :disabled="deleting || savingDetail || detailDirty()">删除</button>
           <button class="btn btn-primary btn-sm" type="button" @click="saveDetail()" :disabled="savingDetail || !detailDirty()">保存</button>
@@ -879,7 +925,6 @@
               placeholder="https://www.xiaohongshu.com/explore/… 或 xhslink"
               @keydown.enter.prevent="bridgeOk && onResolve()"
             />
-            <p class="text-sm text-error" role="alert" x-show="error" x-text="error"></p>
             <div class="flex items-center justify-between gap-2">
               <div class="min-w-0 flex-1 text-sm">
                 <p class="text-base-content/60" x-show="checkStatus === 'checking' || checkStatus === 'idle'">
@@ -1017,7 +1062,6 @@
                 <div class="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-md bg-base-200 p-2 text-sm leading-6" x-text="parts.body"></div>
               </div>
             </div>
-            <p class="text-sm text-error" role="alert" x-show="error" x-text="error"></p>
             <div class="flex justify-end gap-2">
               <button class="btn btn-ghost btn-sm" type="button" @click="close()" :disabled="busy">取消</button>
               <button class="btn btn-primary btn-sm" type="button" @click="onConfirmLearn()" :disabled="busy || !canConfirmLearn">
@@ -1035,7 +1079,6 @@
               <span x-show="articleSample">对标文案已保存。</span>
               风格若有勾选，请在草稿里确认或放弃。
             </p>
-            <p class="text-sm text-error" role="alert" x-show="error" x-text="error"></p>
             <div class="flex justify-end gap-2">
               <button class="btn btn-ghost btn-sm" type="button" @click="finishDone()">完成</button>
               <button

@@ -26,7 +26,12 @@ const {
   isBuiltinAlbum,
   loadAlbumCatalog,
 } = catalogModule;
-const { assertPromptPlaceholders, assertPromptSheet, isBuiltinAlbumId } = learnModule;
+const {
+  allocateAlbumId,
+  assertPromptPlaceholders,
+  assertPromptSheet,
+  isBuiltinAlbumId,
+} = learnModule;
 const { PROMPT_SHEET_VERSION } = sheetModule;
 const {
   DEFAULT_ASPECT_RATIO,
@@ -267,6 +272,8 @@ function commitAlbumDraft(userAlbumsDir, draft, promptsDir) {
       enabled: true,
       promptSheetVersion: PROMPT_SHEET_VERSION,
       aspectRatio,
+      // 新保存的册显式标记；历史册无此字段，读时视为 passed 且无脚标。
+      safetyStatus: 'passed',
     };
     if (draft.learnedFrom && draft.learnedFrom.kind === 'xhs-note') {
       /** @type {Record<string, string>} */
@@ -316,6 +323,144 @@ function commitAlbumDraft(userAlbumsDir, draft, promptsDir) {
     }
   }
   return { id };
+}
+
+/** 审核未通过册的占位题词：仅满足目录扫描，不可用于生图。 */
+function flaggedStubPromptMd() {
+  return [
+    '不可用于生图（样图未通过安全审核）。',
+    '1. 背景：无',
+    '2. 色彩：无',
+    '3. 字体：无',
+    '4. 字号：无',
+    '5. 字重：无',
+    '6. 文字排版：无',
+    '7. 文字位置：无',
+    '8. 构图布局：无',
+    '9. 视觉风格：无',
+    '10. 光影与质感：无',
+    '11. 主题绘画内容：{{scene}}',
+    '',
+    '图片必须准确呈现的中文文案：',
+    '{{line}}',
+    '',
+    '文案必须完整、准确。',
+  ].join('\n');
+}
+
+/**
+ * 探针 CONTENT_FLAGGED：落盘样图与元数据，不学提示词。
+ * @param {string} userAlbumsDir
+ * @param {{
+ *   sampleBytes: Buffer;
+ *   sampleExt: string;
+ *   learnedFrom?: import('../../xhs-note/provenance').XhsNoteProvenance | null;
+ * }} image
+ * @param {string} promptsDir
+ * @returns {{ id: string; label: string; safetyStatus: 'flagged' }}
+ */
+function commitFlaggedAlbumDraft(userAlbumsDir, image, promptsDir) {
+  if (!image || typeof image !== 'object' || !Buffer.isBuffer(image.sampleBytes)) {
+    throw new Error('缺少样图');
+  }
+  if (typeof userAlbumsDir !== 'string' || !userAlbumsDir.trim()) {
+    throw new Error('缺少用户图册目录');
+  }
+  if (typeof promptsDir !== 'string' || !promptsDir.trim()) {
+    throw new Error('缺少提示词目录');
+  }
+  const albumsDir = path.resolve(userAlbumsDir.trim());
+  const factoryDir = path.resolve(promptsDir.trim());
+  const id = allocateAlbumId(factoryDir, { kind: 'card', slug: 'safety-flagged' }, albumsDir);
+  const pack = path.join(albumsDir, id);
+  fs.mkdirSync(albumsDir, { recursive: true });
+
+  const jsonPath = albumMetaPath(pack);
+  const mdPath = albumPromptPath(pack);
+  const sampleMdPath = albumCopySamplePath(pack);
+  const rawExt = typeof image.sampleExt === 'string' && image.sampleExt.startsWith('.')
+    ? image.sampleExt
+    : '.jpg';
+  const ext = rawExt === '.jpeg' || rawExt === '.jpe' || rawExt === '.jfif' || rawExt === '.pjpeg'
+    ? '.jpg'
+    : rawExt;
+  const samplePath = path.join(pack, `sample${ext}`);
+  if (fs.existsSync(pack) && fs.readdirSync(pack).length > 0) {
+    throw new Error('图册文件已存在，请放弃后重新学习');
+  }
+
+  const aspectRatio = aspectRatioFromImage(image.sampleBytes) || DEFAULT_ASPECT_RATIO;
+  const label = '未通过审核的风格';
+  const hint = '这张图未通过安全审核，不能用于生图';
+  const copySchema = [
+    '占位。每一项对象字段：',
+    '- line：一句中文（非空）',
+    '返回形状：{"frames":[{"line":"..."}]}',
+  ].join('\n');
+  const copySample = '不可用。\n\n```json\n{"frames":[{"line":"不可用"}]}\n```';
+
+  /** @type {string[]} */
+  const written = [];
+  try {
+    fs.mkdirSync(pack, { recursive: true });
+    /** @type {Record<string, unknown>} */
+    const meta = {
+      id,
+      kind: 'card',
+      slug: 'safety-flagged',
+      hint,
+      label,
+      copySchema,
+      legacyIds: [],
+      enabled: true,
+      promptSheetVersion: PROMPT_SHEET_VERSION,
+      aspectRatio,
+      safetyStatus: 'flagged',
+    };
+    if (image.learnedFrom && image.learnedFrom.kind === 'xhs-note') {
+      /** @type {Record<string, string>} */
+      const source = {
+        kind: image.learnedFrom.kind,
+        noteId: image.learnedFrom.noteId,
+        linkId: image.learnedFrom.linkId,
+      };
+      if (image.learnedFrom.role) source.role = image.learnedFrom.role;
+      meta.source = source;
+    }
+    fs.writeFileSync(jsonPath, `${JSON.stringify(meta, null, 2)}\n`, 'utf8');
+    written.push(jsonPath);
+    fs.writeFileSync(mdPath, `${flaggedStubPromptMd()}\n`, 'utf8');
+    written.push(mdPath);
+    fs.writeFileSync(sampleMdPath, `${copySample}\n`, 'utf8');
+    written.push(sampleMdPath);
+    fs.writeFileSync(samplePath, image.sampleBytes);
+    written.push(samplePath);
+  } catch (err) {
+    for (const file of written) unlinkQuiet(file);
+    try {
+      if (fs.existsSync(pack) && fs.readdirSync(pack).length === 0) {
+        fs.rmdirSync(pack);
+      }
+    } catch {
+      // ignore
+    }
+    throw err instanceof Error ? err : new Error('写入图册失败');
+  }
+
+  clearAlbumCatalogCache(factoryDir, albumsDir);
+  try {
+    loadAlbumCatalog(factoryDir, albumsDir).get(id);
+  } catch (err) {
+    for (const file of written) unlinkQuiet(file);
+    try {
+      fs.rmSync(pack, { recursive: true, force: true });
+    } catch {
+      // ignore
+    }
+    clearAlbumCatalogCache(factoryDir, albumsDir);
+    throw err instanceof Error ? err : new Error('写入后图册校验失败');
+  }
+  return { id, label, safetyStatus: 'flagged' };
 }
 
 /**
@@ -438,6 +583,7 @@ function ensureAllAlbumAspectRatios(promptsDir, userAlbumsDir) {
 
 module.exports = {
   commitAlbumDraft,
+  commitFlaggedAlbumDraft,
   deleteAlbumFiles,
   ensureAlbumAspectRatio,
   ensureAllAlbumAspectRatios,

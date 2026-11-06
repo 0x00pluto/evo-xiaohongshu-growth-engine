@@ -79,7 +79,11 @@ test('本机服务的 loadLatest 在空目录返回空态', async () => {
     assert.doesNotMatch(sampleSection, /新建到库/);
     assert.match(sampleSection, /id="clear-sample"/);
     assert.match(sampleSection, /id="swap-sample"/);
-    const samplePanel = noteHtml.slice(noteHtml.indexOf('id="sample-panel"'), noteHtml.indexOf('id="sample-error"'));
+    // 字段下裸红已改 toast；sample-panel 后紧接笔记内图数量，勿依赖已删的 sample-error 锚点。
+    const samplePanelEnd = noteHtml.indexOf('id="gallery-count"');
+    const samplePanelStart = noteHtml.indexOf('id="sample-panel"');
+    assert.ok(samplePanelStart > 0 && samplePanelEnd > samplePanelStart);
+    const samplePanel = noteHtml.slice(samplePanelStart, samplePanelEnd);
     assert.doesNotMatch(samplePanel, /清除/);
     assert.doesNotMatch(samplePanel, /换一篇/);
     assert.doesNotMatch(samplePanel, /从库挑/);
@@ -156,8 +160,16 @@ test('本机服务的 loadLatest 在空目录返回空态', async () => {
     const libraryJsFile = await fetch(`${started.url}pages/library.js`);
     assert.equal(libraryJsFile.status, 200);
     const libraryJs = await libraryJsFile.text();
+    assert.match(libraryJs, /createStudioToast/);
     assert.match(libraryJs, /showToast/);
-    assert.match(libraryJs, /toastTimer/);
+    assert.match(libraryHtml, /lucide:circle-alert/);
+    assert.match(libraryHtml, /lucide:circle-check/);
+    assert.match(libraryHtml, /toastOpen/);
+    const toastLibFile = await fetch(`${started.url}lib/studio-toast.js`);
+    assert.equal(toastLibFile.status, 200);
+    const toastLib = await toastLibFile.text();
+    assert.match(toastLib, /toastTimer/);
+    assert.match(toastLib, /createStudioToast/);
     assert.match(libraryJs, /reference-docs/);
     assert.match(libraryJs, /onCreateReferenceDocs/);
     assert.match(libraryJs, /label: '风格'/);

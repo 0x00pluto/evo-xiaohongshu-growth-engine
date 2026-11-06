@@ -919,6 +919,49 @@ test('OUTPUT_EXPIRED 清空 pending key，下次换新 gen', async () => {
   assert.equal(afterRetry.images.cover.attempts, 2);
 });
 
+test('CONTENT_FLAGGED 不清取回提示，清 key 且 attempts+1', async () => {
+  const root = tempDir();
+  const promptsDir = path.join(root, 'prompts');
+  writePrompts(promptsDir);
+  /** @type {string[]} */
+  const imageKeys = [];
+  let mode = 'flag';
+  const runner = createRunner({
+    postsDir: path.join(root, 'latest'),
+    promptsDir,
+    random: firstPick,
+    complete: async (prompt) => responseFor(prompt, 0),
+    generateImage: async ({ outputPath, idempotencyKey }) => {
+      imageKeys.push(String(idempotencyKey || ''));
+      if (mode === 'flag') {
+        mode = 'ok';
+        const err = new Error('敏感');
+        /** @type {{ code?: string }} */ (err).code = 'CONTENT_FLAGGED';
+        throw err;
+      }
+      fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+      fs.writeFileSync(outputPath, 'png');
+      return outputPath;
+    },
+  });
+  await runner.generateDraft(draftArgs());
+  await untilIdle(runner);
+
+  await runner.generateImages({ slot: 'cover' });
+  const afterFlag = await untilIdle(runner);
+  assert.equal(afterFlag.images.cover.idempotencyKey, '');
+  assert.equal(afterFlag.images.cover.attempts, 1);
+  assert.match(String(afterFlag.job.error || ''), /安全审核|CONTENT_FLAGGED/);
+  assert.doesNotMatch(String(afterFlag.job.error || ''), /取回/);
+
+  await runner.generateImages({ slot: 'cover' });
+  const afterRetry = await untilIdle(runner);
+  assert.match(imageKeys[0], /:cover:gen-1$/);
+  assert.match(imageKeys[1], /:cover:gen-2$/);
+  assert.equal(afterRetry.images.cover.status, '成功');
+  assert.equal(afterRetry.images.cover.attempts, 2);
+});
+
 test('readEnv 在建 runner 时不读，下一轮写稿用新密钥', async () => {
   const root = tempDir();
   const promptsDir = path.join(root, 'prompts');

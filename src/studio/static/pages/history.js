@@ -1,33 +1,13 @@
 function historyPage() {
   return {
+    ...window.createStudioToast(),
     posts: [],
     covers: {},
-    notice: '',
-    toast: '',
-    toastTimer: null,
     hostReady: window.studioHost.ready,
     detailOpen: false,
     detailLoading: false,
     detail: null,
     slideIndex: 0,
-
-    clearToast() {
-      if (this.toastTimer) {
-        clearTimeout(this.toastTimer);
-        this.toastTimer = null;
-      }
-      this.toast = '';
-    },
-    showToast(message) {
-      const text = String(message || '').trim();
-      if (!text) return;
-      if (this.toastTimer) clearTimeout(this.toastTimer);
-      this.toast = text;
-      this.toastTimer = setTimeout(() => {
-        this.toast = '';
-        this.toastTimer = null;
-      }, 2000);
-    },
 
     when(value) {
       const date = new Date(value);
@@ -96,7 +76,7 @@ function historyPage() {
       if (!text) return;
       try {
         await navigator.clipboard.writeText(text);
-        this.showToast('复制成功');
+        this.showToast('复制成功', { type: 'success' });
       } catch (err) {
         this.showToast('没有复制成功');
       }
@@ -122,7 +102,7 @@ function historyPage() {
       const result = await window.studioHost.call('previewHistoryPost', { id: item.id });
       this.detailLoading = false;
       if (!result || !result.ok) {
-        this.notice = (result && result.message) || '没有打开这一篇';
+        this.showToast((result && result.message) || '没有打开这一篇');
         this.detailOpen = false;
         this.detail = null;
         return;
@@ -172,10 +152,9 @@ function historyPage() {
     },
     async onRevealDetail() {
       if (!this.detail || !this.detail.id || !this.hostReady) return;
-      this.notice = '';
       const result = await window.studioHost.call('revealPost', { id: this.detail.id });
       if (!result || result.ok === false) {
-        this.notice = (result && result.message) || '没有这张图';
+        this.showToast((result && result.message) || '没有这张图');
       }
     },
     async onEdit() {

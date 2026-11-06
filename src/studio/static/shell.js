@@ -85,6 +85,7 @@
 
   window.shell = function shell() {
     return {
+      ...window.createStudioToast(),
       hostReady: window.studioHost.ready,
       page: '',
       pageError: '',
@@ -125,6 +126,7 @@
         const slot = this.$refs.workspace;
         if (!slot) return;
         try {
+          await loadScript('lib/studio-toast.js');
           await loadScript(`pages/${id}.js`);
           // 资料库壳下面还有资源 Tab 模块，须在 initTree 前挂好。
           if (id === 'library') {
@@ -148,6 +150,7 @@
         } catch (err) {
           this.page = '';
           this.pageError = err && err.message ? err.message : '没有打开这一页';
+          if (this.pageError) this.showToast(this.pageError);
         }
       },
     };

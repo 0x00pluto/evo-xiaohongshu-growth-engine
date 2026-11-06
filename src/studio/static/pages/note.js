@@ -13,6 +13,7 @@ function notePage() {
   const REFERENCES_MAX = 5;
 
   return {
+    ...window.createStudioToast(),
     business: '',
     sampleTitle: '',
     sampleBody: '',
@@ -62,8 +63,7 @@ function notePage() {
     pendingCall: false,
     errors: { business: '', sampleBody: '', references: '', galleryCount: '' },
     notice: '',
-    copied: '',
-    copiedTimer: null,
+    lastToastedJobError: '',
     directory: '',
     previews: {},
     pollTimer: null,
@@ -239,7 +239,7 @@ function notePage() {
     async addReference() {
       if (this.job.running) return;
       if (this.references.length >= REFERENCES_MAX) {
-        this.errors.references = `产品资料最多 ${REFERENCES_MAX} 条。`;
+        this.setFormError('references', `产品资料最多 ${REFERENCES_MAX} 条。`);
         return;
       }
       this.errors.references = '';
@@ -254,9 +254,11 @@ function notePage() {
         const data = await this.call('listLibraryReferenceDocs');
         if (!data || data.ok === false) {
           this.referencePickError = (data && data.message) || '读库失败';
+        if (this.referencePickError) this.showToast(this.referencePickError);
           this.referenceLibraryDocs = [];
           this.openCreateReferenceEditor();
           this.referenceEditorError = this.referencePickError;
+        if (this.referenceEditorError) this.showToast(this.referenceEditorError);
           return;
         }
         const all = Array.isArray(data.docs) ? data.docs : [];
@@ -279,7 +281,7 @@ function notePage() {
     openCreateReferenceFromPick() {
       if (this.referencePickBusy || this.job.running) return;
       if (this.references.length >= REFERENCES_MAX) {
-        this.errors.references = `产品资料最多 ${REFERENCES_MAX} 条。`;
+        this.setFormError('references', `产品资料最多 ${REFERENCES_MAX} 条。`);
         this.closePickReference();
         return;
       }
@@ -351,11 +353,11 @@ function notePage() {
       const item = this.normalizeReferenceItem(snap);
       if (!item) return false;
       if (this.references.length >= REFERENCES_MAX) {
-        this.errors.references = `产品资料最多 ${REFERENCES_MAX} 条。`;
+        this.setFormError('references', `产品资料最多 ${REFERENCES_MAX} 条。`);
         return false;
       }
       if (this.isReferenceAlreadyOnNote(item.body)) {
-        this.errors.references = '这篇已经加过相同的产品资料。';
+        this.setFormError('references', '这篇已经加过相同的产品资料。');
         return false;
       }
       this.references = [...this.references, item];
@@ -366,7 +368,7 @@ function notePage() {
     async pickLibraryReference(item) {
       if (!item || this.referencePickBusy || this.job.running) return;
       if (this.references.length >= REFERENCES_MAX) {
-        this.errors.references = `产品资料最多 ${REFERENCES_MAX} 条。`;
+        this.setFormError('references', `产品资料最多 ${REFERENCES_MAX} 条。`);
         this.closePickReference();
         return;
       }
@@ -376,6 +378,7 @@ function notePage() {
         const data = await this.call('getLibraryReferenceDoc', { id: item.id });
         if (!data || data.ok === false || !data.doc) {
           this.referencePickError = (data && data.message) || '读库失败';
+        if (this.referencePickError) this.showToast(this.referencePickError);
           return;
         }
         const snap = this.normalizeReferenceItem({
@@ -384,15 +387,18 @@ function notePage() {
         });
         if (!snap) {
           this.referencePickError = '这条产品资料是空的';
+        if (this.referencePickError) this.showToast(this.referencePickError);
           return;
         }
         if (this.isReferenceAlreadyOnNote(snap.body)) {
           this.referencePickError = '这篇已经加过相同的产品资料。';
+        if (this.referencePickError) this.showToast(this.referencePickError);
           this.referenceLibraryDocs = this.filterAvailableReferenceDocs(this.referenceLibraryDocs);
           return;
         }
         if (!this.pushReferenceSnapshot(snap)) {
           this.referencePickError = this.errors.references || '没有加上';
+        if (this.referencePickError) this.showToast(this.referencePickError);
           return;
         }
         this.referencePickBusy = false;
@@ -406,29 +412,34 @@ function notePage() {
       const text = String(this.referenceEditorText || '').trim();
       if (!text) {
         this.referenceEditorError = '先写一点事实。空的产品资料不会保存。';
+        if (this.referenceEditorError) this.showToast(this.referenceEditorError);
         return;
       }
       if (this.referenceEditorNew) {
         if (this.references.length >= REFERENCES_MAX) {
-          this.errors.references = `产品资料最多 ${REFERENCES_MAX} 条。`;
+          this.setFormError('references', `产品资料最多 ${REFERENCES_MAX} 条。`);
           this.closeReferenceEditor();
           return;
         }
         const { name, body } = this.splitPasteToDoc(text);
         if (!name) {
           this.referenceEditorError = '请写上名称（第一行）。';
+        if (this.referenceEditorError) this.showToast(this.referenceEditorError);
           return;
         }
         if (!body) {
           this.referenceEditorError = '请写上正文。';
+        if (this.referenceEditorError) this.showToast(this.referenceEditorError);
           return;
         }
         if (Array.from(body).length > 8000) {
           this.referenceEditorError = '产品资料太长了，先删到 8000 字以内。';
+        if (this.referenceEditorError) this.showToast(this.referenceEditorError);
           return;
         }
         if (this.isReferenceAlreadyOnNote(body)) {
           this.referenceEditorError = '这篇已经加过相同的产品资料。';
+        if (this.referenceEditorError) this.showToast(this.referenceEditorError);
           return;
         }
         this.referenceEditorBusy = true;
@@ -437,6 +448,7 @@ function notePage() {
           const result = await this.call('saveLibraryReferenceDoc', { name, body });
           if (!result || result.ok === false || !result.doc) {
             this.referenceEditorError = (result && result.message) || '写入资料库失败';
+        if (this.referenceEditorError) this.showToast(this.referenceEditorError);
             return;
           }
           const snap = this.normalizeReferenceItem({
@@ -446,10 +458,12 @@ function notePage() {
           if (!snap) return;
           if (this.isReferenceAlreadyOnNote(snap.body)) {
             this.referenceEditorError = '这篇已经加过相同的产品资料。';
+        if (this.referenceEditorError) this.showToast(this.referenceEditorError);
             return;
           }
           if (!this.pushReferenceSnapshot(snap)) {
             this.referenceEditorError = this.errors.references || '没有加上';
+        if (this.referenceEditorError) this.showToast(this.referenceEditorError);
             return;
           }
           this.referenceEditorBusy = false;
@@ -462,10 +476,12 @@ function notePage() {
       const parsed = this.parseChipPaste(text);
       if (!parsed) {
         this.referenceEditorError = '先写一点事实。空的产品资料不会保存。';
+        if (this.referenceEditorError) this.showToast(this.referenceEditorError);
         return;
       }
       if (Array.from(parsed.body).length > 8000) {
         this.referenceEditorError = '产品资料太长了，先删到 8000 字以内。';
+        if (this.referenceEditorError) this.showToast(this.referenceEditorError);
         return;
       }
       const i = this.referenceEditorIndex;
@@ -475,6 +491,7 @@ function notePage() {
       }
       if (this.isReferenceAlreadyOnNote(parsed.body, i)) {
         this.referenceEditorError = '这篇已经加过相同的产品资料。';
+        if (this.referenceEditorError) this.showToast(this.referenceEditorError);
         return;
       }
       const next = this.references.slice();
@@ -534,6 +551,7 @@ function notePage() {
       if (!data || data.ok === false) {
         this.libraryArticleSamples = [];
         this.pickSampleError = (data && data.message) || '读库失败';
+        if (this.pickSampleError) this.showToast(this.pickSampleError);
         return;
       }
       this.libraryArticleSamples = Array.isArray(data.samples) ? data.samples : [];
@@ -552,6 +570,7 @@ function notePage() {
         const data = await this.call('getLibraryArticleSample', { id: item.id });
         if (!data || data.ok === false || !data.sample) {
           this.pickSampleError = (data && data.message) || '读对标文案失败';
+        if (this.pickSampleError) this.showToast(this.pickSampleError);
           return;
         }
         this.sampleTitle = String(data.sample.title || item.title || '').trim();
@@ -582,14 +601,17 @@ function notePage() {
       const { title, body } = this.splitPasteToSample(this.createSamplePaste);
       if (!title) {
         this.createSampleError = '请粘贴全文，第一行当标题';
+        if (this.createSampleError) this.showToast(this.createSampleError);
         return;
       }
       if (!body) {
         this.createSampleError = '请粘贴正文（第一行后的内容）';
+        if (this.createSampleError) this.showToast(this.createSampleError);
         return;
       }
       if (Array.from(body).length > 8000) {
         this.createSampleError = '贴进来的原文太长了，先删到 8000 字以内。';
+        if (this.createSampleError) this.showToast(this.createSampleError);
         return;
       }
       this.createSampleBusy = true;
@@ -598,6 +620,7 @@ function notePage() {
         const result = await this.call('saveLibraryArticleSample', { title, body });
         if (!result || result.ok === false) {
           this.createSampleError = (result && result.message) || '保存失败';
+        if (this.createSampleError) this.showToast(this.createSampleError);
           return;
         }
         this.sampleTitle = title;
@@ -847,6 +870,11 @@ function notePage() {
     get gallerySlots() {
       return this.slots.filter((item) => item.slot === 'gallery');
     },
+    setFormError(field, message) {
+      const msg = String(message == null ? '' : message).trim();
+      this.errors[field] = msg;
+      if (msg) this.showToast(msg);
+    },
     clearError(field) {
       this.errors[field] = '';
     },
@@ -861,7 +889,7 @@ function notePage() {
       if (!String(this.business || '').trim()) this.errors.business = '先用一句话说你要发什么。';
       if (this.sampleLength > 8000) this.errors.sampleBody = '贴进来的原文太长了，先删到 8000 字以内。';
       if (this.references.length > REFERENCES_MAX) {
-        this.errors.references = `产品资料最多 ${REFERENCES_MAX} 条。`;
+        this.errors.references =  `产品资料最多 ${REFERENCES_MAX} 条。`;
       }
       const count = Number(this.galleryCount);
       if (!Number.isInteger(count) || count < 0 || count > 9) {
@@ -869,6 +897,7 @@ function notePage() {
       }
       const first = ['business', 'sampleBody', 'references', 'galleryCount'].find((field) => this.errors[field]);
       if (!first) return true;
+      this.showToast(this.errors[first]);
       if (first === 'sampleBody') this.sampleOpen = true;
       this.focusField(first === 'sampleBody' ? 'sampleBody' : first);
       return false;
@@ -921,7 +950,14 @@ function notePage() {
       this.picks = next.picks && typeof next.picks === 'object'
         ? next.picks
         : { cover: { materialIds: [], overrides: {} }, gallery: [] };
+      const prevJobError = this.job && this.job.error ? String(this.job.error) : '';
       this.job = next.job || { running: false, step: '', error: '' };
+      const nextJobError = (!this.job.running && this.job.error) ? String(this.job.error).trim() : '';
+      if (nextJobError && nextJobError !== prevJobError && nextJobError !== this.lastToastedJobError) {
+        this.lastToastedJobError = nextJobError;
+        this.showToast(nextJobError, 4000);
+      }
+      if (!nextJobError) this.lastToastedJobError = '';
       this.directory = next.directory || '';
       this.postId = next.id || '';
       this.editor = next.editor && typeof next.editor === 'object'
@@ -995,12 +1031,11 @@ function notePage() {
       if (!this.hostReady || this.job.running || this.pendingCall || !this.postId) return;
       const next = String(ratio || '').trim();
       if (!next) return;
-      this.notice = '';
       this.pendingCall = true;
       try {
         const result = await this.call('setAspectRatio', { aspectRatio: next });
         if (result && result.ok === false) {
-          this.notice = result.message || '比例改不了';
+          this.showToast(result.message || '比例改不了');
           return;
         }
         if (result && result.ok) {
@@ -1013,10 +1048,14 @@ function notePage() {
         this.pendingCall = false;
       }
     },
+    get selectableAlbums() {
+      return (this.albums || []).filter((item) => item && item.safetyStatus !== 'flagged');
+    },
     albumStyleLabel() {
       const selected = String(this.selectedLook || '').trim();
       if (selected) {
         const hit = (this.albums || []).find((item) => item.id === selected);
+        if (hit && hit.safetyStatus === 'flagged') return '尚未选定';
         if (hit && hit.label) return hit.label;
       }
       const style = this.prompts && String(this.prompts.style || '').trim();
@@ -1042,13 +1081,20 @@ function notePage() {
       }
       this.albums = data.albums;
       if (!this.selectedLook && this.prompts.look) this.selectedLook = this.prompts.look;
+      this.clearFlaggedSelectedLook();
       this.syncAspectFromAlbum();
       await this.loadAlbumSamples();
+    },
+    clearFlaggedSelectedLook() {
+      const selected = String(this.selectedLook || '').trim();
+      if (!selected) return;
+      const hit = (this.albums || []).find((item) => item && item.id === selected);
+      if (hit && hit.safetyStatus === 'flagged') this.selectedLook = '';
     },
     async loadAlbumSamples() {
       const next = { ...this.albumSamples };
       let changed = false;
-      for (const album of this.albums) {
+      for (const album of this.selectableAlbums) {
         if (!album.hasSample || next[album.id]) continue;
         const result = await this.call('previewAlbumSample', { id: album.id });
         if (result && result.ok && result.dataUrl) {
@@ -1069,11 +1115,12 @@ function notePage() {
         if (!this.albums.length) await this.loadAlbums();
         else await this.loadAlbumSamples();
         if (!this.selectedLook && this.prompts.look) this.selectedLook = this.prompts.look;
+        this.clearFlaggedSelectedLook();
       }
     },
     selectAlbumStyle(album) {
       if (this.job.running || !album || !album.id) return;
-      this.notice = '';
+      if (album.safetyStatus === 'flagged') return;
       this.selectedLook = album.id;
       this.syncAspectFromAlbum();
       this.albumStyleOpen = false;
@@ -1127,7 +1174,7 @@ function notePage() {
       if (!this.hostReady || !this.postId) return;
       const data = await this.call('loadLatest');
       if (!data || data.ok === false) {
-        this.notice = data && data.message ? data.message : '没有读到这一篇';
+        this.showToast(data && data.message ? data.message : '没有读到这一篇');
         return;
       }
       this.applyServer(data);
@@ -1171,7 +1218,7 @@ function notePage() {
       if (!id) return;
       const data = await this.call('getLibraryArticleSample', { id });
       if (!data || data.ok === false || !data.sample) {
-        this.errors.sampleBody = (data && data.message) || '读对标文案失败';
+        this.setFormError('sampleBody', (data && data.message) || '读对标文案失败');
         this.sampleOpen = true;
         return;
       }
@@ -1202,7 +1249,7 @@ function notePage() {
       const result = await this.call('saveEditor', this.editorPayload());
       if (result && result.ok === false) {
         if (result.message === '正在生成，请等这一轮结束') return;
-        this.notice = result.message || '没有保存';
+        this.showToast(result.message || '没有保存');
         return;
       }
       await this.refresh();
@@ -1215,7 +1262,7 @@ function notePage() {
         if (result.field === 'sampleBody') this.sampleOpen = true;
         this.focusField(result.field === 'sampleBody' ? 'sampleBody' : result.field);
       } else {
-        this.notice = result.message || '没有完成';
+        this.showToast(result.message || '没有完成');
       }
       return true;
     },
@@ -1223,7 +1270,6 @@ function notePage() {
       if (!result || result.ok !== false) return false;
       if (result.message !== '正在生成，请等这一轮结束') return false;
       if (!result.id || !result.job || !result.job.running) return false;
-      this.notice = '';
       this.applyServer(result);
       this.resetPreview();
       this.phase = 'copy';
@@ -1238,7 +1284,6 @@ function notePage() {
     },
     async onGenerateDraft() {
       if (!this.hostReady || this.job.running || this.pendingCall) return;
-      this.notice = '';
       if (!this.validateForm()) return;
       this.pendingCall = true;
       try {
@@ -1290,7 +1335,6 @@ function notePage() {
     },
     async onDraw(item) {
       if (!item || this.slotDrawDisabled(item)) return;
-      this.notice = '';
       this.pendingCall = true;
       try {
         const result = await this.call('generateImages', {
@@ -1311,14 +1355,13 @@ function notePage() {
     },
     async onChooseVersion(item, version) {
       if (!this.hostReady || this.job.running || !item) return;
-      this.notice = '';
       const result = await this.call('chooseImage', {
         slot: item.slot,
         index: item.index,
         version,
       });
       if (result && result.ok === false) {
-        this.notice = result.message || '没有这一张';
+        this.showToast(result.message || '没有这一张');
         return;
       }
       await this.refresh();
@@ -1326,7 +1369,7 @@ function notePage() {
     async onReveal(item) {
       if (!this.hostReady || !item) return;
       const result = await this.call('revealImage', { slot: item.slot, index: item.index });
-      if (result && result.ok === false) this.notice = result.message || '打不开文件夹';
+      if (result && result.ok === false) this.showToast(result.message || '打不开文件夹');
     },
     async onCopyPost() {
       const text = this.postText();
@@ -1334,31 +1377,16 @@ function notePage() {
       await this.writeClipboard(text);
     },
     async onOpenHistory() {
-      this.clearCopied();
+      this.dismissToast();
       if (!window.studioHost.go) return;
       await window.studioHost.go('history');
-    },
-    clearCopied() {
-      if (this.copiedTimer) {
-        clearTimeout(this.copiedTimer);
-        this.copiedTimer = null;
-      }
-      this.copied = '';
-    },
-    showCopied(message) {
-      if (this.copiedTimer) clearTimeout(this.copiedTimer);
-      this.copied = message;
-      this.copiedTimer = setTimeout(() => {
-        this.copied = '';
-        this.copiedTimer = null;
-      }, 2000);
     },
     async writeClipboard(text) {
       try {
         await navigator.clipboard.writeText(text);
-        this.showCopied('已复制');
+        this.showToast('已复制', { type: 'success' });
       } catch (err) {
-        this.showCopied('没有复制成功');
+        this.showToast('没有复制成功');
       }
     },
     async onNew() {
@@ -1366,12 +1394,12 @@ function notePage() {
       const fresh = await this.call('startNew');
       if (fresh && fresh.ok === false) {
         if (await this.resumeRunningJob(fresh)) return;
-        this.notice = fresh.message || '没有完成';
+        this.showToast(fresh.message || '没有完成');
         return;
       }
       this.previews = {};
       this.errors = { business: '', sampleBody: '', references: '', galleryCount: '' };
-      this.clearCopied();
+      this.dismissToast();
       this.applyServer(fresh);
       this.resetBrief();
       this.resetPreview();
@@ -1381,12 +1409,12 @@ function notePage() {
       if (!this.hostReady || this.job.running || !item || item.id === this.postId) return;
       const result = await this.call('openPost', { id: item.id });
       if (!result || result.ok === false) {
-        this.notice = result && result.message ? result.message : '没有这一篇';
+        this.showToast(result && result.message ? result.message : '没有这一篇');
         return;
       }
       this.previews = {};
       this.errors = { business: '', sampleBody: '', references: '', galleryCount: '' };
-      this.clearCopied();
+      this.dismissToast();
       this.applyServer(result);
       this.resetBrief();
       this.resetPreview();
@@ -1396,7 +1424,7 @@ function notePage() {
     async onCountChange() {
       const count = Number(this.galleryCount);
       if (!Number.isInteger(count) || count < 0 || count > 9) {
-        this.errors.galleryCount = '笔记内图数量要在 0 到 9 之间。';
+        this.setFormError('galleryCount', '笔记内图数量要在 0 到 9 之间。');
         this.focusField('galleryCount');
         return;
       }
@@ -1438,7 +1466,7 @@ function notePage() {
         overrides,
       });
       if (!result || result.ok === false) {
-        this.notice = (result && result.message) || '勾选失败';
+        this.showToast((result && result.message) || '勾选失败');
         return false;
       }
       if (result.picks) this.picks = result.picks;
@@ -1454,7 +1482,7 @@ function notePage() {
         delete overrides[item.id];
       } else {
         if (materialIds.length >= 9) {
-          this.notice = '一张图最多 9 张我们的图';
+          this.showToast('一张图最多 9 张我们的图');
           return;
         }
         materialIds.push(item.id);
@@ -1526,6 +1554,7 @@ function notePage() {
       const usage = String(this.uploadRefEditorUsage || '').trim();
       if (!usage) {
         this.uploadRefEditorError = '请写上图片用法';
+        if (this.uploadRefEditorError) this.showToast(this.uploadRefEditorError);
         return;
       }
       this.uploadRefEditorBusy = true;
@@ -1537,6 +1566,7 @@ function notePage() {
         });
         if (!result || result.ok === false) {
           this.uploadRefEditorError = (result && result.message) || '保存失败';
+        if (this.uploadRefEditorError) this.showToast(this.uploadRefEditorError);
           return;
         }
         if (Array.isArray(result.uploadRefs)) this.postUploadRefs = result.uploadRefs;
@@ -1593,12 +1623,12 @@ function notePage() {
       const mimeOk = /^image\/(jpeg|jpg|pjpeg|png|webp|bmp|x-ms-bmp)$/i.test(file.type || '');
       const extOk = /\.(jpe?g|jfif|pjpeg|png|webp|bmp)$/i.test(file.name || '');
       if (!mimeOk && !extOk) {
-        this.notice = '只支持 JPEG、PNG、WebP、BMP';
+        this.showToast('只支持 JPEG、PNG、WebP、BMP');
         input.value = '';
         return;
       }
       if (file.size > 8 * 1024 * 1024) {
-        this.notice = '单张不超过 8MB';
+        this.showToast('单张不超过 8MB');
         input.value = '';
         return;
       }
@@ -1610,7 +1640,7 @@ function notePage() {
         this.uploadRefUploadOpen = true;
       };
       reader.onerror = () => {
-        this.notice = '读图失败';
+        this.showToast('读图失败');
       };
       reader.readAsDataURL(file);
       input.value = '';
@@ -1627,6 +1657,7 @@ function notePage() {
       const usage = String(this.uploadUsage || '').trim();
       if (!usage) {
         this.uploadError = '请写上图片用法';
+        if (this.uploadError) this.showToast(this.uploadError);
         return;
       }
       this.uploadRefUploading = true;
@@ -1638,6 +1669,7 @@ function notePage() {
         });
         if (!result || result.ok === false) {
           this.uploadError = (result && result.message) || '上传失败';
+        if (this.uploadError) this.showToast(this.uploadError);
           return;
         }
         this.postUploadRefs = Array.isArray(result.uploadRefs) ? result.uploadRefs : this.postUploadRefs;
@@ -1666,7 +1698,7 @@ function notePage() {
       try {
         const result = await this.call('deleteUploadRef', { id: this.deleteUploadRefTarget.id });
         if (!result || result.ok === false) {
-          this.notice = (result && result.message) || '删除失败';
+          this.showToast((result && result.message) || '删除失败');
           return;
         }
         this.postUploadRefs = Array.isArray(result.uploadRefs) ? result.uploadRefs : [];
@@ -1698,6 +1730,7 @@ function notePage() {
       const dataUrl = this.uploadRefPreview(this.saveToLibraryTarget);
       if (!dataUrl) {
         this.saveToLibraryError = '还没有预览，请稍后再试';
+        if (this.saveToLibraryError) this.showToast(this.saveToLibraryError);
         return;
       }
       this.saveToLibraryBusy = true;
@@ -1706,6 +1739,7 @@ function notePage() {
         const result = await this.call('draftUploadRefUsage', { dataUrl });
         if (!result || result.ok === false) {
           this.saveToLibraryError = (result && result.message) || '自动识别失败';
+        if (this.saveToLibraryError) this.showToast(this.saveToLibraryError);
           return;
         }
         this.saveToLibraryUsage = String(result.usage || '');
@@ -1718,6 +1752,7 @@ function notePage() {
       const usage = String(this.saveToLibraryUsage || '').trim();
       if (!usage) {
         this.saveToLibraryError = '请写上图片用法';
+        if (this.saveToLibraryError) this.showToast(this.saveToLibraryError);
         return;
       }
       this.saveToLibraryBusy = true;
@@ -1729,10 +1764,11 @@ function notePage() {
         });
         if (!result || result.ok === false) {
           this.saveToLibraryError = (result && result.message) || '保存到资料库失败';
+        if (this.saveToLibraryError) this.showToast(this.saveToLibraryError);
           return;
         }
         if (Array.isArray(result.uploadRefs)) this.postUploadRefs = result.uploadRefs;
-        this.notice = '已保存到资料库';
+        this.showToast('已保存到资料库', { type: 'success' });
         this.closeSaveToLibrary(true);
       } finally {
         this.saveToLibraryBusy = false;
@@ -1746,6 +1782,7 @@ function notePage() {
       if (!data || data.ok === false) {
         this.libraryUploadRefs = [];
         this.pickFromLibraryError = (data && data.message) || '读库失败';
+        if (this.pickFromLibraryError) this.showToast(this.pickFromLibraryError);
         return;
       }
       this.libraryUploadRefs = Array.isArray(data.uploadRefs) ? data.uploadRefs : [];
@@ -1777,6 +1814,7 @@ function notePage() {
         const result = await this.call('pickLibraryUploadRef', { id: item.id });
         if (!result || result.ok === false) {
           this.pickFromLibraryError = (result && result.message) || '挑库失败';
+        if (this.pickFromLibraryError) this.showToast(this.pickFromLibraryError);
           return;
         }
         this.postUploadRefs = Array.isArray(result.uploadRefs) ? result.uploadRefs : this.postUploadRefs;

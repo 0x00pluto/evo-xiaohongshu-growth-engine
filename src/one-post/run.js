@@ -58,6 +58,7 @@ const { generatePng } = imageModule;
 const {
   ASPECT_RATIOS,
   DEFAULT_ASPECT_RATIO,
+  aspectRatioFromImage,
   cssAspectRatio,
   normalizeAspectRatio,
 } = aspectModule;
@@ -74,6 +75,7 @@ const {
   buildAlbumDraft,
   buildDraftMessages,
   commitAlbumDraft,
+  commitFlaggedAlbumDraft,
   copyFramesFitSchema,
   copySchema,
   decodeFilledPrompt,
@@ -89,6 +91,8 @@ const {
   formatPlannedLines,
   frameDisplayLine,
   composeImagePrompt,
+  findImageSafety,
+  formatImageSafetyMessage,
   isAlbum,
   isArticleType,
   isPersonaType,
@@ -1130,6 +1134,29 @@ function createRunner(options) {
         // 失败未取回时复用同一把 key；成功后再抽才 gen+1。
         const key = pending || imageGenKey(currentId, stepName, attempts + 1);
         const file = nextImageFile(job.slot, job.index, previous.versions);
+        const pick = job.slot === 'cover'
+          ? current.picks.cover
+          : (current.picks.gallery[job.index - 1] || uploadRefRules.emptySlotPick());
+        const composed = composeImagePrompt(job.prompt, {
+          promptsDir,
+          look,
+          userAlbumsDir,
+          userImageRefsDir,
+          postDir: currentDir,
+          uploadRefs: current.uploadRefs,
+          pick,
+          aspectRatio,
+        });
+        // 只检查不改字；命中则停住，不写「生成中」、不调生图。
+        const safetyHits = findImageSafety(composed.prompt);
+        if (safetyHits.length > 0) {
+          failed += 1;
+          lastFailKind = 'safety';
+          lastError = formatImageSafetyMessage(safetyHits);
+          current.job = { running: true, step: job.label, error: '' };
+          store.write(current);
+          continue;
+        }
         setImageSlot(current, job.slot, job.index, {
           ...previous,
           status: '生成中',
@@ -1139,19 +1166,6 @@ function createRunner(options) {
         store.write(current);
         const outputPath = path.join(currentDir, file);
         try {
-          const pick = job.slot === 'cover'
-            ? current.picks.cover
-            : (current.picks.gallery[job.index - 1] || uploadRefRules.emptySlotPick());
-          const composed = composeImagePrompt(job.prompt, {
-            promptsDir,
-            look,
-            userAlbumsDir,
-            userImageRefsDir,
-            postDir: currentDir,
-            uploadRefs: current.uploadRefs,
-            pick,
-            aspectRatio,
-          });
           await generateImage({
             prompt: composed.prompt,
             outputPath,
@@ -1176,8 +1190,10 @@ function createRunner(options) {
           store.write(done);
         } catch (err) {
           failed += 1;
-          const expired = errorCode(err) === 'OUTPUT_EXPIRED';
-          lastFailKind = expired ? 'expired' : 'replay';
+          const code = errorCode(err);
+          const expired = code === 'OUTPUT_EXPIRED';
+          const flagged = code === 'CONTENT_FLAGGED';
+          lastFailKind = flagged ? 'flagged' : (expired ? 'expired' : 'replay');
           lastError = errorMessage(err, '生图失败');
           fs.rmSync(outputPath, { force: true });
           const failedState = store.read();
@@ -1185,25 +1201,30 @@ function createRunner(options) {
           setImageSlot(failedState, job.slot, job.index, {
             ...base,
             status: base.versions.length > 0 ? '成功' : '失败',
-            // 非过期保留 pending key，attempts 不加；过期清 key 且 attempts+1，避免再用已删对象的 gen。
-            attempts: expired ? attempts + 1 : attempts,
-            idempotencyKey: expired ? '' : key,
+            // 过期 / 敏感：清 key 且 attempts+1，禁止原样取回；其它失败保留 pending key。
+            attempts: (expired || flagged) ? attempts + 1 : attempts,
+            idempotencyKey: (expired || flagged) ? '' : key,
           });
           failedState.job = { running: true, step: job.label, error: '' };
           store.write(failedState);
         }
       }
       const finished = store.read();
-      let failHint = '';
+      let failMessage = '';
       if (failed > 0) {
-        failHint = lastFailKind === 'expired'
-          ? '成图已过期，请再点一次出一张新的'
-          : '请再点一次取回这张图（不会重复扣费）';
+        if (lastFailKind === 'safety' || lastFailKind === 'flagged') {
+          failMessage = lastError;
+        } else {
+          const failHint = lastFailKind === 'expired'
+            ? '成图已过期，请再点一次出一张新的'
+            : '请再点一次取回这张图（不会重复扣费）';
+          failMessage = `${lastError}。${failHint}`;
+        }
       }
       finished.job = {
         running: false,
         step: '',
-        error: failed > 0 ? `${lastError}。${failHint}` : '',
+        error: failMessage,
       };
       store.write(finished);
     } catch (err) {
@@ -1370,6 +1391,12 @@ function createRunner(options) {
     if (albumLook && !isAlbum(albumLook, promptsDir, userAlbumsDir)) {
       return { ok: false, message: '图册不在允许列表', field: 'look' };
     }
+    if (albumLook) {
+      const lookMeta = loadAlbumCatalog(promptsDir, userAlbumsDir).get(albumLook);
+      if (lookMeta.safetyStatus === 'flagged') {
+        return { ok: false, message: '这套风格未通过安全审核，不能用于生图', field: 'look' };
+      }
+    }
     if (!state.draft) return { ok: false, message: '还没有稿面' };
     const faceMessage = validateDraftFace(state.draft);
     if (faceMessage) return { ok: false, message: faceMessage };
@@ -1400,6 +1427,8 @@ function createRunner(options) {
           deletable: meta.source === 'user',
           aspectRatio,
           aspectRatioCss: cssAspectRatio(aspectRatio),
+          safetyStatus: meta.safetyStatus,
+          safetyProbed: meta.safetyProbed,
         };
       }),
     };
@@ -1450,10 +1479,64 @@ function createRunner(options) {
     } catch (err) {
       return { ok: false, message: err instanceof Error ? err.message : '参考图不合格' };
     }
+    if (!userAlbumsDir) return { ok: false, message: '缺少用户图册目录' };
     const learnedFrom = xhsNoteProvenance.normalizeXhsProvenance(source.source);
     lock = 'learnAlbum';
     const vis = visionStepKey('album-learn', image.dataUrl);
+    const probeDir = path.join(path.dirname(userAlbumsDir), 'temp', 'album-probe');
+    const probeSample = path.join(probeDir, `sample-${vis.key.slice(-16)}${image.ext}`);
+    const probeOut = path.join(probeDir, `out-${vis.key.slice(-16)}.png`);
     try {
+      // 先探针：最短提示 + 仅本图；过审才识图学词。
+      fs.mkdirSync(probeDir, { recursive: true });
+      fs.writeFileSync(probeSample, image.bytes);
+      try {
+        await generateImage({
+          prompt: '生成一张类似的图',
+          outputPath: probeOut,
+          aspectRatio: normalizeAspectRatio(aspectRatioFromImage(image.bytes)) || DEFAULT_ASPECT_RATIO,
+          references: [{ role: 'template', path: probeSample }],
+          idempotencyKey: `album-probe:${vis.key}`,
+        });
+      } catch (probeErr) {
+        if (errorCode(probeErr) === 'CONTENT_FLAGGED') {
+          const saved = commitFlaggedAlbumDraft(
+            userAlbumsDir,
+            {
+              sampleBytes: image.bytes,
+              sampleExt: image.ext,
+              learnedFrom: learnedFrom || null,
+            },
+            promptsDir,
+          );
+          if (
+            learnedFrom
+            && learnedFrom.kind === 'xhs-note'
+            && userXhsNotesDir
+            && learnedFrom.linkId
+          ) {
+            xhsNoteLinks.attachLearnedAlbum(
+              userXhsNotesDir,
+              learnedFrom.linkId,
+              saved.id,
+              learnedFrom.role || 'image',
+            );
+          }
+          return {
+            ok: true,
+            safetyStatus: 'flagged',
+            album: {
+              id: saved.id,
+              label: saved.label,
+              safetyStatus: 'flagged',
+              safetyProbed: true,
+            },
+            message: '这张图未通过安全审核，已入库但不能用于生图',
+          };
+        }
+        return { ok: false, message: formatModelError(probeErr, '检查这张图失败') };
+      }
+
       const system = readLearnSystemPrompt(promptsDir);
       const raw = await completeVision({ text: system, dataUrl: image.dataUrl }, { idempotencyKey: vis.key });
       albumDraftSeq += 1;
@@ -1461,11 +1544,13 @@ function createRunner(options) {
       const draft = buildAlbumDraft(promptsDir, raw, image, draftId, userAlbumsDir);
       if (learnedFrom) draft.learnedFrom = learnedFrom;
       albumDraft = draft;
-      return { ok: true, draft: draftPublicView(draft) };
+      return { ok: true, safetyStatus: 'passed', draft: draftPublicView(draft) };
     } catch (err) {
       rememberVisionFailure(vis.step);
       return { ok: false, message: formatModelError(err, '学习失败') };
     } finally {
+      fs.rmSync(probeSample, { force: true });
+      fs.rmSync(probeOut, { force: true });
       lock = null;
     }
   }
@@ -1547,6 +1632,9 @@ function createRunner(options) {
       if (meta.source !== 'user') {
         return { ok: false, message: '出厂图册不能修改' };
       }
+      if (meta.safetyStatus === 'flagged') {
+        return { ok: false, message: '未通过审核的风格不能改怎么画' };
+      }
       const promptMd = validatedPromptTemplate(
         typeof source.promptTemplate === 'string' ? source.promptTemplate : '',
         meta.kind,
@@ -1627,12 +1715,14 @@ function createRunner(options) {
       id: meta.id,
       label: meta.label,
       hint: meta.hint,
-      editable: meta.source === 'user',
+      editable: meta.source === 'user' && meta.safetyStatus !== 'flagged',
       hasSample: fs.existsSync(albumSampleFile(promptsDir, id, userAlbumsDir)),
       promptSheetVersion: meta.promptSheetVersion,
       promptTemplate,
       aspectRatio,
       aspectRatioCss: cssAspectRatio(aspectRatio),
+      safetyStatus: meta.safetyStatus,
+      safetyProbed: meta.safetyProbed,
     };
     if (meta.learnedFrom) detail.source = meta.learnedFrom;
     return detail;

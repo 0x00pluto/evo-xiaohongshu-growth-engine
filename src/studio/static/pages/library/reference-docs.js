@@ -59,6 +59,7 @@ function libraryReferenceDocs() {
       if (!data || data.ok === false) {
         this.docs = [];
         this.error = (data && data.message) || '读库失败';
+        if (this.error) this.$dispatch('library-toast', this.error);
         return;
       }
       this.docs = Array.isArray(data.docs) ? data.docs : [];
@@ -91,14 +92,17 @@ function libraryReferenceDocs() {
       const { name, body } = splitPasteToDoc(this.editorPaste);
       if (!name) {
         this.editorError = '请粘贴全文，第一行当名称';
+        if (this.editorError) this.$dispatch('library-toast', this.editorError);
         return;
       }
       if (!body) {
         this.editorError = '请粘贴正文（第一行后的内容）';
+        if (this.editorError) this.$dispatch('library-toast', this.editorError);
         return;
       }
       if (Array.from(body).length > 8000) {
         this.editorError = '贴进来的原文太长了，先删到 8000 字以内。';
+        if (this.editorError) this.$dispatch('library-toast', this.editorError);
         return;
       }
       this.busy = true;
@@ -110,10 +114,11 @@ function libraryReferenceDocs() {
         const result = await this.call('saveLibraryReferenceDoc', payload);
         if (!result || result.ok === false) {
           this.editorError = (result && result.message) || '保存失败';
+          if (this.editorError) this.$dispatch('library-toast', this.editorError);
           return;
         }
         this.closeEditor(true);
-        this.$dispatch('library-toast', '已保存');
+        this.$dispatch('library-toast', { message: '已保存', type: 'success' });
         await this.refresh();
       } finally {
         this.busy = false;
@@ -169,10 +174,12 @@ function libraryReferenceDocs() {
       const body = String(this.detailBody || '').trim();
       if (!body) {
         this.detailError = '正文不能为空';
+        if (this.detailError) this.$dispatch('library-toast', this.detailError);
         return;
       }
       if (Array.from(body).length > 8000) {
         this.detailError = '正文太长了，先删到 8000 字以内。';
+        if (this.detailError) this.$dispatch('library-toast', this.detailError);
         return;
       }
       this.savingDetail = true;
@@ -186,6 +193,7 @@ function libraryReferenceDocs() {
         });
         if (!result || result.ok === false) {
           this.detailError = (result && result.message) || '保存失败';
+          if (this.detailError) this.$dispatch('library-toast', this.detailError);
           return;
         }
         if (result.doc) {
@@ -195,7 +203,7 @@ function libraryReferenceDocs() {
           this.detailBody = body;
         }
         this.detailBaselineBody = this.detailBody;
-        this.$dispatch('library-toast', '已更新');
+        this.$dispatch('library-toast', { message: '已更新', type: 'success' });
         await this.refresh();
       } finally {
         this.savingDetail = false;
@@ -229,6 +237,7 @@ function libraryReferenceDocs() {
         const result = await this.call('deleteLibraryReferenceDoc', { id: this.deleteTarget.id });
         if (!result || result.ok === false) {
           this.error = (result && result.message) || '删除失败';
+          if (this.error) this.$dispatch('library-toast', this.error);
           return;
         }
         const deletedId = this.deleteTarget.id;
@@ -237,7 +246,7 @@ function libraryReferenceDocs() {
         if (this.detailTarget && this.detailTarget.id === deletedId) {
           this.forceCloseDetail();
         }
-        this.$dispatch('library-toast', '已删除');
+        this.$dispatch('library-toast', { message: '已删除', type: 'success' });
         await this.refresh();
       } finally {
         this.deleting = false;

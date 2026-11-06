@@ -2,6 +2,7 @@ function libraryPage() {
   const INTAKE_MAX_BYTES = 8 * 1024 * 1024;
 
   return {
+    ...window.createStudioToast(),
     hostReady: window.studioHost.ready,
     tabs: [
       { id: 'albums', label: '风格' },
@@ -12,8 +13,6 @@ function libraryPage() {
     activeTab: 'albums',
     createOpen: false,
     albumsBusy: false,
-    toast: '',
-    toastTimer: null,
     intakeOpen: false,
     intakeTarget: '',
     intakeError: '',
@@ -31,26 +30,15 @@ function libraryPage() {
       this.albumsBusy = Boolean(detail);
     },
 
-    clearToast() {
-      if (this.toastTimer) {
-        clearTimeout(this.toastTimer);
-        this.toastTimer = null;
-      }
-      this.toast = '';
-    },
-
-    showToast(message) {
-      const text = String(message || '').trim();
-      if (!text) return;
-      if (this.toastTimer) clearTimeout(this.toastTimer);
-      this.toast = text;
-      this.toastTimer = setTimeout(() => {
-        this.toast = '';
-        this.toastTimer = null;
-      }, 2000);
-    },
-
     onLibraryToast(detail) {
+      if (detail && typeof detail === 'object' && !Array.isArray(detail)) {
+        const msg = detail.message != null ? detail.message : detail.text;
+        this.showToast(msg, {
+          type: detail.type === 'success' ? 'success' : 'error',
+          ms: typeof detail.ms === 'number' ? detail.ms : undefined,
+        });
+        return;
+      }
       this.showToast(detail);
     },
 
@@ -238,6 +226,7 @@ function libraryPage() {
 
       if (imageFiles.length > 1) {
         this.intakeError = '一次一张';
+        if (this.intakeError) this.showToast(this.intakeError);
         return;
       }
       if (imageFiles.length === 1) {
@@ -248,21 +237,26 @@ function libraryPage() {
       if (fromPaste) {
         if (hasText) {
           this.intakeError = '贴进来的是文字，请改贴一张图片';
+          if (this.intakeError) this.showToast(this.intakeError);
           return;
         }
         this.intakeError = '剪贴板里没有图片';
+        if (this.intakeError) this.showToast(this.intakeError);
         return;
       }
 
       if ((files || []).length > 1) {
         this.intakeError = '一次一张';
+        if (this.intakeError) this.showToast(this.intakeError);
         return;
       }
       if ((files || []).length === 1) {
         this.intakeError = '只支持 JPEG、PNG、WebP、BMP';
+        if (this.intakeError) this.showToast(this.intakeError);
         return;
       }
       this.intakeError = '只支持 JPEG、PNG、WebP、BMP';
+      if (this.intakeError) this.showToast(this.intakeError);
     },
 
     /**
@@ -290,10 +284,12 @@ function libraryPage() {
     async handoffIntakeFile(file) {
       if (!this.isAllowedImageFile(file)) {
         this.intakeError = '只支持 JPEG、PNG、WebP、BMP';
+        if (this.intakeError) this.showToast(this.intakeError);
         return;
       }
       if (file.size > INTAKE_MAX_BYTES) {
         this.intakeError = '单张不超过 8MB';
+        if (this.intakeError) this.showToast(this.intakeError);
         return;
       }
 
@@ -316,6 +312,7 @@ function libraryPage() {
         }
       } catch (err) {
         this.intakeError = err && err.message ? err.message : '读图失败';
+        if (this.intakeError) this.showToast(this.intakeError);
       } finally {
         this.intakeBusy = false;
       }

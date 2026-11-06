@@ -41,6 +41,9 @@ function formatModelError(err, fallback) {
   if (code === 'INSUFFICIENT_CREDITS') {
     return `积分不足（${code}）`;
   }
+  if (code === 'CONTENT_FLAGGED') {
+    return `内容未通过安全审核。请换画面说明，或换风格样图 / 我们的图后再试（${code}）`;
+  }
   const text = raw || fallback || '没有完成';
   return code && !text.includes(`（${code}）`) ? `${text}（${code}）` : text;
 }

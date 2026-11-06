@@ -12,6 +12,8 @@ const frameModule = require('./frame');
 const sheetModule = require('./sheet');
 /** @type {typeof import('../../image/aspect')} */
 const aspectModule = require('../../image/aspect');
+/** @type {typeof import('../image-safety/apply')} */
+const imageSafetyModule = require('../image-safety/apply');
 const { ALBUM_KIND_SET } = catalogModule;
 const { schemaFieldNames } = frameModule;
 const {
@@ -20,6 +22,7 @@ const {
   assertPromptSheet,
 } = sheetModule;
 const { aspectRatioFromImage } = aspectModule;
+const { applyImageSafety } = imageSafetyModule;
 
 const LEARN_PROMPT_REL = 'learn-album/system.md';
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -42,6 +45,7 @@ const USER_ALBUM_SEQ_START = 100000;
  *   sampleBytes: Buffer;
  *   sampleDataUrl: string;
  *   aspectRatio: string;
+ *   promptRewrites: import('../image-safety/apply').SafetyHit[];
  *   learnedFrom?: import('../../xhs-note/provenance').XhsNoteProvenance;
  * }} AlbumDraft
  */
@@ -295,6 +299,8 @@ function buildAlbumDraft(promptsDir, learnRaw, image, draftId, userAlbumsDir) {
   const parsed = parseLearnResult(learnRaw);
   const id = allocateAlbumId(promptsDir, parsed, userAlbumsDir);
   const aspectRatio = aspectRatioFromImage(image.bytes);
+  // 学模板时只替换一次；草稿里看到的就是将要保存的全文。
+  const safety = applyImageSafety(parsed.promptMd);
   return {
     draftId,
     id,
@@ -303,13 +309,14 @@ function buildAlbumDraft(promptsDir, learnRaw, image, draftId, userAlbumsDir) {
     label: parsed.label,
     hint: parsed.hint,
     copySchema: parsed.copySchema,
-    promptMd: parsed.promptMd,
+    promptMd: safety.text,
     copySample: parsed.copySample,
     sampleExt: image.ext,
     sampleMime: image.mime,
     sampleBytes: image.bytes,
     sampleDataUrl: image.dataUrl,
     aspectRatio,
+    promptRewrites: safety.changes,
   };
 }
 
@@ -330,6 +337,7 @@ function draftPublicView(draft) {
     copySample: draft.copySample,
     sampleDataUrl: draft.sampleDataUrl,
     aspectRatio: draft.aspectRatio,
+    promptRewrites: Array.isArray(draft.promptRewrites) ? draft.promptRewrites : [],
     builtin: false,
   };
 }

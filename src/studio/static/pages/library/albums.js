@@ -11,6 +11,7 @@ function libraryAlbums() {
   let eyedropperSampler = null;
 
   const LEARNING_LINES = [
+    '正在检查这张图能否用于生图',
     '正在看这张图',
     '在看配色和排版',
     '在整理这套风格',
@@ -69,6 +70,22 @@ function libraryAlbums() {
 
     get learningLineText() {
       return LEARNING_LINES[this.learningLineIndex] || LEARNING_LINES[0];
+    },
+
+    draftRewriteSummary() {
+      const list = this.draft && Array.isArray(this.draft.promptRewrites)
+        ? this.draft.promptRewrites
+        : [];
+      if (list.length === 0) return '';
+      const parts = list.slice(0, 4).map((item) => {
+        const match = item && typeof item.match === 'string' ? item.match : '';
+        const replace = item && typeof item.replace === 'string' ? item.replace : '';
+        if (!match) return '';
+        return replace ? `${match} → ${replace}` : `删掉「${match}」`;
+      }).filter(Boolean);
+      if (parts.length === 0) return '';
+      const more = list.length > 4 ? ` 等 ${list.length} 处` : '';
+      return `已改写：${parts.join('；')}${more}`;
     },
 
     startLearningCopy() {
@@ -167,6 +184,7 @@ function libraryAlbums() {
       if (which === 'detail' && !this.detailEditable()) return;
       if (which === 'detail' && !this.detailSample) {
         this.error = '没有可吸色的样图';
+        if (this.error) this.$dispatch('library-toast', this.error);
         return;
       }
       const index = Number(btn.getAttribute('data-color-index'));
@@ -194,6 +212,7 @@ function libraryAlbums() {
       if (!data || data.ok === false || !Array.isArray(data.albums)) {
         this.albums = [];
         this.error = (data && data.message) || '没有读到风格列表';
+        if (this.error) this.$dispatch('library-toast', this.error);
         return;
       }
       this.albums = data.albums;
@@ -220,6 +239,7 @@ function libraryAlbums() {
       const detail = await this.call('getAlbumDetail', { id: album.id });
       if (!detail || detail.ok === false) {
         this.error = (detail && detail.message) || '没有读到这一册';
+        if (this.error) this.$dispatch('library-toast', this.error);
         return;
       }
       this.detail = detail;
@@ -280,12 +300,13 @@ function libraryAlbums() {
         });
         if (!result || result.ok === false) {
           this.error = (result && result.message) || '保存失败';
+          if (this.error) this.$dispatch('library-toast', this.error);
           return;
         }
         this.detailSavedPrompt = String(this.detailPrompt || '');
         this.detail.promptTemplate = this.detailSavedPrompt;
         this.syncPromptEditor('detail');
-        this.$dispatch('library-toast', '已保存怎么画');
+        this.$dispatch('library-toast', { message: '已保存怎么画', type: 'success' });
       } finally {
         this.savingDetail = false;
       }
@@ -324,9 +345,25 @@ function libraryAlbums() {
         if (!result || result.ok === false) {
           const message = (result && result.message) || '学习失败';
           this.error = message;
+          if (this.error) this.$dispatch('library-toast', this.error);
           window.dispatchEvent(new CustomEvent('library-album-draft-settled', {
             detail: { action: 'error', message },
           }));
+          return;
+        }
+        if (result.safetyStatus === 'flagged') {
+          const message = (result && result.message)
+            || '这张图未通过安全审核，已入库但不能用于生图';
+          this.error = message;
+          if (this.error) this.$dispatch('library-toast', this.error);
+          window.dispatchEvent(new CustomEvent('library-album-draft-settled', {
+            detail: {
+              action: 'flagged',
+              id: result.album && result.album.id ? String(result.album.id) : '',
+              message,
+            },
+          }));
+          await this.refresh();
           return;
         }
         this.draft = result.draft;
@@ -341,6 +378,7 @@ function libraryAlbums() {
       } catch (err) {
         const message = err && err.message ? err.message : '学习失败';
         this.error = message;
+        if (this.error) this.$dispatch('library-toast', this.error);
         window.dispatchEvent(new CustomEvent('library-album-draft-settled', {
           detail: { action: 'error', message },
         }));
@@ -361,6 +399,7 @@ function libraryAlbums() {
         });
         if (!result || result.ok === false) {
           this.error = (result && result.message) || '写入失败';
+          if (this.error) this.$dispatch('library-toast', this.error);
           return;
         }
         const albumId = result && result.id ? String(result.id) : '';
@@ -368,7 +407,7 @@ function libraryAlbums() {
         this.draftOpen = false;
         this.draft = null;
         this.draftPrompt = '';
-        this.$dispatch('library-toast', '已保存风格');
+        this.$dispatch('library-toast', { message: '已保存风格', type: 'success' });
         // 先清 committing，再派 settled，避免下一张学图命中「风格正忙」
         this.committing = false;
         window.dispatchEvent(new CustomEvent('library-album-draft-settled', {
@@ -387,7 +426,7 @@ function libraryAlbums() {
       this.draftOpen = false;
       this.draft = null;
       this.draftPrompt = '';
-      this.$dispatch('library-toast', '已放弃草稿');
+      this.$dispatch('library-toast', { message: '已放弃草稿', type: 'success' });
       this.committing = false;
       window.dispatchEvent(new CustomEvent('library-album-draft-settled', {
         detail: { action: 'discard' },
@@ -404,6 +443,7 @@ function libraryAlbums() {
         : this.detailSample || '';
       if (!imageUrl) {
         this.error = '没有可吸色的样图';
+        if (this.error) this.$dispatch('library-toast', this.error);
         return;
       }
       if (target === 'detail' && !this.detailEditable()) return;
@@ -514,6 +554,7 @@ function libraryAlbums() {
         const result = await this.call('deleteAlbum', { id: this.deleteTarget.id });
         if (!result || result.ok === false) {
           this.error = (result && result.message) || '删除失败';
+          if (this.error) this.$dispatch('library-toast', this.error);
           return;
         }
         const id = this.deleteTarget.id;
@@ -523,7 +564,7 @@ function libraryAlbums() {
         this.detailSample = '';
         this.detailPrompt = '';
         this.detailSavedPrompt = '';
-        this.$dispatch('library-toast', '已删除这套风格');
+        this.$dispatch('library-toast', { message: '已删除这套风格', type: 'success' });
         const nextSamples = { ...this.albumSamples };
         delete nextSamples[id];
         this.albumSamples = nextSamples;
