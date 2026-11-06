@@ -17,11 +17,11 @@ node scripts/run-studio.js --open
 
 **未打包的 Dex Buddy 维护者**才用仓库根 `config.dev.json` 的 `extraPluginPaths`（从 `config.dev.example.json` 复制），或把本仓软链进 `plugins/`；打包后的应用不读 `extraPluginPaths`。界面里没有「移除」这些路径。
 
-本地目录挂进来时，`ctx.dirs.data` 就是本仓：笔记写在 `output/one-post/posts/`，用户自学图册写在 `runtime/albums/`（一册一夹），用户参考图角色包写在 `runtime/image-refs/`，我们的图库写在 `runtime/materials/upload-refs/`，用户对标文案库写在 `runtime/materials/article-samples/`，产品资料库写在 `runtime/materials/reference-docs/`（整目录 `runtime/` gitignore）。从插件中心装进 Dex Buddy 之后，`ctx.dirs.data` 是用户数据目录 `plugin-data/app-dexbuddy-xiaohongshu-standard-editor/`，同样是 `output/…` 与上述 `runtime/` 分工。`assets/` 仍从安装目录读（出厂提示词与出厂图册）；启动时会把 assets 里序号 ≥ `100000` 的旧用户册迁到 `runtime/albums/`。
+本地目录挂进来时，`ctx.dirs.data` 就是本仓、`ctx.dirs.cache` 是仓库 `cache/`：笔记写在 `output/one-post/posts/`，用户自学图册写在 `runtime/albums/`（一册一夹），用户参考图角色包写在 `runtime/image-refs/`，我们的图库写在 `runtime/materials/upload-refs/`，用户对标文案库写在 `runtime/materials/article-samples/`，产品资料库写在 `runtime/materials/reference-docs/`（整目录 `runtime/` gitignore），对标笔记原始快照写在 `cache/xhs-notes/`。从插件中心装进 Dex Buddy 之后，`ctx.dirs.data` 是用户数据目录 `plugin-data/app-dexbuddy-xiaohongshu-standard-editor/`，同样是 `output/…` 与上述 `runtime/` 分工；可重建的对标笔记快照写在 `ctx.dirs.cache`（`plugin-runtime/app-dexbuddy-xiaohongshu-standard-editor/cache/xhs-notes/`），不要写进 `plugin-data`。`assets/` 仍从安装目录读（出厂提示词与出厂图册）；启动时会把 assets 里序号 ≥ `100000` 的旧用户册迁到 `runtime/albums/`。
 
 日常发版只走 [`docs/builtin-workflows/cut-release-tag.md`](../builtin-workflows/cut-release-tag.md)：`evo_agent_pack.json` 与 `plugin.manifest.json` 的 `version` 必须同号（`X.Y.Z`，不含 `v`），tag 为 `v` + 该号。插件中心只读清单；**禁止**只改一边。根上的 `dex-buddy-plugin.pack` 只列入清单、`index.js`、`icon.png`、`lib/`、`src/` 和 `assets/`（`lib/` 含接口层与独立跑实现）。可选再放 `dex-buddy-plugin.ignore` 从候选里挖掉路径。`scripts/`、测试、文档和 `.env` 不进这份 zip。这不是 `dex-buddy-plugin-pack.json`，仓库根上有那份旧文件时发布会失败。把仓库和这个 tag 告诉 Dex Buddy 维护者，由他在 Actions 里运行 Publish Plugin。
 
-模型助手：`lib/dex-buddy-sdk.js` 是接口层（`SDK_VERSION` 对照母版）；工作台走宿主 `ctx.models`。本机 `node scripts/run-studio.js` 无宿主时，同目录还要有 `lib/dex-buddy-standalone.js`（`bindModels` 会懒加载）。工作台登录后走宿主会话，设置页不再要模型钥匙。作者独立运行在仓库 `.env` 填 `DEX_BUDDY_API_KEY`（可选 `DEX_GATEWAY_BASE_URL`）；本仓自己读 `.env`，SDK 不读。钥匙不进设置页，不进 zip。装进 Dex Buddy 后不读这把钥匙。
+模型助手：`lib/dex-buddy-sdk.js` 是接口层（当前母版 `SDK_VERSION` `1.0.4`，含 `navigate` 导出）；工作台走宿主 `ctx.models`。本机 `node scripts/run-studio.js` 无宿主时，同目录还要有 `lib/dex-buddy-standalone.js`（`STANDALONE_VERSION` `1.0.3`；`bindModels` 会懒加载）。工作台登录后走宿主会话，本插件无 `configSchema`、不另开设置页，因此不调用 `navigate` / `window.dex.navigate`。作者独立运行在仓库 `.env` 填 `DEX_BUDDY_API_KEY`（可选 `DEX_GATEWAY_BASE_URL`）；本仓自己读 `.env`，SDK 不读。钥匙不进设置页，不进 zip。装进 Dex Buddy 后不读这把钥匙。
 
 ## 参数
 
@@ -71,7 +71,7 @@ node scripts/run-studio.js --open
 - 笔记目录下 `materials/upload-refs/`：这篇上传或从库挑来的参考文件；清单与按张勾选写在同篇 `draft.json` 的 `uploadRefs` / `picks`（新上传默认勾进全部槽）
 - 同篇 `draft.json` 的 `sampleBody` / `sampleTitle` / `references`：这篇粘贴的对标文案快照与产品资料快照（`{ name?, body }[]`；旧 `string[]` 读成无名称；旧字段 `article` 读时迁入 `sampleBody`）
 
-本机命令写在仓库里。装进 Dex Buddy 之后笔记在 `plugin-data/app-dexbuddy-xiaohongshu-standard-editor/output/one-post/posts/`，用户图册、参考图角色包、我们的图库、对标文案库、产品资料库与对标笔记链接资源在同 data 下的 `runtime/albums/`、`runtime/image-refs/`、`runtime/materials/upload-refs/`、`runtime/materials/article-samples/`、`runtime/materials/reference-docs/`、`runtime/materials/xhs-notes/`，原始笔记缓存在 `cache/xhs-notes/`。学成顺序：封面入库 → 后面的图入库 → 再写对标文案；对标文案 `meta.json` / 图册 `album.json` 可带 `source` 指回笔记，链接 `learned` 指回对标文案与图册。仓库里如果还有旧的 `output/one-post/latest/`，第一次打开会抄进历史并删掉那个目录。
+本机命令写在仓库里。装进 Dex Buddy 之后笔记在 `plugin-data/app-dexbuddy-xiaohongshu-standard-editor/output/one-post/posts/`，用户图册、参考图角色包、我们的图库、对标文案库、产品资料库与对标笔记链接资源在同 data 下的 `runtime/albums/`、`runtime/image-refs/`、`runtime/materials/upload-refs/`、`runtime/materials/article-samples/`、`runtime/materials/reference-docs/`、`runtime/materials/xhs-notes/`，原始笔记缓存在 `plugin-runtime/app-dexbuddy-xiaohongshu-standard-editor/cache/xhs-notes/`（宿主 `ctx.dirs.cache`）。学成顺序：封面入库 → 后面的图入库 → 再写对标文案；对标文案 `meta.json` / 图册 `album.json` 可带 `source` 指回笔记，链接 `learned` 指回对标文案与图册。仓库里如果还有旧的 `output/one-post/latest/`，第一次打开会抄进历史并删掉那个目录。
 
 ## 失败排查
 

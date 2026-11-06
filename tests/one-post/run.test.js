@@ -2150,12 +2150,13 @@ test('一篇可囤超过 9 张；每槽勾选第 10 张被拒', async () => {
   assert.match(ten.message, /最多勾 9/);
 });
 
-test('模型助手是 Dex Buddy SDK 1.0.3', () => {
+test('模型助手是 Dex Buddy SDK 1.0.4', () => {
   const sdk = require('../../lib/dex-buddy-sdk');
   const standalone = require('../../lib/dex-buddy-standalone');
-  assert.equal(sdk.SDK_VERSION, '1.0.3');
+  assert.equal(sdk.SDK_VERSION, '1.0.4');
   assert.equal(standalone.STANDALONE_VERSION, '1.0.3');
   assert.equal(typeof sdk.requireEntitlement, 'function');
+  assert.equal(typeof sdk.navigate, 'function');
   assert.equal(typeof sdk.bindModels, 'function');
   assert.equal(typeof standalone.createStandaloneModels, 'function');
 });

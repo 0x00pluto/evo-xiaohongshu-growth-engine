@@ -6,7 +6,7 @@ const path = require('node:path');
 /**
  * @typedef {{
  *   pluginEnv?: () => Record<string, string>;
- *   dirs?: { data?: string };
+ *   dirs?: { data?: string; cache?: string };
  *   models?: unknown;
  *   registerService: (name: string, service: Record<string, Function>) => void;
  * }} AppContext
@@ -83,6 +83,8 @@ module.exports = {
       );
     }
     const dataDir = ctx && ctx.dirs && ctx.dirs.data ? ctx.dirs.data : pluginRoot();
+    // 可重建缓存走宿主 ctx.dirs.cache（安装后是 plugin-runtime）；缺字段时回退 dataDir/cache。
+    const cacheDir = ctx && ctx.dirs && ctx.dirs.cache ? ctx.dirs.cache : path.join(dataDir, 'cache');
     const runner = createRunner({
       postsDir: path.join(dataDir, 'output', 'one-post', 'posts'),
       promptsDir: path.join(pluginRoot(), 'assets', 'prompts', 'one-post'),
@@ -92,7 +94,7 @@ module.exports = {
       userArticleSamplesDir: path.join(dataDir, 'runtime', 'materials', 'article-samples'),
       userReferenceDocsDir: path.join(dataDir, 'runtime', 'materials', 'reference-docs'),
       userXhsNotesDir: path.join(dataDir, 'runtime', 'materials', 'xhs-notes'),
-      userXhsNotesCacheDir: path.join(dataDir, 'cache', 'xhs-notes'),
+      userXhsNotesCacheDir: path.join(cacheDir, 'xhs-notes'),
       // 设置页保存不重跑 apply；真正发请求时再读 pluginEnv / .env。
       readEnv: () => resolveEnv(ctx),
       ctx,
