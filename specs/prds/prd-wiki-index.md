@@ -19,3 +19,4 @@
 | 00013 | `specs/prds/prd-00013-library-paste-image.md` | 资料库新建图库与上传参考先出虚线上传框；拖入、粘贴或点击从本机选一张，再交回现有学草稿与写用法句。工程 accepted |
 | 00014 | `specs/prds/prd-00014-reference-library.md` | 参考资料本机库；加一条可从库挑或写一次即入库；快照进笔记。工程 accepted |
 | 00015 | `specs/prds/prd-00015-studio-plain-copy.md` | 资料库与写笔记可见文案统一成运营能懂的一套词；删说明书灰字；不改交互与模型提示词；工程 accepted |
+| 00016 | `specs/prds/prd-00016-feishu-demand-loop.md` | 飞书需求池按需求 ID 转入本仓功能 PRD，修完只回填需求状态；不改表结构；工程 accepted |
