@@ -31,25 +31,128 @@ const CHROME_ID_VECTOR_ID = 'andhfibibleajbnnpbnfdmngmhkoeldj';
  */
 
 /**
- * Chrome 清单 path 必须纯 ASCII；安装到 Application Support，避开仓库中文目录。
+ * @param {{
+ *   homedir?: string;
+ *   localAppData?: string;
+ *   programData?: string;
+ *   publicDir?: string;
+ *   platform?: string;
+ * }} [options]
+ * @returns {{ platform: string; home: string; localAppData: string; programData: string; publicDir: string }}
+ */
+function resolveInstallDirOptions(options) {
+  const opts = options && typeof options === 'object' ? options : {};
+  const platform = opts.platform || process.platform;
+  const home = typeof opts.homedir === 'string' && opts.homedir.trim()
+    ? opts.homedir.trim()
+    : os.homedir();
+  const localAppData = typeof opts.localAppData === 'string' && opts.localAppData.trim()
+    ? opts.localAppData.trim()
+    : (process.env.LOCALAPPDATA || (
+      platform === 'win32'
+        ? path.win32.join(home, 'AppData', 'Local')
+        : path.join(home, 'AppData', 'Local')
+    ));
+  const programData = typeof opts.programData === 'string' && opts.programData.trim()
+    ? opts.programData.trim()
+    : (process.env.ProgramData || 'C:\\ProgramData');
+  const publicDir = typeof opts.publicDir === 'string' && opts.publicDir.trim()
+    ? opts.publicDir.trim()
+    : (process.env.PUBLIC || 'C:\\Users\\Public');
+  return { platform, home, localAppData, programData, publicDir };
+}
+
+/**
+ * Windows 候选安装目录：用户 Local 优先；含非 ASCII 时改 ProgramData / Public。
+ * 仅 win32 使用；darwin 不会走到这里。
+ * @param {{
+ *   homedir?: string;
+ *   localAppData?: string;
+ *   programData?: string;
+ *   publicDir?: string;
+ *   platform?: string;
+ * }} [options]
+ * @returns {string[]}
+ */
+function windowsNativeHostInstallCandidates(options) {
+  const resolved = resolveInstallDirOptions({ ...options, platform: 'win32' });
+  return [
+    path.win32.join(resolved.localAppData, 'DexBuddy', 'native-host'),
+    path.win32.join(resolved.programData, 'DexBuddy', 'native-host'),
+    path.win32.join(resolved.publicDir, 'DexBuddy', 'native-host'),
+  ];
+}
+
+/**
+ * Chrome 清单 path 必须纯 ASCII。
+ * darwin / linux：用户 Application Support（或 .local），不写 Windows 盘符。
+ * win32：用户 Local 若纯 ASCII 则用它；否则改 ProgramData，再不行 Users\Public。
+ * @param {{
+ *   homedir?: string;
+ *   localAppData?: string;
+ *   programData?: string;
+ *   publicDir?: string;
+ *   platform?: string;
+ * }} [options]
  * @returns {string}
  */
-function nativeHostInstallDir() {
-  const home = os.homedir();
-  if (process.platform === 'darwin') {
-    return path.join(home, 'Library', 'Application Support', 'DexBuddy', 'native-host');
+function nativeHostInstallDir(options) {
+  const resolved = resolveInstallDirOptions(options);
+  if (resolved.platform === 'darwin') {
+    return path.posix.join(
+      resolved.home,
+      'Library',
+      'Application Support',
+      'DexBuddy',
+      'native-host',
+    );
   }
-  if (process.platform === 'win32') {
-    return path.join(home, 'AppData', 'Local', 'DexBuddy', 'native-host');
+  if (resolved.platform === 'win32') {
+    const candidates = windowsNativeHostInstallCandidates(resolved);
+    for (const dir of candidates) {
+      if (isAsciiPath(dir)) return dir;
+    }
+    return candidates[0];
   }
-  return path.join(home, '.local', 'share', 'DexBuddy', 'native-host');
+  return path.posix.join(resolved.home, '.local', 'share', 'DexBuddy', 'native-host');
+}
+
+/**
+ * win32：按候选依次 mkdir，挑第一个可写的纯 ASCII 目录。
+ * @param {{
+ *   homedir?: string;
+ *   localAppData?: string;
+ *   programData?: string;
+ *   publicDir?: string;
+ * }} [options]
+ * @returns {string}
+ */
+function ensureWindowsNativeHostInstallDir(options) {
+  const candidates = windowsNativeHostInstallCandidates(options);
+  /** @type {string[]} */
+  const errors = [];
+  for (const dir of candidates) {
+    if (!isAsciiPath(dir)) {
+      errors.push(`${dir}（非 ASCII）`);
+      continue;
+    }
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      return dir;
+    } catch (err) {
+      errors.push(`${dir}（${err instanceof Error ? err.message : String(err)}）`);
+    }
+  }
+  throw new Error(
+    `无法创建 ASCII Native Host 安装目录：${errors.join('；') || '无候选'}`,
+  );
 }
 
 /**
  * @returns {string}
  */
 function defaultHostScriptPath() {
-  return path.resolve(__dirname, '..', '..', 'scripts', 'dexbuddy-native-host.js');
+  return path.resolve(__dirname, 'dexbuddy-native-host.js');
 }
 
 /**
@@ -212,10 +315,11 @@ function sameOriginSet(a, b) {
 }
 
 /**
- * @param {string} name
+ * macOS / Linux 清单目录。Windows 清单与 Host 同目录（见 manifestPathFor），由注册表指向。
+ * @param {string} [_name]
  * @returns {string}
  */
-function chromeNativeHostsDir(name) {
+function chromeNativeHostsDir(_name) {
   const home = os.homedir();
   if (process.platform === 'darwin') {
     return path.join(home, 'Library', 'Application Support', 'Google', 'Chrome', 'NativeMessagingHosts');
@@ -224,7 +328,7 @@ function chromeNativeHostsDir(name) {
     return path.join(home, '.config', 'google-chrome', 'NativeMessagingHosts');
   }
   if (process.platform === 'win32') {
-    // Windows：清单文件可放任意可读路径；注册表项指向该文件。默认放用户级目录。
+    // 兼容旧调用：英文用户名时曾写在 Chrome User Data；新登记改走 installDir。
     return path.join(home, 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'NativeMessagingHosts');
   }
   return path.join(home, '.config', 'google-chrome', 'NativeMessagingHosts');
@@ -232,9 +336,16 @@ function chromeNativeHostsDir(name) {
 
 /**
  * @param {string} name
+ * @param {string} [installDir] Windows 上清单与 Host 同目录，避开中文用户名
  * @returns {string}
  */
-function manifestPathFor(name) {
+function manifestPathFor(name, installDir) {
+  if (process.platform === 'win32') {
+    const dir = typeof installDir === 'string' && installDir.trim()
+      ? path.resolve(installDir.trim())
+      : nativeHostInstallDir();
+    return path.join(dir, `${name}.json`);
+  }
   return path.join(chromeNativeHostsDir(name), `${name}.json`);
 }
 
@@ -352,6 +463,60 @@ function resolveHostRuntime(options) {
 }
 
 /**
+ * 去掉 Windows 目录联接（只删联接本身，不递归删目标）。
+ * @param {string} linkPath
+ */
+function removeWindowsJunction(linkPath) {
+  if (process.platform !== 'win32') return;
+  try {
+    if (!fs.existsSync(linkPath)) return;
+    const st = fs.lstatSync(linkPath);
+    if (st.isSymbolicLink()) {
+      fs.unlinkSync(linkPath);
+      return;
+    }
+    if (st.isDirectory()) {
+      try {
+        fs.unlinkSync(linkPath);
+      } catch {
+        fs.rmdirSync(linkPath);
+      }
+    }
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * 仅 Windows：.cmd 里的解释器路径必须纯 ASCII。含中文时在 installDir 建 junction。
+ * darwin 的 .sh 不走这里。
+ * @param {string} execPath
+ * @param {string} installDir
+ * @returns {string}
+ */
+function resolveAsciiExecPath(execPath, installDir) {
+  const abs = path.resolve(execPath);
+  if (isAsciiPath(abs)) return abs;
+  if (process.platform !== 'win32') {
+    throw new Error(`Host 解释器路径含非 ASCII：${abs}`);
+  }
+  const binDir = path.dirname(abs);
+  const baseName = path.basename(abs);
+  const linkRoot = path.join(installDir, 'runtime-bin');
+  if (!isAsciiPath(linkRoot)) {
+    throw new Error(`无法在非 ASCII 安装目录创建解释器联接：${linkRoot}`);
+  }
+  fs.mkdirSync(installDir, { recursive: true });
+  removeWindowsJunction(linkRoot);
+  fs.symlinkSync(binDir, linkRoot, 'junction');
+  const linked = path.join(linkRoot, baseName);
+  if (!isAsciiPath(linked)) {
+    throw new Error(`解释器联接路径仍含非 ASCII：${linked}`);
+  }
+  return linked;
+}
+
+/**
  * @param {string} hostScriptPath
  * @param {string} wrapperPath
  * @param {HostRuntime} [runtime]
@@ -360,9 +525,11 @@ function resolveHostRuntime(options) {
 function writeWrapper(hostScriptPath, wrapperPath, runtime) {
   const absScript = path.resolve(hostScriptPath);
   const rt = runtime || resolveHostRuntime();
-  const absExec = path.resolve(rt.execPath);
   const installDir = path.dirname(wrapperPath);
   const logFile = path.join(installDir, 'host.log');
+  const absExec = process.platform === 'win32'
+    ? resolveAsciiExecPath(rt.execPath, installDir)
+    : path.resolve(rt.execPath);
 
   if (process.platform === 'win32') {
     const prefix = rt.electronRunAsNode ? 'set ELECTRON_RUN_AS_NODE=1\r\n' : '';
@@ -467,17 +634,27 @@ function registerNativeHost(options) {
   const sourceHostScript = typeof opts.hostScriptPath === 'string' && opts.hostScriptPath.trim()
     ? path.resolve(opts.hostScriptPath.trim())
     : defaultHostScriptPath();
-  const installDir = typeof opts.installDir === 'string' && opts.installDir.trim()
-    ? path.resolve(opts.installDir.trim())
-    : nativeHostInstallDir();
-  const manifestPath = manifestPathFor(name);
 
   /** @type {string} */
-  let wrapperPath = path.join(installDir, process.platform === 'win32'
-    ? 'dexbuddy-native-host.cmd'
-    : 'dexbuddy-native-host.sh');
+  let installDir = typeof opts.installDir === 'string' && opts.installDir.trim()
+    ? path.resolve(opts.installDir.trim())
+    : '';
+  /** @type {string} */
+  let manifestPath = '';
+  /** @type {string} */
+  let wrapperPath = '';
 
   try {
+    if (!installDir) {
+      installDir = process.platform === 'win32'
+        ? ensureWindowsNativeHostInstallDir()
+        : nativeHostInstallDir();
+    }
+    manifestPath = manifestPathFor(name, installDir);
+    wrapperPath = path.join(installDir, process.platform === 'win32'
+      ? 'dexbuddy-native-host.cmd'
+      : 'dexbuddy-native-host.sh');
+
     if (!allowedOrigins.length) {
       throw new Error('没有可写入的 allowed_origins');
     }
@@ -559,9 +736,13 @@ function registerNativeHost(options) {
       hostName: name,
       extensionId,
       allowedOrigins,
-      manifestPath,
-      wrapperPath,
-      installDir,
+      manifestPath: manifestPath || (installDir ? manifestPathFor(name, installDir) : manifestPathFor(name)),
+      wrapperPath: wrapperPath || (installDir
+        ? path.join(installDir, process.platform === 'win32'
+          ? 'dexbuddy-native-host.cmd'
+          : 'dexbuddy-native-host.sh')
+        : ''),
+      installDir: installDir || undefined,
       message: err instanceof Error ? err.message : String(err),
     };
   }
@@ -584,6 +765,7 @@ module.exports = {
   chromeUnpackedExtensionId,
   defaultHostScriptPath,
   ensureNativeHostRegistered,
+  ensureWindowsNativeHostInstallDir,
   isAsciiPath,
   isNodeBinary,
   manifestPathFor,
@@ -593,11 +775,13 @@ module.exports = {
   quanMediaCrawlExtensionDirs,
   registerNativeHost,
   resolveAllowedOrigins,
+  resolveAsciiExecPath,
   resolveExtensionId,
   resolveExtraExtensionIds,
   resolveHostRuntime,
   sameOriginSet,
   syncNativeHostInstall,
+  windowsNativeHostInstallCandidates,
   wrapperPathFor,
   writeWrapper,
 };

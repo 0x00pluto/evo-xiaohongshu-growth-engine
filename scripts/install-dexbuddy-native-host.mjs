@@ -47,7 +47,7 @@ if (args.help) {
 
 const result = registerHost.registerNativeHost({
   extensionId: args.extensionId || undefined,
-  hostScriptPath: path.join(root, 'scripts', 'dexbuddy-native-host.js'),
+  hostScriptPath: path.join(root, 'src', 'xhs-note', 'dexbuddy-native-host.js'),
 });
 
 if (!result.ok) {

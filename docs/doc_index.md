@@ -14,7 +14,7 @@
 - `specs/prds/prd-00013-library-paste-image.md`: 资料库新建图库与上传参考先出虚线上传框；拖入、粘贴或点击从本机选一张，再交回现有学草稿与写用法句
 - `specs/prds/prd-00014-reference-library.md`: 参考资料本机库；加一条可卡墙选库或写新入库并快照；篇内去重；工程 accepted
 - `specs/prds/prd-00015-studio-plain-copy.md`: 资料库与写笔记可见文案统一成运营能懂的一套词；删说明书灰字；不改交互与模型提示词
-- `docs/faqs/how-to-native-host-silent-register.md`: Native Host ASCII 安装；按 QuanMediaCrawl 路径算扩展 ID；host exited 排查
+- `docs/faqs/how-to-native-host-silent-register.md`: Native Host ASCII 安装；Windows 中文用户名改 ProgramData；Mac 仍用 Application Support；按 QuanMediaCrawl 路径算扩展 ID；host exited 排查
 - `docs/workflows/_TEMPLATE.md`: 业务 workflow 六段骨架；新建业务工作流时复制并改名，写完后删掉本行或改成真实条目
 - `docs/workflows/feishu-demand-to-prd.md`: 按需求 ID 从飞书需求池读行；可处理则开功能 PRD 并把状态改为进行中
 - `docs/workflows/feishu-demand-writeback.md`: 验收或放弃后只回填飞书「需求状态」（已完成 / 待评估）

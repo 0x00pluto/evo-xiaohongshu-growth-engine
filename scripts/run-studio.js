@@ -419,7 +419,7 @@ function startServer(options) {
   // 静默注册 Native Messaging Host；失败不挡操作台启动。
   try {
     const hostReg = registerHost.ensureNativeHostRegistered({
-      hostScriptPath: path.join(ROOT, 'scripts', 'dexbuddy-native-host.js'),
+      hostScriptPath: path.join(ROOT, 'src', 'xhs-note', 'dexbuddy-native-host.js'),
     });
     if (!hostReg.ok && hostReg.message) {
       process.stderr.write(`[studio] native host: ${hostReg.message}\n`);

@@ -71,7 +71,7 @@ module.exports = {
     // 静默注册 Native Messaging Host；失败不挡插件启动。
     try {
       const hostReg = registerHost.ensureNativeHostRegistered({
-        hostScriptPath: path.join(pluginRoot(), 'scripts', 'dexbuddy-native-host.js'),
+        hostScriptPath: path.join(pluginRoot(), 'src', 'xhs-note', 'dexbuddy-native-host.js'),
       });
       if (!hostReg.ok && hostReg.message) {
         console.warn('[xhs-growth] native host register:', hostReg.message);

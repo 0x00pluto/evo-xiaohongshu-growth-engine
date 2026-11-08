@@ -9,8 +9,10 @@ const {
   CHROME_ID_VECTOR_ID,
   CHROME_ID_VECTOR_PATH,
   chromeUnpackedExtensionId,
+  defaultHostScriptPath,
   isAsciiPath,
   isNodeBinary,
+  nativeHostInstallDir,
   preferStableNodePath,
   quanMediaCrawlExtensionDirs,
   registerNativeHost,
@@ -18,6 +20,7 @@ const {
   resolveExtensionId,
   resolveHostRuntime,
   sameOriginSet,
+  windowsNativeHostInstallCandidates,
   wrapperPathFor,
   writeWrapper,
 } = require('../../src/xhs-note/register-host');
@@ -176,6 +179,84 @@ test('注册安装到 ASCII 目录；清单含双 origin', () => {
     assert.ok(Array.isArray(manifest.allowed_origins));
     assert.ok(manifest.allowed_origins.length >= 2);
     assert.equal(sameOriginSet(manifest.allowed_origins, result.allowedOrigins), true);
+  } finally {
+    if (prev === undefined) delete process.env.DEX_BUDDY_XHS_EXTENSION_ID;
+    else process.env.DEX_BUDDY_XHS_EXTENSION_ID = prev;
+  }
+});
+
+test('Host 脚本默认路径在 src/xhs-note（进插件包）', () => {
+  const script = defaultHostScriptPath();
+  assert.match(script.replace(/\\/g, '/'), /src\/xhs-note\/dexbuddy-native-host\.js$/);
+  assert.ok(fs.existsSync(script));
+});
+
+test('win32 中文用户名：安装目录改 ProgramData；darwin 不出现 C:', () => {
+  const winDir = nativeHostInstallDir({
+    platform: 'win32',
+    homedir: 'C:\\Users\\张三',
+    localAppData: 'C:\\Users\\张三\\AppData\\Local',
+    programData: 'C:\\ProgramData',
+    publicDir: 'C:\\Users\\Public',
+  });
+  assert.equal(winDir, path.win32.join('C:\\ProgramData', 'DexBuddy', 'native-host'));
+  assert.equal(isAsciiPath(winDir), true);
+
+  const candidates = windowsNativeHostInstallCandidates({
+    platform: 'win32',
+    homedir: 'C:\\Users\\张三',
+    localAppData: 'C:\\Users\\张三\\AppData\\Local',
+    programData: 'C:\\ProgramData',
+    publicDir: 'C:\\Users\\Public',
+  });
+  assert.equal(candidates[0], path.win32.join('C:\\Users\\张三\\AppData\\Local', 'DexBuddy', 'native-host'));
+  assert.equal(candidates[1], winDir);
+
+  const asciiWin = nativeHostInstallDir({
+    platform: 'win32',
+    homedir: 'C:\\Users\\peng.zhi',
+    localAppData: 'C:\\Users\\peng.zhi\\AppData\\Local',
+  });
+  assert.equal(
+    asciiWin,
+    path.win32.join('C:\\Users\\peng.zhi\\AppData\\Local', 'DexBuddy', 'native-host'),
+  );
+
+  const macDir = nativeHostInstallDir({
+    platform: 'darwin',
+    homedir: '/Users/张三',
+  });
+  assert.equal(
+    macDir,
+    '/Users/张三/Library/Application Support/DexBuddy/native-host',
+  );
+  assert.doesNotMatch(macDir, /C:/);
+  assert.doesNotMatch(macDir, /ProgramData/);
+  assert.doesNotMatch(macDir, /Users\\Public/);
+});
+
+test('win32 中文扩展目录仍能算出 origin 并进白名单', () => {
+  const prev = process.env.DEX_BUDDY_XHS_EXTENSION_ID;
+  try {
+    delete process.env.DEX_BUDDY_XHS_EXTENSION_ID;
+    const home = 'C:\\Users\\张三';
+    const local = 'C:\\Users\\张三\\AppData\\Local';
+    const origins = resolveAllowedOrigins({
+      platform: 'win32',
+      homedir: home,
+      localAppData: local,
+    });
+    assert.equal(origins.length, 2);
+    const currentId = chromeUnpackedExtensionId(
+      path.win32.join(home, 'QuanMediaCrawl', 'extension'),
+      'win32',
+    );
+    const legacyId = chromeUnpackedExtensionId(
+      path.win32.join(local, 'QuanMediaCrawl', 'extension'),
+      'win32',
+    );
+    assert.ok(origins.includes(`chrome-extension://${currentId}/`));
+    assert.ok(origins.includes(`chrome-extension://${legacyId}/`));
   } finally {
     if (prev === undefined) delete process.env.DEX_BUDDY_XHS_EXTENSION_ID;
     else process.env.DEX_BUDDY_XHS_EXTENSION_ID = prev;
