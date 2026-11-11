@@ -5,6 +5,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { extForMime, guessMime } = require('./download-image');
 
+/** 成功取回后的复用窗口（毫秒） */
+const CACHE_TTL_MS = 30 * 60 * 1000;
+
 /**
  * @param {string} cacheRoot
  * @param {string} noteId
@@ -28,8 +31,63 @@ function payloadPath(cacheRoot, noteId) {
  * @param {string} noteId
  * @returns {string}
  */
+function metaPath(cacheRoot, noteId) {
+  return path.join(noteCacheDir(cacheRoot, noteId), 'cache-meta.json');
+}
+
+/**
+ * @param {string} cacheRoot
+ * @param {string} noteId
+ * @returns {string}
+ */
 function imagesDir(cacheRoot, noteId) {
   return path.join(noteCacheDir(cacheRoot, noteId), 'images');
+}
+
+/**
+ * @param {string} cacheRoot
+ * @param {string} noteId
+ * @param {number} [fetchedAtMs]
+ */
+function writeCacheMeta(cacheRoot, noteId, fetchedAtMs) {
+  const id = String(noteId || '').trim();
+  if (!cacheRoot || !id) return;
+  const dir = noteCacheDir(cacheRoot, id);
+  fs.mkdirSync(dir, { recursive: true });
+  const ms = Number.isFinite(fetchedAtMs) ? Number(fetchedAtMs) : Date.now();
+  fs.writeFileSync(metaPath(cacheRoot, id), `${JSON.stringify({ fetchedAtMs: ms }, null, 2)}\n`);
+}
+
+/**
+ * @param {string} cacheRoot
+ * @param {string} noteId
+ * @returns {number | null}
+ */
+function readFetchedAtMs(cacheRoot, noteId) {
+  const id = String(noteId || '').trim();
+  if (!cacheRoot || !id) return null;
+  const file = metaPath(cacheRoot, id);
+  if (!fs.existsSync(file)) return null;
+  try {
+    const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const ms = raw && typeof raw === 'object' ? Number(/** @type {Record<string, unknown>} */ (raw).fetchedAtMs) : NaN;
+    return Number.isFinite(ms) ? ms : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @param {string} cacheRoot
+ * @param {string} noteId
+ * @param {number} [nowMs]
+ * @returns {boolean}
+ */
+function isCacheFresh(cacheRoot, noteId, nowMs) {
+  const fetchedAt = readFetchedAtMs(cacheRoot, noteId);
+  if (fetchedAt == null) return false;
+  const now = Number.isFinite(nowMs) ? Number(nowMs) : Date.now();
+  return now - fetchedAt < CACHE_TTL_MS;
 }
 
 /**
@@ -45,6 +103,7 @@ function writeNotePayload(cacheRoot, noteId, note) {
   fs.mkdirSync(dir, { recursive: true });
   const file = payloadPath(cacheRoot, id);
   fs.writeFileSync(file, `${JSON.stringify(note, null, 2)}\n`);
+  writeCacheMeta(cacheRoot, id, Date.now());
   return file;
 }
 
@@ -167,13 +226,18 @@ async function resolveImageDataUrl(args) {
 }
 
 module.exports = {
+  CACHE_TTL_MS,
   imagesDir,
+  isCacheFresh,
+  metaPath,
   noteCacheDir,
   parseDataUrl,
   payloadPath,
+  readFetchedAtMs,
   readImageDataUrl,
   readNotePayload,
   resolveImageDataUrl,
+  writeCacheMeta,
   writeImageDataUrl,
   writeNotePayload,
 };

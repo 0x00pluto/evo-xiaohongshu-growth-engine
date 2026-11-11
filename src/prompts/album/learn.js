@@ -47,6 +47,8 @@ const USER_ALBUM_SEQ_START = 100000;
  *   aspectRatio: string;
  *   promptRewrites: import('../image-safety/apply').SafetyHit[];
  *   learnedFrom?: import('../../xhs-note/provenance').XhsNoteProvenance;
+ *   replaceExisting?: boolean;
+ *   contentMd5?: string;
  * }} AlbumDraft
  */
 

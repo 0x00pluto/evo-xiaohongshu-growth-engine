@@ -41,6 +41,10 @@ const xhsNoteBridge = require('../xhs-note/bridge');
 const xhsNoteId = require('../xhs-note/note-id');
 /** @type {typeof import('../xhs-note/cache')} */
 const xhsNoteCache = require('../xhs-note/cache');
+/** @type {typeof import('../xhs-note/fingerprint')} */
+const xhsNoteFingerprint = require('../xhs-note/fingerprint');
+/** @type {typeof import('../xhs-note/compare')} */
+const xhsNoteCompare = require('../xhs-note/compare');
 /** @type {typeof import('../xhs-note/provenance')} */
 const xhsNoteProvenance = require('../xhs-note/provenance');
 /** @type {typeof import('../prompts/parse')} */
@@ -1481,6 +1485,10 @@ function createRunner(options) {
     }
     if (!userAlbumsDir) return { ok: false, message: '缺少用户图册目录' };
     const learnedFrom = xhsNoteProvenance.normalizeXhsProvenance(source.source);
+    const replaceAlbumId = typeof source.replaceAlbumId === 'string'
+      ? source.replaceAlbumId.trim()
+      : '';
+    const contentMd5 = xhsNoteFingerprint.contentMd5FromDataUrl(image.dataUrl);
     lock = 'learnAlbum';
     const vis = visionStepKey('album-learn', image.dataUrl);
     const probeDir = path.join(path.dirname(userAlbumsDir), 'temp', 'album-probe');
@@ -1520,6 +1528,7 @@ function createRunner(options) {
               learnedFrom.linkId,
               saved.id,
               learnedFrom.role || 'image',
+              contentMd5,
             );
           }
           return {
@@ -1543,6 +1552,11 @@ function createRunner(options) {
       const draftId = `draft-${albumDraftSeq}`;
       const draft = buildAlbumDraft(promptsDir, raw, image, draftId, userAlbumsDir);
       if (learnedFrom) draft.learnedFrom = learnedFrom;
+      if (replaceAlbumId) {
+        draft.id = replaceAlbumId;
+        draft.replaceExisting = true;
+      }
+      if (contentMd5) draft.contentMd5 = contentMd5;
       albumDraft = draft;
       return { ok: true, safetyStatus: 'passed', draft: draftPublicView(draft) };
     } catch (err) {
@@ -1590,6 +1604,7 @@ function createRunner(options) {
         );
       }
       const learnedFrom = albumDraft.learnedFrom || null;
+      const contentMd5 = typeof albumDraft.contentMd5 === 'string' ? albumDraft.contentMd5 : '';
       const result = commitAlbumDraft(userAlbumsDir, albumDraft, promptsDir);
       albumDraft = null;
       if (
@@ -1603,6 +1618,7 @@ function createRunner(options) {
           learnedFrom.linkId,
           result.id,
           learnedFrom.role || 'image',
+          contentMd5,
         );
       }
       return { ok: true, id: result.id };
@@ -2564,13 +2580,50 @@ function createRunner(options) {
   }
 
   /**
-   * 粘贴链接：已收录则停；有 cache 则直接拼勾选层（不调插件）；否则取料并立刻写 cache。
+   * @param {Awaited<ReturnType<typeof buildResolveOkResult>>} result
+   * @param {import('../xhs-note/links').XhsNoteLinkMeta} link
+   * @param {number} [innerIndex]
+   */
+  function withLearnedCompare(result, link, innerIndex) {
+    const idx = Number.isInteger(innerIndex) ? /** @type {number} */ (innerIndex) : 0;
+    const coverMd5 = xhsNoteFingerprint.contentMd5FromDataUrl(result.parts.coverPreviewUrl || '');
+    const innerRow = Array.isArray(result.parts.inners)
+      ? result.parts.inners.find((row) => Number(row.index) === idx) || result.parts.inners[0]
+      : null;
+    const innerMd5 = innerRow
+      ? xhsNoteFingerprint.contentMd5FromDataUrl(String(innerRow.previewUrl || ''))
+      : '';
+    const compare = xhsNoteCompare.compareLearnedParts({
+      link,
+      title: result.parts.title || '',
+      body: result.parts.body || '',
+      coverMd5,
+      innerMd5,
+      hasCover: Boolean(result.parts.hasCover),
+      hasInner: Number(result.parts.innerCount) > 0,
+    });
+    return {
+      ...result,
+      link: {
+        id: link.id,
+        noteId: link.noteId,
+        sourceUrl: link.sourceUrl,
+        title: link.title,
+      },
+      compare,
+      allUnchanged: compare.allUnchanged,
+    };
+  }
+
+  /**
+   * 粘贴链接或重新学：未知则取料；已知则比较指纹。30 分钟内复用新鲜 cache。
    * @param {Record<string, unknown>} payload
    */
   async function resolveXhsNote(payload) {
     if (!userXhsNotesDir) return { ok: false, code: 'INTERNAL', message: '缺少小红书链接库目录' };
     const url = xhsNoteLinks.trimUrl(payload.url);
-    if (!url) {
+    const linkIdHint = typeof payload.linkId === 'string' ? payload.linkId.trim() : '';
+    if (!url && !linkIdHint) {
       return {
         ok: false,
         code: 'INVALID_URL',
@@ -2584,98 +2637,147 @@ function createRunner(options) {
         message: xhsNoteBridge.humanError('IMPORTING'),
       };
     }
-    const known = xhsNoteLinks.findXhsNoteLinkByUrl(userXhsNotesDir, url);
-    if (known) {
+
+    /** @type {import('../xhs-note/links').XhsNoteLinkMeta | null} */
+    let known = linkIdHint ? xhsNoteLinks.readXhsNoteLink(userXhsNotesDir, linkIdHint) : null;
+    if (!known && url) known = xhsNoteLinks.findXhsNoteLinkByUrl(userXhsNotesDir, url);
+
+    const resolveUrl = url || (known ? known.sourceUrl : '');
+    if (!resolveUrl) {
       return {
         ok: false,
-        code: 'ALREADY',
-        message: xhsNoteBridge.humanError('ALREADY'),
-        link: {
-          id: known.id,
-          noteId: known.noteId,
-          sourceUrl: known.sourceUrl,
-          title: known.title,
-        },
+        code: 'INVALID_URL',
+        message: xhsNoteBridge.humanError('INVALID_URL'),
       };
     }
 
-    const pastedNoteId = xhsNoteId.extractXhsNoteId(url);
-    if (pastedNoteId && userXhsNotesCacheDir) {
-      const cachedRaw = xhsNoteCache.readNotePayload(userXhsNotesCacheDir, pastedNoteId);
+    const pastedNoteId = xhsNoteId.extractXhsNoteId(resolveUrl)
+      || (known ? known.noteId : '');
+    // 有 noteId 时取料用无 query 的 explore 链，避免 xsec_token 触发风控；短链抽不出 ID 仍用原串
+    const fetchUrl = pastedNoteId
+      ? (xhsNoteId.canonicalExploreUrl(resolveUrl)
+        || `https://www.xiaohongshu.com/explore/${pastedNoteId}`)
+      : resolveUrl;
+    const innerIndex = Number.isInteger(payload.innerIndex)
+      ? /** @type {number} */ (payload.innerIndex)
+      : 0;
+
+    /**
+     * @param {string} noteId
+     * @returns {import('../xhs-note/split').NoteImportPayload | null}
+     */
+    function readLearnableCachedNote(noteId) {
+      if (!userXhsNotesCacheDir || !noteId) return null;
+      const cachedRaw = xhsNoteCache.readNotePayload(userXhsNotesCacheDir, noteId);
       const cachedNote = xhsNoteSplit.normalizeNotePayload(cachedRaw);
-      if (cachedNote) {
-        const knownCached = xhsNoteLinks.findXhsNoteLinkByNoteId(userXhsNotesDir, pastedNoteId);
-        if (knownCached) {
-          xhsNoteLinks.rememberInputUrl(userXhsNotesDir, knownCached.sourceUrl, url);
-          return {
-            ok: false,
-            code: 'ALREADY',
-            message: xhsNoteBridge.humanError('ALREADY'),
-            link: {
-              id: knownCached.id,
-              noteId: knownCached.noteId,
-              sourceUrl: knownCached.sourceUrl,
-              title: knownCached.title,
-            },
-          };
+      if (!cachedNote || !xhsNoteSplit.hasLearnableNoteContent(cachedNote)) return null;
+      return cachedNote;
+    }
+
+    /**
+     * @param {import('../xhs-note/split').NoteImportPayload} note
+     * @param {string} noteId
+     * @param {boolean} fromCache
+     */
+    async function finishOk(note, noteId, fromCache) {
+      const result = await buildResolveOkResult(resolveUrl, note, noteId);
+      result.fromCache = fromCache;
+      if (known) {
+        if (url) xhsNoteLinks.rememberInputUrl(userXhsNotesDir, known.sourceUrl, url);
+        return withLearnedCompare(result, known, innerIndex);
+      }
+      return result;
+    }
+
+    /**
+     * 取料空/失败时：不写盘；能回退可学旧包则用旧包。
+     * @param {string} noteIdHint
+     * @param {{ ok: false; code?: string; message?: string }} fail
+     */
+    async function finishFetchMiss(noteIdHint, fail) {
+      const fallbackId = noteIdHint || pastedNoteId || (known ? known.noteId : '');
+      const stale = fallbackId ? readLearnableCachedNote(fallbackId) : null;
+      if (stale) {
+        const staleId = xhsNoteId.extractXhsNoteId(stale.sourceUrl) || fallbackId;
+        if (!known) {
+          known = xhsNoteLinks.findXhsNoteLinkByNoteId(userXhsNotesDir, staleId)
+            || xhsNoteLinks.findXhsNoteLinkByUrl(userXhsNotesDir, stale.sourceUrl);
         }
-        xhsNoteBusyKey = url;
+        return finishOk(stale, staleId, true);
+      }
+      return {
+        ok: false,
+        code: fail.code || 'INTERNAL',
+        message: fail.message
+          || '取到的笔记没有正文也没有图，没法学。已有内容未改动。',
+      };
+    }
+
+    if (pastedNoteId && userXhsNotesCacheDir
+      && xhsNoteCache.isCacheFresh(userXhsNotesCacheDir, pastedNoteId)) {
+      const cachedNote = readLearnableCachedNote(pastedNoteId);
+      if (cachedNote) {
+        if (!known) {
+          known = xhsNoteLinks.findXhsNoteLinkByNoteId(userXhsNotesDir, pastedNoteId);
+        }
+        xhsNoteBusyKey = pastedNoteId || resolveUrl;
         try {
-          const result = await buildResolveOkResult(url, cachedNote, pastedNoteId);
-          return { ...result, fromCache: true };
+          return await finishOk(cachedNote, pastedNoteId, true);
         } finally {
           xhsNoteBusyKey = '';
         }
       }
+      // 新鲜但不可学（空壳污染）：当 miss，继续取料
     }
 
-    xhsNoteBusyKey = url;
+    xhsNoteBusyKey = pastedNoteId || resolveUrl;
     try {
-      const fetched = await fetchNoteByUrl(url);
+      const fetched = await fetchNoteByUrl(fetchUrl);
       if (!fetched.ok) {
-        return {
+        return await finishFetchMiss(pastedNoteId, {
           ok: false,
           code: fetched.code,
           message: fetched.message || xhsNoteBridge.humanError(fetched.code),
-        };
+        });
       }
-      const note = fetched.note;
-      const noteId = xhsNoteId.extractXhsNoteId(note.sourceUrl);
-      if (!noteId) {
-        return {
+      const note = xhsNoteSplit.normalizeNotePayload(fetched.note);
+      if (!note) {
+        return await finishFetchMiss(pastedNoteId, {
           ok: false,
           code: 'INVALID_URL',
           message: '取料回包缺少可识别的笔记 ID',
-        };
+        });
       }
-      const knownAfter = xhsNoteLinks.findXhsNoteLinkByNoteId(userXhsNotesDir, noteId)
-        || xhsNoteLinks.findXhsNoteLinkByUrl(userXhsNotesDir, note.sourceUrl);
-      if (knownAfter) {
-        xhsNoteLinks.rememberInputUrl(userXhsNotesDir, knownAfter.sourceUrl, url);
-        return {
+      const noteId = xhsNoteId.extractXhsNoteId(note.sourceUrl) || pastedNoteId;
+      if (!noteId) {
+        return await finishFetchMiss(pastedNoteId, {
           ok: false,
-          code: 'ALREADY',
-          message: xhsNoteBridge.humanError('ALREADY'),
-          link: {
-            id: knownAfter.id,
-            noteId: knownAfter.noteId,
-            sourceUrl: knownAfter.sourceUrl,
-            title: knownAfter.title,
-          },
-        };
+          code: 'INVALID_URL',
+          message: '取料回包缺少可识别的笔记 ID',
+        });
+      }
+      if (!known) {
+        known = xhsNoteLinks.findXhsNoteLinkByNoteId(userXhsNotesDir, noteId)
+          || xhsNoteLinks.findXhsNoteLinkByUrl(userXhsNotesDir, note.sourceUrl);
+      }
+      if (!xhsNoteSplit.hasLearnableNoteContent(note)) {
+        return await finishFetchMiss(noteId, {
+          ok: false,
+          code: 'INTERNAL',
+          message: '取到的笔记没有正文也没有图，没法学。已有内容未改动。',
+        });
       }
       if (userXhsNotesCacheDir) {
         xhsNoteCache.writeNotePayload(userXhsNotesCacheDir, noteId, note);
       }
-      const result = await buildResolveOkResult(url, note, noteId);
-      return { ...result, fromCache: false };
+      return await finishOk(note, noteId, false);
     } finally {
       xhsNoteBusyKey = '';
     }
   }
 
   /**
-   * 确认勾选后：写瘦链接 meta + cache；不写范文（留给 saveXhsNoteArticle）；返回待学图队列。
+   * 确认勾选后：写/更新链接；返回待学图队列；缺指纹只补指纹。
    * @param {Record<string, unknown>} payload
    */
   async function importXhsNote(payload) {
@@ -2710,24 +2812,14 @@ function createRunner(options) {
     const known = xhsNoteLinks.findXhsNoteLinkByNoteId(userXhsNotesDir, noteId)
       || xhsNoteLinks.findXhsNoteLinkByUrl(userXhsNotesDir, note.sourceUrl)
       || xhsNoteLinks.findXhsNoteLinkByUrl(userXhsNotesDir, inputUrl);
-    if (known) {
-      xhsNoteLinks.rememberInputUrl(userXhsNotesDir, known.sourceUrl, inputUrl);
-      return {
-        ok: false,
-        code: 'ALREADY',
-        message: xhsNoteBridge.humanError('ALREADY'),
-        link: {
-          id: known.id,
-          noteId: known.noteId,
-          sourceUrl: known.sourceUrl,
-          title: known.title,
-        },
-      };
-    }
-    const learnArticle = payload.learnArticle === true;
-    const learnCover = payload.learnCover === true;
-    const learnInner = payload.learnInner === true;
-    if (!learnArticle && !learnCover && !learnInner) {
+
+    let learnArticle = payload.learnArticle === true;
+    let learnCover = payload.learnCover === true;
+    let learnInner = payload.learnInner === true;
+    const patchArticleFp = payload.patchArticleFingerprint === true;
+    const patchCoverFp = payload.patchCoverFingerprint === true;
+    const patchInnerFp = payload.patchInnerFingerprint === true;
+    if (!learnArticle && !learnCover && !learnInner && !patchArticleFp && !patchCoverFp && !patchInnerFp) {
       return { ok: false, code: 'INTERNAL', message: '请至少选择学习文章、首图或内页中的一项' };
     }
     const parts = xhsNoteSplit.splitNoteParts(note);
@@ -2740,13 +2832,259 @@ function createRunner(options) {
     const innerIndex = Number.isInteger(payload.innerIndex)
       ? /** @type {number} */ (payload.innerIndex)
       : 0;
-    const inner = learnInner ? xhsNoteSplit.pickInnerImage(parts, innerIndex) : null;
+    const inner = (learnInner || patchInnerFp) ? xhsNoteSplit.pickInnerImage(parts, innerIndex) : null;
     if (learnInner && !inner) {
       return { ok: false, code: 'INTERNAL', message: '这篇没有内页可学' };
     }
 
     const coverDataUrl = typeof payload.coverDataUrl === 'string' ? payload.coverDataUrl.trim() : '';
     const innerDataUrl = typeof payload.innerDataUrl === 'string' ? payload.innerDataUrl.trim() : '';
+
+    /** @type {string} */
+    let articleSampleId = '';
+    /** @type {string} */
+    let coverReplaceId = '';
+    /** @type {string} */
+    let innerReplaceId = '';
+
+    if (known) {
+      const coverMd5Hint = xhsNoteFingerprint.contentMd5FromDataUrl(coverDataUrl);
+      const innerMd5Hint = xhsNoteFingerprint.contentMd5FromDataUrl(innerDataUrl);
+      const compare = xhsNoteCompare.compareLearnedParts({
+        link: known,
+        title: parts.title,
+        body: parts.body,
+        coverMd5: coverMd5Hint,
+        innerMd5: innerMd5Hint,
+        hasCover: Boolean(parts.cover),
+        hasInner: Boolean(inner) || parts.inners.length > 0,
+      });
+      if (learnArticle) {
+        if (compare.article.status === 'unchanged') learnArticle = false;
+        else if (compare.article.status === 'missing_fp') {
+          learnArticle = false;
+          // 缺指纹：只补指纹，不改文案
+        } else if (compare.article.existingId) {
+          articleSampleId = compare.article.existingId;
+        }
+      }
+      if (learnCover) {
+        if (compare.cover.status === 'unchanged') learnCover = false;
+        else if (compare.cover.status === 'missing_fp') learnCover = false;
+        else if (compare.cover.existingId) coverReplaceId = compare.cover.existingId;
+      }
+      if (learnInner) {
+        if (compare.inner.status === 'unchanged') learnInner = false;
+        else if (compare.inner.status === 'missing_fp') learnInner = false;
+        else if (compare.inner.existingId) innerReplaceId = compare.inner.existingId;
+      }
+      // 显式补指纹或缺指纹勾选（learn 被关掉但仍要 patch）
+      const needArticleFp = patchArticleFp
+        || (payload.learnArticle === true && compare.article.status === 'missing_fp');
+      const needCoverFp = patchCoverFp
+        || (payload.learnCover === true && compare.cover.status === 'missing_fp');
+      const needInnerFp = patchInnerFp
+        || (payload.learnInner === true && compare.inner.status === 'missing_fp');
+
+      if (!learnArticle && !learnCover && !learnInner && !needArticleFp && !needCoverFp && !needInnerFp) {
+        return {
+          ok: true,
+          allUnchanged: true,
+          link: {
+            id: known.id,
+            noteId: known.noteId,
+            sourceUrl: known.sourceUrl,
+            title: known.title,
+          },
+          wantArticle: false,
+          articleSampleId: '',
+          learnImages: [],
+          skippedImages: false,
+        };
+      }
+
+      xhsNoteBusyKey = noteId;
+      try {
+        xhsNoteLinks.rememberInputUrl(userXhsNotesDir, known.sourceUrl, inputUrl);
+        xhsNoteLinks.saveXhsNoteLink(userXhsNotesDir, {
+          id: known.id,
+          noteId: known.noteId,
+          sourceUrl: known.sourceUrl,
+          inputUrl,
+          title: note.title || known.title,
+          fetchedAt: note.fetchedAt || known.fetchedAt,
+          learned: known.learned,
+          learnedAt: known.learnedAt,
+        });
+        if (xhsNoteSplit.hasLearnableNoteContent(note)) {
+          xhsNoteCache.writeNotePayload(userXhsNotesCacheDir, noteId, note);
+        }
+
+        /** @type {{ albumId: string; role: string; contentMd5?: string }[]} */
+        const fpAlbums = [];
+        /** @type {string} */
+        let articleHash = '';
+        if (needArticleFp && parts.body) {
+          articleHash = xhsNoteFingerprint.articleTextHash(parts.title, parts.body);
+        }
+        /**
+         * @param {string} remoteUrl
+         * @param {{ mime?: string }} [options]
+         */
+        const downloadFn = async (remoteUrl, options) => xhsNoteDownload.downloadNoteImage(remoteUrl, {
+          mime: options && options.mime,
+          fetchFn: fetchImpl || globalThis.fetch,
+        });
+
+        /** @type {{
+         *   role: string;
+         *   label: string;
+         *   dataUrl: string;
+         *   replaceAlbumId?: string;
+         *   source: import('../xhs-note/provenance').XhsNoteProvenance;
+         * }[]} */
+        const learnImages = [];
+
+        if (needCoverFp && parts.cover && compare.cover.existingId) {
+          const dataUrl = await xhsNoteCache.resolveImageDataUrl({
+            cacheRoot: userXhsNotesCacheDir,
+            noteId,
+            basename: 'cover',
+            dataUrl: coverDataUrl,
+            remoteUrl: parts.cover.url,
+            mime: parts.cover.mime,
+            downloadFn,
+          });
+          const md5 = xhsNoteFingerprint.contentMd5FromDataUrl(dataUrl);
+          if (md5) fpAlbums.push({ albumId: compare.cover.existingId, role: 'cover', contentMd5: md5 });
+        }
+        if (needInnerFp && inner && compare.inner.existingId) {
+          const dataUrl = await xhsNoteCache.resolveImageDataUrl({
+            cacheRoot: userXhsNotesCacheDir,
+            noteId,
+            basename: `inner-${innerIndex}`,
+            dataUrl: innerDataUrl,
+            remoteUrl: inner.url,
+            mime: inner.mime,
+            downloadFn,
+          });
+          const md5 = xhsNoteFingerprint.contentMd5FromDataUrl(dataUrl);
+          if (md5) {
+            fpAlbums.push({
+              albumId: compare.inner.existingId,
+              role: compare.inner.existingId ? 'inner' : 'inner',
+              contentMd5: md5,
+            });
+          }
+        }
+        if (articleHash || fpAlbums.length) {
+          xhsNoteLinks.patchLearnedFingerprints(userXhsNotesDir, known.id, {
+            articleTextHash: articleHash || undefined,
+            albums: fpAlbums,
+          });
+        }
+
+        if (learnCover && parts.cover) {
+          const dataUrl = await xhsNoteCache.resolveImageDataUrl({
+            cacheRoot: userXhsNotesCacheDir,
+            noteId,
+            basename: 'cover',
+            dataUrl: coverDataUrl,
+            remoteUrl: parts.cover.url,
+            mime: parts.cover.mime,
+            downloadFn,
+          });
+          if (dataUrl) {
+            /** @type {{
+             *   role: string;
+             *   label: string;
+             *   dataUrl: string;
+             *   replaceAlbumId?: string;
+             *   source: import('../xhs-note/provenance').XhsNoteProvenance;
+             * }} */
+            const row = {
+              role: 'cover',
+              label: '首图',
+              dataUrl,
+              source: {
+                kind: 'xhs-note',
+                noteId,
+                linkId: known.id,
+                role: 'cover',
+              },
+            };
+            if (coverReplaceId) row.replaceAlbumId = coverReplaceId;
+            learnImages.push(row);
+          }
+        }
+        if (learnInner && inner) {
+          const dataUrl = await xhsNoteCache.resolveImageDataUrl({
+            cacheRoot: userXhsNotesCacheDir,
+            noteId,
+            basename: `inner-${innerIndex}`,
+            dataUrl: innerDataUrl,
+            remoteUrl: inner.url,
+            mime: inner.mime,
+            downloadFn,
+          });
+          if (dataUrl) {
+            /** @type {{
+             *   role: string;
+             *   label: string;
+             *   dataUrl: string;
+             *   replaceAlbumId?: string;
+             *   source: import('../xhs-note/provenance').XhsNoteProvenance;
+             * }} */
+            const row = {
+              role: 'inner',
+              label: '内页',
+              dataUrl,
+              source: {
+                kind: 'xhs-note',
+                noteId,
+                linkId: known.id,
+                role: 'inner',
+              },
+            };
+            if (innerReplaceId) row.replaceAlbumId = innerReplaceId;
+            learnImages.push(row);
+          }
+        }
+
+        if (Array.isArray(parts.inners) && parts.inners.length > 1) {
+          const previewInners = Array.isArray(payload.innerPreviews) ? payload.innerPreviews : [];
+          for (let i = 0; i < parts.inners.length; i += 1) {
+            if (learnInner && i === innerIndex) continue;
+            const preview = previewInners.find((row) => (
+              row && typeof row === 'object' && Number(/** @type {Record<string, unknown>} */ (row).index) === i
+            ));
+            const previewUrl = preview && typeof /** @type {Record<string, unknown>} */ (preview).previewUrl === 'string'
+              ? String(/** @type {Record<string, unknown>} */ (preview).previewUrl)
+              : '';
+            if (previewUrl.startsWith('data:')) {
+              xhsNoteCache.writeImageDataUrl(userXhsNotesCacheDir, noteId, `inner-${i}`, previewUrl);
+            }
+          }
+        }
+
+        return {
+          ok: true,
+          link: {
+            id: known.id,
+            noteId: known.noteId,
+            sourceUrl: known.sourceUrl,
+            title: note.title || known.title,
+          },
+          wantArticle: learnArticle,
+          articleSampleId,
+          learnImages,
+          skippedImages: (learnCover && parts.cover && !learnImages.some((i) => i.role === 'cover'))
+            || (learnInner && inner && !learnImages.some((i) => i.role === 'inner')),
+        };
+      } finally {
+        xhsNoteBusyKey = '';
+      }
+    }
 
     xhsNoteBusyKey = noteId;
     try {
@@ -2757,12 +3095,15 @@ function createRunner(options) {
         title: note.title,
         fetchedAt: note.fetchedAt,
       });
-      xhsNoteCache.writeNotePayload(userXhsNotesCacheDir, noteId, note);
+      if (xhsNoteSplit.hasLearnableNoteContent(note)) {
+        xhsNoteCache.writeNotePayload(userXhsNotesCacheDir, noteId, note);
+      }
 
       /** @type {{
        *   role: string;
        *   label: string;
        *   dataUrl: string;
+       *   replaceAlbumId?: string;
        *   source: import('../xhs-note/provenance').XhsNoteProvenance;
        * }[]} */
       const learnImages = [];
@@ -2824,7 +3165,6 @@ function createRunner(options) {
         }
       }
 
-      // 勾选层已预览的其它内页也落进 cache，方便以后复用
       if (Array.isArray(parts.inners) && parts.inners.length > 1) {
         const previewInners = Array.isArray(payload.innerPreviews) ? payload.innerPreviews : [];
         for (let i = 0; i < parts.inners.length; i += 1) {
@@ -2850,6 +3190,7 @@ function createRunner(options) {
           title: link.title,
         },
         wantArticle: learnArticle,
+        articleSampleId: '',
         learnImages,
         skippedImages: (learnCover && parts.cover && !learnImages.some((i) => i.role === 'cover'))
           || (learnInner && inner && !learnImages.some((i) => i.role === 'inner')),
@@ -2860,7 +3201,7 @@ function createRunner(options) {
   }
 
   /**
-   * 图队列结束后写范文，并回写链接 learned.articleSampleId。
+   * 图队列结束后写范文，并回写链接 learned.articleSampleId + 文本哈希。
    * @param {Record<string, unknown>} payload
    */
   function saveXhsNoteArticle(payload) {
@@ -2875,8 +3216,13 @@ function createRunner(options) {
     if (!link) return { ok: false, code: 'INTERNAL', message: '找不到对应的笔记链接' };
     const parts = xhsNoteSplit.splitNoteParts(note);
     if (!parts.body) return { ok: false, code: 'INTERNAL', message: '这篇没有正文可学' };
+    const existingId = typeof payload.articleSampleId === 'string'
+      ? payload.articleSampleId.trim()
+      : (link.learned.articleSampleId || '');
+    const textHash = xhsNoteFingerprint.articleTextHash(parts.title, parts.body);
     try {
-      const saved = articleSamplesStore.saveArticleSample(userArticleSamplesDir, {
+      /** @type {{ id?: string; title: string; body: string; source: Record<string, string> }} */
+      const input = {
         title: parts.title,
         body: parts.body,
         source: {
@@ -2884,8 +3230,10 @@ function createRunner(options) {
           noteId: link.noteId,
           linkId: link.id,
         },
-      });
-      xhsNoteLinks.attachLearnedArticle(userXhsNotesDir, link.id, saved.id);
+      };
+      if (existingId) input.id = existingId;
+      const saved = articleSamplesStore.saveArticleSample(userArticleSamplesDir, input);
+      xhsNoteLinks.attachLearnedArticle(userXhsNotesDir, link.id, saved.id, textHash);
       return { ok: true, articleSample: { id: saved.id, title: saved.title } };
     } catch (err) {
       return {
@@ -2894,6 +3242,198 @@ function createRunner(options) {
         message: err instanceof Error ? err.message : '写入范文失败',
       };
     }
+  }
+
+  /**
+   * @param {string} albumId
+   * @returns {string}
+   */
+  function albumPreviewDataUrl(albumId) {
+    const id = String(albumId || '').trim();
+    if (!id || !isAlbum(id, promptsDir, userAlbumsDir)) return '';
+    const abs = albumSampleFile(promptsDir, id, userAlbumsDir);
+    if (!fs.existsSync(abs)) return '';
+    try {
+      const bytes = fs.readFileSync(abs);
+      const ext = path.extname(abs).toLowerCase();
+      const mime = ext === '.png'
+        ? 'image/png'
+        : (ext === '.webp'
+          ? 'image/webp'
+          : (ext === '.bmp' ? 'image/bmp' : 'image/jpeg'));
+      return `data:${mime};base64,${bytes.toString('base64')}`;
+    } catch {
+      return '';
+    }
+  }
+
+  /**
+   * 资料库「对标笔记」卡墙。
+   */
+  function listLibraryXhsNotes() {
+    if (!userXhsNotesDir) return { ok: false, message: '缺少小红书链接库目录' };
+    const links = xhsNoteLinks.listXhsNoteLinks(userXhsNotesDir);
+    /** @type {Record<string, unknown>[]} */
+    const notes = [];
+    for (const link of links) {
+      // list 直接 parse 文件：顺带用 read 治愈脏 sourceUrl
+      const healed = xhsNoteLinks.readXhsNoteLink(userXhsNotesDir, link.id) || link;
+      const coverAlbum = healed.learned.albums.find((row) => row.role === 'cover')
+        || healed.learned.albums[0];
+      let coverPreviewUrl = '';
+      if (coverAlbum && coverAlbum.albumId) {
+        coverPreviewUrl = albumPreviewDataUrl(coverAlbum.albumId);
+      }
+      /** @type {string} */
+      let bodyPreview = '';
+      if (healed.learned.articleSampleId && userArticleSamplesDir) {
+        const sample = articleSamplesStore.readArticleSample(
+          userArticleSamplesDir,
+          healed.learned.articleSampleId,
+        );
+        if (sample) bodyPreview = String(sample.body || '').slice(0, 200);
+      }
+      notes.push({
+        id: healed.id,
+        noteId: healed.noteId,
+        title: healed.title || '未命名笔记',
+        sourceUrl: healed.sourceUrl,
+        learnedAt: healed.learnedAt || healed.updatedAt || 0,
+        updatedAt: healed.updatedAt || 0,
+        coverPreviewUrl,
+        bodyPreview,
+        hasArticle: Boolean(healed.learned.articleSampleId),
+        albumCount: healed.learned.albums.length,
+      });
+    }
+    return { ok: true, notes };
+  }
+
+  /**
+   * 对标笔记详情浮层。
+   * @param {Record<string, unknown>} payload
+   */
+  function getLibraryXhsNote(payload) {
+    if (!userXhsNotesDir) return { ok: false, message: '缺少小红书链接库目录' };
+    const id = typeof payload.id === 'string' ? payload.id.trim() : '';
+    if (!id) return { ok: false, message: '要指明笔记' };
+    const link = xhsNoteLinks.readXhsNoteLink(userXhsNotesDir, id);
+    if (!link) return { ok: false, message: '找不到这篇对标笔记' };
+
+    /** @type {{
+     *   role: string;
+     *   albumId: string;
+     *   exists: boolean;
+     *   missing: boolean;
+     *   label: string;
+     *   previewUrl: string;
+     *   promptExcerpt: string;
+     * }[]} */
+    const images = [];
+    for (const row of link.learned.albums) {
+      const exists = Boolean(row.albumId) && isAlbum(row.albumId, promptsDir, userAlbumsDir);
+      /** @type {string} */
+      let promptExcerpt = '';
+      if (exists) {
+        try {
+          const full = readAlbumPromptText(promptsDir, row.albumId, userAlbumsDir);
+          promptExcerpt = String(full || '').trim().split(/\n/).slice(0, 2).join('\n');
+        } catch {
+          promptExcerpt = '';
+        }
+      }
+      images.push({
+        role: row.role || 'image',
+        albumId: row.albumId,
+        exists,
+        missing: !exists,
+        label: row.role === 'cover' ? '首图' : '内页',
+        previewUrl: exists ? albumPreviewDataUrl(row.albumId) : '',
+        promptExcerpt,
+      });
+    }
+
+    /** @type {null | { id: string; title: string; body: string }} */
+    let article = null;
+    let articleMissing = false;
+    if (link.learned.articleSampleId) {
+      if (!userArticleSamplesDir) {
+        articleMissing = true;
+      } else {
+        const sample = articleSamplesStore.readArticleSample(
+          userArticleSamplesDir,
+          link.learned.articleSampleId,
+        );
+        if (sample) {
+          article = { id: sample.id, title: sample.title, body: sample.body };
+        } else {
+          articleMissing = true;
+        }
+      }
+    }
+
+    return {
+      ok: true,
+      link: {
+        id: link.id,
+        noteId: link.noteId,
+        title: link.title,
+        sourceUrl: link.sourceUrl,
+        // 文案用规范链；仅带 xsec_token 的原粘贴串可点，否则为空
+        openUrl: xhsNoteLinks.pickOpenableXhsUrl(link),
+        learnedAt: link.learnedAt || link.updatedAt || 0,
+        updatedAt: link.updatedAt || 0,
+      },
+      images,
+      article,
+      articleMissing,
+      articleSampleId: link.learned.articleSampleId || '',
+    };
+  }
+
+  /**
+   * 从笔记删除：级联删名下图册与对标文案。
+   * @param {Record<string, unknown>} payload
+   */
+  function deleteLibraryXhsNote(payload) {
+    if (!userXhsNotesDir) return { ok: false, message: '缺少小红书链接库目录' };
+    if (lock) return busy();
+    const id = typeof payload.id === 'string' ? payload.id.trim() : '';
+    if (!id) return { ok: false, message: '要指明笔记' };
+    const link = xhsNoteLinks.readXhsNoteLink(userXhsNotesDir, id);
+    if (!link) return { ok: false, message: '找不到这篇对标笔记' };
+
+    /** @type {string[]} */
+    const errors = [];
+    for (const row of link.learned.albums) {
+      const albumId = row.albumId;
+      if (!albumId || isBuiltinAlbum(albumId)) continue;
+      if (!isAlbum(albumId, promptsDir, userAlbumsDir)) continue;
+      try {
+        deleteAlbumFiles(promptsDir, userAlbumsDir, albumId);
+      } catch (err) {
+        errors.push(err instanceof Error ? err.message : '删图册失败');
+      }
+    }
+    if (link.learned.articleSampleId && userArticleSamplesDir) {
+      try {
+        articleSamplesStore.deleteArticleSample(
+          userArticleSamplesDir,
+          link.learned.articleSampleId,
+        );
+      } catch (err) {
+        // 已不存在则忽略
+        if (!(err instanceof Error) || !/没有这篇范文/.test(err.message)) {
+          errors.push(err instanceof Error ? err.message : '删对标文案失败');
+        }
+      }
+    }
+    const removed = xhsNoteLinks.deleteXhsNoteLink(userXhsNotesDir, id);
+    if (!removed) return { ok: false, message: '删除链接失败' };
+    if (errors.length) {
+      return { ok: true, warning: errors.join('；') };
+    }
+    return { ok: true };
   }
 
   return {
@@ -2905,6 +3445,7 @@ function createRunner(options) {
     deleteLibraryArticleSample,
     deleteLibraryReferenceDoc,
     deleteLibraryUploadRef,
+    deleteLibraryXhsNote,
     deleteUploadRef,
     discardAlbum,
     draftUploadRefUsage,
@@ -2914,6 +3455,7 @@ function createRunner(options) {
     getAlbumDetail,
     getLibraryArticleSample,
     getLibraryReferenceDoc,
+    getLibraryXhsNote,
     checkXhsNoteBridge,
     importXhsNote,
     saveXhsNoteArticle,
@@ -2922,6 +3464,7 @@ function createRunner(options) {
     listLibraryArticleSamples,
     listLibraryReferenceDocs,
     listLibraryUploadRefs,
+    listLibraryXhsNotes,
     listPosts: catalog,
     loadLatest,
     openPost,

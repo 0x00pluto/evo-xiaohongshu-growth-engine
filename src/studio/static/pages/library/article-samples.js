@@ -122,6 +122,14 @@ function libraryArticleSamples() {
       }
     },
 
+    openDetailById(detail) {
+      const id = typeof detail === 'string'
+        ? detail.trim()
+        : (detail && typeof detail.id === 'string' ? detail.id.trim() : '');
+      if (!id) return;
+      this.openDetail({ id });
+    },
+
     async openDetail(item) {
       if (!item || this.deleting || this.busy || this.savingDetail) return;
       this.detailError = '';

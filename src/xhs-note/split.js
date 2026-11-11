@@ -1,6 +1,8 @@
 // @ts-check
 'use strict';
 
+const { canonicalExploreUrl } = require('./note-id');
+
 /**
  * @typedef {{ url: string; mime?: string; role?: string }} NoteImage
  * @typedef {{
@@ -49,8 +51,10 @@ function readImages(raw) {
 function normalizeNotePayload(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const bag = /** @type {Record<string, unknown>} */ (raw);
-  const sourceUrl = typeof bag.sourceUrl === 'string' ? bag.sourceUrl.trim() : '';
-  if (!sourceUrl) return null;
+  const sourceUrlRaw = typeof bag.sourceUrl === 'string' ? bag.sourceUrl.trim() : '';
+  if (!sourceUrlRaw) return null;
+  // 能抽出 noteId 则去掉 xsec_token 等 query，缓存与入库共用规范链
+  const sourceUrl = canonicalExploreUrl(sourceUrlRaw) || sourceUrlRaw;
   const title = typeof bag.title === 'string' ? bag.title : '';
   const body = typeof bag.body === 'string' ? bag.body : '';
   const tags = Array.isArray(bag.tags)
@@ -130,7 +134,28 @@ function isTagOnlyBody(body) {
   return withoutTags.length === 0;
 }
 
+/**
+ * 是否值得写入取料缓存 / 进入学笔记：有正文或至少一张图。仅标题不算可学。
+ * @param {unknown} note
+ * @returns {boolean}
+ */
+function hasLearnableNoteContent(note) {
+  if (!note || typeof note !== 'object' || Array.isArray(note)) return false;
+  const bag = /** @type {Record<string, unknown>} */ (note);
+  const body = typeof bag.body === 'string' ? bag.body.trim() : '';
+  if (body) return true;
+  const images = Array.isArray(bag.images) ? bag.images : [];
+  return images.some((row) => (
+    row
+    && typeof row === 'object'
+    && !Array.isArray(row)
+    && typeof /** @type {Record<string, unknown>} */ (row).url === 'string'
+    && String(/** @type {Record<string, unknown>} */ (row).url).trim()
+  ));
+}
+
 module.exports = {
+  hasLearnableNoteContent,
   isTagOnlyBody,
   normalizeNotePayload,
   pickInnerImage,

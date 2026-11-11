@@ -56,6 +56,17 @@ test('normalizeNotePayload 拒绝无 sourceUrl', () => {
   assert.deepEqual(ok?.tags, ['a']);
 });
 
+test('normalizeNotePayload 去掉 xsec_token 等 query', () => {
+  const ok = normalizeNotePayload({
+    sourceUrl: 'https://www.xiaohongshu.com/explore/6ae9a894000000001803b493?xsec_token=AB9U&xsec_source=pc_feed',
+    title: 't',
+    body: 'b',
+    tags: [],
+    images: [],
+  });
+  assert.equal(ok?.sourceUrl, 'https://www.xiaohongshu.com/explore/6ae9a894000000001803b493');
+});
+
 test('isTagOnlyBody 识别纯话题标签正文', () => {
   assert.equal(isTagOnlyBody('#护肤# #种草# #好物分享#'), true);
   assert.equal(isTagOnlyBody('今天试了这款精华 #护肤#'), false);

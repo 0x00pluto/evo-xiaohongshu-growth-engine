@@ -4,6 +4,7 @@ function libraryXhsNote() {
     open: false,
     step: 'url', // url | choose | done
     url: '',
+    linkId: '',
     error: '',
     busy: false,
     /** @type {'idle'|'checking'|'ok'|'bridge_down'|'version_low'} */
@@ -24,6 +25,13 @@ function libraryXhsNote() {
       innerCount: 0,
       inners: [],
     },
+    /** @type {null | {
+     *   article: { status: string; defaultChecked: boolean; locked: boolean; label: string; existingId?: string };
+     *   cover: { status: string; defaultChecked: boolean; locked: boolean; label: string; existingId?: string };
+     *   inner: { status: string; defaultChecked: boolean; locked: boolean; label: string; existingId?: string };
+     *   allUnchanged: boolean;
+     * }} */
+    compare: null,
     learnArticle: true,
     learnCover: true,
     learnInner: true,
@@ -39,6 +47,7 @@ function libraryXhsNote() {
     /** @type {null | { id: string; noteId?: string; sourceUrl?: string; title?: string }} */
     link: null,
     wantArticle: false,
+    articleSampleId: '',
     imageQueue: [],
     learningLabel: '',
 
@@ -47,7 +56,7 @@ function libraryXhsNote() {
     },
 
     init() {
-      // 由壳上的 library-create-xhs-note 打开
+      // 由壳上的 library-create-xhs-note / library-relearn-xhs-note 打开
     },
 
     get bridgeOk() {
@@ -61,9 +70,27 @@ function libraryXhsNote() {
       this.runBridgeCheck();
     },
 
+    /**
+     * 从对标笔记浮层「重新学」
+     * @param {{ linkId?: string; url?: string } | undefined} detail
+     */
+    openRelink(detail) {
+      if (!this.hostReady || this.busy) return;
+      this.reset();
+      this.linkId = detail && detail.linkId ? String(detail.linkId) : '';
+      this.url = detail && detail.url ? String(detail.url) : '';
+      this.open = true;
+      this.runBridgeCheck().then(() => {
+        if (this.bridgeOk && (this.url || this.linkId)) {
+          this.onResolve();
+        }
+      });
+    },
+
     reset() {
       this.step = 'url';
       this.url = '';
+      this.linkId = '';
       this.error = '';
       this.busy = false;
       this.checkStatus = 'idle';
@@ -81,6 +108,7 @@ function libraryXhsNote() {
         innerCount: 0,
         inners: [],
       };
+      this.compare = null;
       this.learnArticle = true;
       this.learnCover = true;
       this.learnInner = true;
@@ -90,6 +118,7 @@ function libraryXhsNote() {
       this.articleSample = null;
       this.link = null;
       this.wantArticle = false;
+      this.articleSampleId = '';
       this.imageQueue = [];
       this.learningLabel = '';
     },
@@ -132,10 +161,20 @@ function libraryXhsNote() {
       }
     },
 
+    partLabel(key) {
+      if (!this.compare || !this.compare[key]) return '';
+      return String(this.compare[key].label || '');
+    },
+
+    partLocked(key) {
+      if (!this.compare || !this.compare[key]) return false;
+      return Boolean(this.compare[key].locked);
+    },
+
     get canConfirmLearn() {
-      const article = this.learnArticle && Boolean(this.parts.body);
-      const cover = this.learnCover && this.parts.hasCover;
-      const inner = this.learnInner && this.parts.innerCount > 0;
+      const article = this.learnArticle && Boolean(this.parts.body) && !this.partLocked('article');
+      const cover = this.learnCover && this.parts.hasCover && !this.partLocked('cover');
+      const inner = this.learnInner && this.parts.innerCount > 0 && !this.partLocked('inner');
       return article || cover || inner;
     },
 
@@ -176,25 +215,58 @@ function libraryXhsNote() {
       this.hoverStyle = '';
     },
 
+    applyCompareDefaults() {
+      if (!this.compare) {
+        this.learnArticle = Boolean(this.parts.body);
+        this.learnCover = Boolean(this.parts.hasCover);
+        this.learnInner = this.parts.innerCount > 0;
+        return;
+      }
+      this.learnArticle = Boolean(this.parts.body)
+        && Boolean(this.compare.article && this.compare.article.defaultChecked)
+        && !this.partLocked('article');
+      this.learnCover = Boolean(this.parts.hasCover)
+        && Boolean(this.compare.cover && this.compare.cover.defaultChecked)
+        && !this.partLocked('cover');
+      this.learnInner = this.parts.innerCount > 0
+        && Boolean(this.compare.inner && this.compare.inner.defaultChecked)
+        && !this.partLocked('inner');
+    },
+
     async onResolve() {
       if (this.busy || !this.bridgeOk) return;
       this.error = '';
       const url = String(this.url || '').trim();
-      if (!url) {
+      if (!url && !this.linkId) {
         this.error = '请粘贴小红书笔记链接';
         if (this.error) this.$dispatch('library-toast', this.error);
         return;
       }
       this.busy = true;
       try {
-        const result = await this.call('resolveXhsNote', { url });
+        /** @type {Record<string, unknown>} */
+        const payload = { url, innerIndex: this.innerIndex };
+        if (this.linkId) payload.linkId = this.linkId;
+        const result = await this.call('resolveXhsNote', payload);
         if (!result || result.ok === false) {
           this.error = (result && result.message) || '读取失败';
           if (this.error) this.$dispatch('library-toast', this.error);
           return;
         }
+        if (result.allUnchanged) {
+          this.$dispatch('library-toast', { message: '这篇没变', type: 'success' });
+          this.open = false;
+          this.reset();
+          this.$dispatch('library-select-tab', 'xhs-notes');
+          this.$dispatch('library-xhs-notes-refresh');
+          return;
+        }
         this.inputUrl = String(result.inputUrl || url);
         this.note = result.note || null;
+        if (result.link && result.link.id) {
+          this.linkId = String(result.link.id);
+          this.link = result.link;
+        }
         const parts = result.parts || {};
         this.parts = {
           title: String(parts.title || ''),
@@ -206,9 +278,8 @@ function libraryXhsNote() {
           innerCount: Number(parts.innerCount) || 0,
           inners: Array.isArray(parts.inners) ? parts.inners : [],
         };
-        this.learnArticle = Boolean(this.parts.body);
-        this.learnCover = Boolean(this.parts.hasCover);
-        this.learnInner = this.parts.innerCount > 0;
+        this.compare = result.compare || null;
+        this.applyCompareDefaults();
         this.innerIndex = 0;
         this.bodyOpen = false;
         this.hideInnerHover();
@@ -227,20 +298,54 @@ function libraryXhsNote() {
       this.busy = true;
       this.hideInnerHover();
       try {
-        const wantArticle = this.learnArticle && Boolean(this.parts.body);
-        const wantCover = this.learnCover && this.parts.hasCover;
-        const wantInner = this.learnInner && this.parts.innerCount > 0;
+        const wantArticle = this.learnArticle && Boolean(this.parts.body) && !this.partLocked('article');
+        const wantCover = this.learnCover && this.parts.hasCover && !this.partLocked('cover');
+        const wantInner = this.learnInner && this.parts.innerCount > 0 && !this.partLocked('inner');
         const selectedInner = wantInner
           ? (this.parts.inners || []).find((item) => Number(item.index) === Number(this.innerIndex))
           : null;
+
+        const patchArticle = Boolean(
+          this.compare
+          && this.compare.article
+          && this.compare.article.status === 'missing_fp'
+          && this.learnArticle
+          && this.parts.body,
+        );
+        const patchCover = Boolean(
+          this.compare
+          && this.compare.cover
+          && this.compare.cover.status === 'missing_fp'
+          && this.learnCover
+          && this.parts.hasCover,
+        );
+        const patchInner = Boolean(
+          this.compare
+          && this.compare.inner
+          && this.compare.inner.status === 'missing_fp'
+          && this.learnInner
+          && this.parts.innerCount > 0,
+        );
+
+        // missing_fp：勾选时只补指纹，不重学；changed/new 才走 learn*
+        const learnArticle = wantArticle
+          && !(this.compare && this.compare.article && this.compare.article.status === 'missing_fp');
+        const learnCover = wantCover
+          && !(this.compare && this.compare.cover && this.compare.cover.status === 'missing_fp');
+        const learnInner = wantInner
+          && !(this.compare && this.compare.inner && this.compare.inner.status === 'missing_fp');
+
         const result = await this.call('importXhsNote', {
           url: this.inputUrl || this.url,
           note: this.note,
-          learnArticle: wantArticle,
-          learnCover: wantCover,
-          learnInner: wantInner,
+          learnArticle: learnArticle || patchArticle,
+          learnCover: learnCover || patchCover,
+          learnInner: learnInner || patchInner,
+          patchArticleFingerprint: patchArticle,
+          patchCoverFingerprint: patchCover,
+          patchInnerFingerprint: patchInner,
           innerIndex: this.innerIndex,
-          coverDataUrl: wantCover ? String(this.parts.coverPreviewUrl || '') : '',
+          coverDataUrl: (learnCover || patchCover) ? String(this.parts.coverPreviewUrl || '') : '',
           innerDataUrl: selectedInner ? String(selectedInner.previewUrl || '') : '',
           innerPreviews: (this.parts.inners || []).map((item) => ({
             index: Number(item.index) || 0,
@@ -252,8 +357,17 @@ function libraryXhsNote() {
           if (this.error) this.$dispatch('library-toast', this.error);
           return;
         }
+        if (result.allUnchanged) {
+          this.$dispatch('library-toast', { message: '这篇没变', type: 'success' });
+          this.open = false;
+          this.reset();
+          this.$dispatch('library-select-tab', 'xhs-notes');
+          this.$dispatch('library-xhs-notes-refresh');
+          return;
+        }
         this.link = result.link || null;
         this.wantArticle = Boolean(result.wantArticle);
+        this.articleSampleId = String(result.articleSampleId || '');
         this.articleSample = null;
         this.imageQueue = Array.isArray(result.learnImages) ? result.learnImages.slice() : [];
         if (result.skippedImages) {
@@ -264,10 +378,13 @@ function libraryXhsNote() {
           await this.runImageQueue();
         }
         if (this.wantArticle && this.link && this.link.id && this.note) {
-          const articleResult = await this.call('saveXhsNoteArticle', {
+          /** @type {Record<string, unknown>} */
+          const articlePayload = {
             linkId: this.link.id,
             note: this.note,
-          });
+          };
+          if (this.articleSampleId) articlePayload.articleSampleId = this.articleSampleId;
+          const articleResult = await this.call('saveXhsNoteArticle', articlePayload);
           if (!articleResult || articleResult.ok === false) {
             this.error = (articleResult && articleResult.message) || '写入对标文案失败';
             if (this.error) this.$dispatch('library-toast', this.error);
@@ -279,6 +396,7 @@ function libraryXhsNote() {
         }
         this.step = 'done';
         this.open = true;
+        this.$dispatch('library-xhs-notes-refresh');
       } catch (err) {
         this.error = err && err.message ? err.message : '保存失败';
         if (this.error) this.$dispatch('library-toast', this.error);
@@ -288,17 +406,22 @@ function libraryXhsNote() {
     },
 
     /**
-     * 串行：切到风格 Tab → 交 dataUrl 学草稿 → 等确定/放弃。
+     * 串行：留在对标笔记 Tab → 交 dataUrl 学草稿 → 等确定/放弃。
+     * 扫图 loading / 风格草稿是全局浮层，不切到「风格」Tab。
      */
     async runImageQueue() {
+      this.$dispatch('library-select-tab', 'xhs-notes');
       const queue = this.imageQueue.slice();
       for (const item of queue) {
         const dataUrl = item && item.dataUrl ? String(item.dataUrl) : '';
         if (!dataUrl) continue;
         this.learningLabel = (item && item.label) || '图片';
-        this.$dispatch('library-select-tab', 'albums');
         // eslint-disable-next-line no-await-in-loop
-        await this.learnOneAlbum(dataUrl, item && item.source ? item.source : null);
+        await this.learnOneAlbum(
+          dataUrl,
+          item && item.source ? item.source : null,
+          item && item.replaceAlbumId ? String(item.replaceAlbumId) : '',
+        );
       }
       this.imageQueue = [];
       this.learningLabel = '';
@@ -307,9 +430,10 @@ function libraryXhsNote() {
     /**
      * @param {string} dataUrl
      * @param {Record<string, unknown> | null} source
+     * @param {string} [replaceAlbumId]
      * @returns {Promise<{ action: string }>}
      */
-    learnOneAlbum(dataUrl, source) {
+    learnOneAlbum(dataUrl, source, replaceAlbumId) {
       return new Promise((resolve) => {
         const onSettled = (event) => {
           window.removeEventListener('library-album-draft-settled', onSettled);
@@ -320,7 +444,10 @@ function libraryXhsNote() {
           resolve(detail);
         };
         window.addEventListener('library-album-draft-settled', onSettled);
-        this.$dispatch('library-learn-album-dataurl', { dataUrl, source: source || undefined });
+        /** @type {Record<string, unknown>} */
+        const detail = { dataUrl, source: source || undefined };
+        if (replaceAlbumId) detail.replaceAlbumId = replaceAlbumId;
+        this.$dispatch('library-learn-album-dataurl', detail);
       });
     },
 
@@ -333,11 +460,8 @@ function libraryXhsNote() {
 
     finishDone() {
       this.close();
-      if (this.articleSample) {
-        this.$dispatch('library-select-tab', 'article-samples');
-      } else {
-        this.$dispatch('library-select-tab', 'albums');
-      }
+      this.$dispatch('library-select-tab', 'xhs-notes');
+      this.$dispatch('library-xhs-notes-refresh');
     },
   };
 }

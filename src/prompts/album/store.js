@@ -239,6 +239,7 @@ function commitAlbumDraft(userAlbumsDir, draft, promptsDir) {
     : '.jpg';
   const samplePath = path.join(pack, `sample${ext}`);
 
+  const replaceExisting = Boolean(draft.replaceExisting);
   if (
     fs.existsSync(jsonPath)
     || fs.existsSync(mdPath)
@@ -247,7 +248,10 @@ function commitAlbumDraft(userAlbumsDir, draft, promptsDir) {
     || fs.existsSync(pack)
   ) {
     if (fs.existsSync(pack) && fs.readdirSync(pack).length > 0) {
-      throw new Error('图册文件已存在，请放弃后重新学习');
+      if (!replaceExisting) {
+        throw new Error('图册文件已存在，请放弃后重新学习');
+      }
+      fs.rmSync(pack, { recursive: true, force: true });
     }
   }
 

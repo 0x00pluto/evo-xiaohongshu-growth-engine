@@ -11,6 +11,7 @@ const {
   findXhsNoteLinkByNoteId,
   findXhsNoteLinkByUrl,
   listXhsNoteLinks,
+  pickOpenableXhsUrl,
   rememberInputUrl,
   saveXhsNoteLink,
 } = require('../../src/xhs-note/links');
@@ -29,6 +30,7 @@ test('链接资源按 noteId 去重；不同 xsec 仍命中同一篇', () => {
   });
   assert.ok(saved.id);
   assert.equal(saved.noteId, 'abc123');
+  assert.equal(saved.sourceUrl, 'https://www.xiaohongshu.com/explore/abc123');
   assert.equal(listXhsNoteLinks(libraryDir).length, 1);
 
   assert.equal(
@@ -65,6 +67,34 @@ test('同一 noteId 再次保存合并 inputUrls，不新建第二条', () => {
   assert.equal(listXhsNoteLinks(libraryDir).length, 1);
   assert.ok(second.inputUrls.includes('https://xhslink.com/a'));
   assert.ok(second.inputUrls.includes('https://xhslink.com/b'));
+});
+
+test('pickOpenableXhsUrl：仅返回带 xsec_token 的链；否则空', () => {
+  const canonical = 'https://www.xiaohongshu.com/explore/6af3b0c8000000001803b777';
+  const discoveryToken = 'https://www.xiaohongshu.com/discovery/item/6af3b0c8000000001803b777?source=webshare&xsec_token=AB&xsec_source=pc_share';
+  const short = 'https://xhslink.com/openMe';
+  assert.equal(
+    pickOpenableXhsUrl({
+      sourceUrl: canonical,
+      inputUrls: [short, canonical, discoveryToken],
+    }),
+    discoveryToken,
+  );
+  assert.equal(
+    pickOpenableXhsUrl({
+      sourceUrl: canonical,
+      inputUrls: [canonical, short],
+    }),
+    '',
+  );
+  assert.equal(
+    pickOpenableXhsUrl({
+      sourceUrl: canonical,
+      inputUrls: [canonical],
+    }),
+    '',
+  );
+  assert.equal(pickOpenableXhsUrl(null), '');
 });
 
 test('双向溯源：范文与图册回写 learned', () => {

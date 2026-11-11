@@ -191,6 +191,21 @@ module.exports = {
       saveXhsNoteArticle(payload) {
         return runner.saveXhsNoteArticle(asObject(payload));
       },
+      listLibraryXhsNotes() {
+        return runner.listLibraryXhsNotes();
+      },
+      /**
+       * @param {unknown} payload
+       */
+      getLibraryXhsNote(payload) {
+        return runner.getLibraryXhsNote(asObject(payload));
+      },
+      /**
+       * @param {unknown} payload
+       */
+      deleteLibraryXhsNote(payload) {
+        return runner.deleteLibraryXhsNote(asObject(payload));
+      },
       /**
        * @param {unknown} payload
        */

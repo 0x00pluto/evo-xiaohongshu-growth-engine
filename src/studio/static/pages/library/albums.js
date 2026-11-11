@@ -233,6 +233,14 @@ function libraryAlbums() {
       if (changed) this.albumSamples = next;
     },
 
+    openDetailById(detail) {
+      const id = typeof detail === 'string'
+        ? detail.trim()
+        : (detail && typeof detail.id === 'string' ? detail.id.trim() : '');
+      if (!id) return;
+      this.openDetail({ id });
+    },
+
     async openDetail(album) {
       if (!album || !album.id || this.learning || this.committing || this.savingDetail) return;
       this.error = '';
@@ -323,6 +331,10 @@ function libraryAlbums() {
       const source = typeof detail === 'object' && detail && detail.source
         ? detail.source
         : undefined;
+      const replaceAlbumId = typeof detail === 'object' && detail
+        && typeof detail.replaceAlbumId === 'string'
+        ? detail.replaceAlbumId.trim()
+        : '';
       if (!dataUrl) {
         window.dispatchEvent(new CustomEvent('library-album-draft-settled', {
           detail: { action: 'error', message: '没有可学的图' },
@@ -341,6 +353,7 @@ function libraryAlbums() {
         /** @type {Record<string, unknown>} */
         const payload = { dataUrl };
         if (source) payload.source = source;
+        if (replaceAlbumId) payload.replaceAlbumId = replaceAlbumId;
         const result = await this.call('learnAlbum', payload);
         if (!result || result.ok === false) {
           const message = (result && result.message) || '学习失败';

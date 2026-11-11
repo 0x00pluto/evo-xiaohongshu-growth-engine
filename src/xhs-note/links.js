@@ -10,9 +10,11 @@ const { canonicalExploreUrl, extractXhsNoteId } = require('./note-id');
  * @typedef {{
  *   albumId: string;
  *   role: string;
+ *   contentMd5?: string;
  * }} XhsLearnedAlbum
  * @typedef {{
  *   articleSampleId: string;
+ *   articleTextHash?: string;
  *   albums: XhsLearnedAlbum[];
  * }} XhsNoteLearned
  * @typedef {{
@@ -23,6 +25,7 @@ const { canonicalExploreUrl, extractXhsNoteId } = require('./note-id');
  *   title: string;
  *   fetchedAt: string;
  *   learned: XhsNoteLearned;
+ *   learnedAt: number;
  *   updatedAt: number;
  * }} XhsNoteLinkMeta
  */
@@ -68,10 +71,14 @@ function normalizeLearned(raw) {
   /** @type {XhsLearnedAlbum[]} */
   const albums = [];
   let articleSampleId = '';
+  let articleTextHash = '';
   if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
     const bag = /** @type {Record<string, unknown>} */ (raw);
     if (typeof bag.articleSampleId === 'string' && bag.articleSampleId.trim()) {
       articleSampleId = bag.articleSampleId.trim();
+    }
+    if (typeof bag.articleTextHash === 'string' && bag.articleTextHash.trim()) {
+      articleTextHash = bag.articleTextHash.trim();
     }
     if (Array.isArray(bag.albums)) {
       for (const item of bag.albums) {
@@ -79,12 +86,19 @@ function normalizeLearned(raw) {
         const row = /** @type {Record<string, unknown>} */ (item);
         const albumId = typeof row.albumId === 'string' ? row.albumId.trim() : '';
         const role = typeof row.role === 'string' ? row.role.trim() : '';
+        const contentMd5 = typeof row.contentMd5 === 'string' ? row.contentMd5.trim() : '';
         if (!albumId) continue;
-        albums.push({ albumId, role: role || 'image' });
+        /** @type {XhsLearnedAlbum} */
+        const next = { albumId, role: role || 'image' };
+        if (contentMd5) next.contentMd5 = contentMd5;
+        albums.push(next);
       }
     }
   }
-  return { articleSampleId, albums };
+  /** @type {XhsNoteLearned} */
+  const learned = { articleSampleId, albums };
+  if (articleTextHash) learned.articleTextHash = articleTextHash;
+  return learned;
 }
 
 /**
@@ -95,8 +109,9 @@ function parseMeta(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const bag = /** @type {Record<string, unknown>} */ (raw);
   const id = typeof bag.id === 'string' ? bag.id.trim() : '';
-  const sourceUrl = trimUrl(bag.sourceUrl);
-  if (!id || !sourceUrl) return null;
+  const sourceUrlRaw = trimUrl(bag.sourceUrl);
+  if (!id || !sourceUrlRaw) return null;
+  const sourceUrl = canonicalExploreUrl(sourceUrlRaw) || sourceUrlRaw;
   /** @type {string[]} */
   const inputUrls = [];
   if (Array.isArray(bag.inputUrls)) {
@@ -105,10 +120,14 @@ function parseMeta(raw) {
       if (u && !inputUrls.includes(u)) inputUrls.push(u);
     }
   }
+  if (sourceUrlRaw !== sourceUrl && !inputUrls.includes(sourceUrlRaw)) {
+    inputUrls.push(sourceUrlRaw);
+  }
   const noteId = typeof bag.noteId === 'string' && bag.noteId.trim()
     ? bag.noteId.trim()
     : extractXhsNoteId(sourceUrl);
   const updatedAt = Number(bag.updatedAt);
+  const learnedAt = Number(bag.learnedAt);
   return {
     id,
     noteId,
@@ -117,6 +136,7 @@ function parseMeta(raw) {
     title: typeof bag.title === 'string' ? bag.title : '',
     fetchedAt: typeof bag.fetchedAt === 'string' ? bag.fetchedAt : '',
     learned: normalizeLearned(bag.learned),
+    learnedAt: Number.isFinite(learnedAt) ? learnedAt : 0,
     updatedAt: Number.isFinite(updatedAt) ? updatedAt : 0,
   };
 }
@@ -154,7 +174,23 @@ function readXhsNoteLink(libraryDir, id) {
   const file = metaPath(libraryDir, safe);
   if (!fs.existsSync(file)) return null;
   try {
-    return parseMeta(JSON.parse(fs.readFileSync(file, 'utf8')));
+    const raw = /** @type {Record<string, unknown>} */ (JSON.parse(fs.readFileSync(file, 'utf8')));
+    const meta = parseMeta(raw);
+    if (!meta) return null;
+    const diskUrl = trimUrl(raw.sourceUrl);
+    // 盘上仍带 xsec_token 等 query：写回规范链，避免浮层展示脏链
+    if (diskUrl && diskUrl !== meta.sourceUrl) {
+      return saveXhsNoteLink(libraryDir, {
+        id: meta.id,
+        noteId: meta.noteId,
+        sourceUrl: meta.sourceUrl,
+        title: meta.title,
+        fetchedAt: meta.fetchedAt,
+        learned: meta.learned,
+        learnedAt: meta.learnedAt,
+      });
+    }
+    return meta;
   } catch {
     return null;
   }
@@ -204,6 +240,19 @@ function writeMetaFile(libraryDir, meta) {
   const dir = entryDir(libraryDir, meta.id);
   fs.mkdirSync(dir, { recursive: true });
   /** @type {Record<string, unknown>} */
+  const learnedOut = {
+    articleSampleId: meta.learned.articleSampleId || '',
+    albums: meta.learned.albums.map((row) => {
+      /** @type {Record<string, string>} */
+      const album = { albumId: row.albumId, role: row.role };
+      if (row.contentMd5) album.contentMd5 = row.contentMd5;
+      return album;
+    }),
+  };
+  if (meta.learned.articleTextHash) {
+    learnedOut.articleTextHash = meta.learned.articleTextHash;
+  }
+  /** @type {Record<string, unknown>} */
   const out = {
     id: meta.id,
     noteId: meta.noteId,
@@ -211,13 +260,8 @@ function writeMetaFile(libraryDir, meta) {
     inputUrls: meta.inputUrls,
     title: meta.title,
     fetchedAt: meta.fetchedAt,
-    learned: {
-      articleSampleId: meta.learned.articleSampleId || '',
-      albums: meta.learned.albums.map((row) => ({
-        albumId: row.albumId,
-        role: row.role,
-      })),
-    },
+    learned: learnedOut,
+    learnedAt: meta.learnedAt || 0,
     updatedAt: meta.updatedAt,
   };
   fs.writeFileSync(metaPath(libraryDir, meta.id), `${JSON.stringify(out, null, 2)}\n`);
@@ -233,6 +277,7 @@ function writeMetaFile(libraryDir, meta) {
  *   title?: string;
  *   fetchedAt?: string;
  *   learned?: unknown;
+ *   learnedAt?: number;
  * }} input
  * @returns {XhsNoteLinkMeta}
  */
@@ -260,6 +305,7 @@ function saveXhsNoteLink(libraryDir, input) {
     inputUrls.push(sourceUrlRaw);
   }
 
+  const learnedAtInput = Number(input.learnedAt);
   /** @type {XhsNoteLinkMeta} */
   const meta = {
     id,
@@ -273,6 +319,9 @@ function saveXhsNoteLink(libraryDir, input) {
     learned: input.learned !== undefined
       ? normalizeLearned(input.learned)
       : (prev ? prev.learned : { articleSampleId: '', albums: [] }),
+    learnedAt: Number.isFinite(learnedAtInput)
+      ? learnedAtInput
+      : (prev ? prev.learnedAt : 0),
     updatedAt: Date.now(),
   };
   writeMetaFile(libraryDir, meta);
@@ -305,23 +354,30 @@ function rememberInputUrl(libraryDir, sourceUrl, inputUrl) {
  * @param {string} libraryDir
  * @param {string} linkId
  * @param {string} articleSampleId
+ * @param {string} [articleTextHash]
  * @returns {XhsNoteLinkMeta | null}
  */
-function attachLearnedArticle(libraryDir, linkId, articleSampleId) {
+function attachLearnedArticle(libraryDir, linkId, articleSampleId, articleTextHash) {
   const prev = readXhsNoteLink(libraryDir, linkId);
   if (!prev) return null;
   const sampleId = String(articleSampleId || '').trim();
   if (!sampleId) return prev;
+  const hash = typeof articleTextHash === 'string' ? articleTextHash.trim() : '';
+  /** @type {XhsNoteLearned} */
+  const learned = {
+    articleSampleId: sampleId,
+    albums: prev.learned.albums,
+  };
+  if (hash) learned.articleTextHash = hash;
+  else if (prev.learned.articleTextHash) learned.articleTextHash = prev.learned.articleTextHash;
   return saveXhsNoteLink(libraryDir, {
     id: prev.id,
     noteId: prev.noteId,
     sourceUrl: prev.sourceUrl,
     title: prev.title,
     fetchedAt: prev.fetchedAt,
-    learned: {
-      articleSampleId: sampleId,
-      albums: prev.learned.albums,
-    },
+    learned,
+    learnedAt: Date.now(),
   });
 }
 
@@ -330,37 +386,135 @@ function attachLearnedArticle(libraryDir, linkId, articleSampleId) {
  * @param {string} linkId
  * @param {string} albumId
  * @param {string} role
+ * @param {string} [contentMd5]
  * @returns {XhsNoteLinkMeta | null}
  */
-function attachLearnedAlbum(libraryDir, linkId, albumId, role) {
+function attachLearnedAlbum(libraryDir, linkId, albumId, role, contentMd5) {
   const prev = readXhsNoteLink(libraryDir, linkId);
   if (!prev) return null;
   const id = String(albumId || '').trim();
   if (!id) return prev;
   const nextRole = String(role || '').trim() || 'image';
+  const md5 = typeof contentMd5 === 'string' ? contentMd5.trim() : '';
   /** @type {XhsLearnedAlbum[]} */
-  const albums = prev.learned.albums.filter((row) => row.albumId !== id);
-  albums.push({ albumId: id, role: nextRole });
+  const albums = prev.learned.albums.filter((row) => (
+    row.albumId !== id && row.role !== nextRole
+  ));
+  /** @type {XhsLearnedAlbum} */
+  const row = { albumId: id, role: nextRole };
+  if (md5) row.contentMd5 = md5;
+  albums.push(row);
+  /** @type {XhsNoteLearned} */
+  const learned = {
+    articleSampleId: prev.learned.articleSampleId,
+    albums,
+  };
+  if (prev.learned.articleTextHash) learned.articleTextHash = prev.learned.articleTextHash;
   return saveXhsNoteLink(libraryDir, {
     id: prev.id,
     noteId: prev.noteId,
     sourceUrl: prev.sourceUrl,
     title: prev.title,
     fetchedAt: prev.fetchedAt,
-    learned: {
-      articleSampleId: prev.learned.articleSampleId,
-      albums,
-    },
+    learned,
+    learnedAt: Date.now(),
   });
+}
+
+/**
+ * 只补指纹，不改柜子里的图文内容。
+ * @param {string} libraryDir
+ * @param {string} linkId
+ * @param {{ articleTextHash?: string; albums?: { albumId: string; role: string; contentMd5?: string }[] }} patch
+ * @returns {XhsNoteLinkMeta | null}
+ */
+function patchLearnedFingerprints(libraryDir, linkId, patch) {
+  const prev = readXhsNoteLink(libraryDir, linkId);
+  if (!prev) return null;
+  /** @type {XhsNoteLearned} */
+  const learned = {
+    articleSampleId: prev.learned.articleSampleId,
+    albums: prev.learned.albums.map((row) => ({ ...row })),
+  };
+  if (typeof patch.articleTextHash === 'string' && patch.articleTextHash.trim()) {
+    learned.articleTextHash = patch.articleTextHash.trim();
+  } else if (prev.learned.articleTextHash) {
+    learned.articleTextHash = prev.learned.articleTextHash;
+  }
+  if (Array.isArray(patch.albums)) {
+    for (const item of patch.albums) {
+      if (!item || !item.albumId) continue;
+      const role = item.role || 'image';
+      const idx = learned.albums.findIndex((row) => row.albumId === item.albumId || row.role === role);
+      if (idx >= 0) {
+        learned.albums[idx] = {
+          albumId: item.albumId,
+          role,
+          contentMd5: item.contentMd5 || learned.albums[idx].contentMd5,
+        };
+      } else {
+        /** @type {XhsLearnedAlbum} */
+        const next = { albumId: item.albumId, role };
+        if (item.contentMd5) next.contentMd5 = item.contentMd5;
+        learned.albums.push(next);
+      }
+    }
+  }
+  return saveXhsNoteLink(libraryDir, {
+    id: prev.id,
+    noteId: prev.noteId,
+    sourceUrl: prev.sourceUrl,
+    title: prev.title,
+    fetchedAt: prev.fetchedAt,
+    learned,
+    learnedAt: Date.now(),
+  });
+}
+
+/**
+ * @param {string} libraryDir
+ * @param {string} id
+ * @returns {boolean}
+ */
+function deleteXhsNoteLink(libraryDir, id) {
+  const safe = String(id || '').trim();
+  if (!safe || !libraryDir) return false;
+  const dir = entryDir(libraryDir, safe);
+  if (!fs.existsSync(dir)) return false;
+  fs.rmSync(dir, { recursive: true, force: true });
+  return true;
+}
+
+/**
+ * 详情「打开原帖」用：仅返回带 xsec_token 的原粘贴串；没有则空串（前端不做成可点链接）。
+ * @param {{ sourceUrl?: string; inputUrls?: string[] } | null | undefined} meta
+ * @returns {string}
+ */
+function pickOpenableXhsUrl(meta) {
+  if (!meta || typeof meta !== 'object') return '';
+  /** @type {string[]} */
+  const inputs = Array.isArray(meta.inputUrls)
+    ? meta.inputUrls.map((u) => trimUrl(u)).filter(Boolean)
+    : [];
+  // 从后往前：偏最近粘贴；无 token 的 explore/短链点开也看不了，不返回
+  for (let i = inputs.length - 1; i >= 0; i -= 1) {
+    const url = inputs[i];
+    if (url && /[?&]xsec_token=/i.test(url)) return url;
+  }
+  return '';
 }
 
 module.exports = {
   attachLearnedAlbum,
   attachLearnedArticle,
+  deleteXhsNoteLink,
   findXhsNoteLinkByNoteId,
   findXhsNoteLinkByUrl,
   listXhsNoteLinks,
+  normalizeLearned,
   parseMeta,
+  patchLearnedFingerprints,
+  pickOpenableXhsUrl,
   readXhsNoteLink,
   rememberInputUrl,
   saveXhsNoteLink,

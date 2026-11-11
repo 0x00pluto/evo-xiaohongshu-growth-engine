@@ -9,6 +9,7 @@ function libraryPage() {
       { id: 'upload-refs', label: '我们的图' },
       { id: 'article-samples', label: '对标文案' },
       { id: 'reference-docs', label: '产品资料' },
+      { id: 'xhs-notes', label: '对标笔记' },
     ],
     activeTab: 'albums',
     createOpen: false,
