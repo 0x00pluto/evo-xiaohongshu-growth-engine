@@ -5,7 +5,7 @@ description: 同一篇对标笔记可反复学；图文按哈希跳过未变内�
 status: accepted
 created: 2026-11-11T08:25:39Z
 last_accepted_at: 2026-11-11T09:51:47Z
-accepted_commit: eb2eafd
+accepted_commit: 8c58cfc
 accepted_branch: prd/xhs-learned-notes
 accepted_scope: R0
 demand_id: "20261110_0012"
@@ -225,18 +225,18 @@ stateDiagram-v2
 | 日期 | 说明 |
 |------|------|
 | 2026-11-11 | 初稿。来源飞书 `20261110_0012`；反复学、30 分钟缓存、对标笔记 Tab 末尾、写回原柜子。 |
-| 2026-11-11 | 工程验收 accepted（R0）；交付 commit `eb2eafd`。 |
+| 2026-11-11 | 工程验收 accepted（R0）；交付 commit `8c58cfc`。 |
 
 ## 1. 工程验收状态
 
-> 由 `/team:prd-accept` 维护；勿手工编造「通过」。最后更新：2026-11-11T09:51:47Z，`prd/xhs-learned-notes`@`eb2eafd`，范围：R0。
+> 由 `/team:prd-accept` 维护；勿手工编造「通过」。最后更新：2026-11-11T09:51:47Z，`prd/xhs-learned-notes`@`8c58cfc`，范围：R0。
 
 ### 总览
 
 - **工程状态**：`accepted`
 - **验收判定**：Release 0 范围内能力均有代码与单测证据；本轮对话内运营路径（删后关浮层、学图留对标笔记、去 token、有 token 才可点开）已按反馈修完。Cursor 浏览器无 Dex Buddy 插件页，**未再跑 UI 冒烟**；用户确认无额外待测项后关闭本 PRD。
 - **最近验收**：2026-11-11T09:51:47Z
-- **代码提交**：分支 `prd/xhs-learned-notes`；交付 commit `eb2eafd`
+- **代码提交**：分支 `prd/xhs-learned-notes`；交付 commit `8c58cfc`
 - **摘要**：
   1. 对标笔记 Tab / 卡墙 / 详情浮层与跳转改学法、级联删除已落地。
   2. 30 分钟按 noteId 缓存、指纹比较、allUnchanged、写回原柜子、缺指纹补指纹有单测。
