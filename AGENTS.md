@@ -22,16 +22,15 @@
 8. **记忆巩固与遗忘**：用户明确要求遗忘 / 记忆巩固 / consolidate-memory / 剪枝记忆时 → 读并执行 [`docs/builtin-workflows/consolidate-memory.md`](./docs/builtin-workflows/consolidate-memory.md)。与反思、提取经验同为手动触发、互不串联；**不**自动跑。当前任务已是本流则禁止套娃。
 9. **发工牌**：用户明确要求发工牌 / 写工牌 / 首次发布 / 改合同字段（`name`·`origin`·`depends_on`）时 → 读并执行 [`docs/builtin-workflows/publish-evo-agent-pack.md`](./docs/builtin-workflows/publish-evo-agent-pack.md)。**日常发版不要从本条进门**。
 10. **打发版 tag**：用户明确要求发版 / 打 tag / 建 Release 时 → 读并执行 [`docs/builtin-workflows/cut-release-tag.md`](./docs/builtin-workflows/cut-release-tag.md)。已有工牌与 remote 后，日常发版只雇本篇。
-11. **飞书需求转入**：用户明确要求从飞书需求池转入 / 按需求 ID 开 PRD / 跑 feishu-demand-to-prd，或使用 `/team:feishu-demand-to-prd` 时 → 读并执行 [`docs/workflows/feishu-demand-to-prd.md`](./docs/workflows/feishu-demand-to-prd.md)。**不**自动扫表；缺需求 ID 则先问。口述需求仍走 `/team:product-manager`，不与本条互替。
-12. **飞书需求回填**：用户明确说需求已验收 / 已修好 / 回填飞书 / 放弃该需求，或使用 `/team:feishu-demand-writeback` 时 → 读并执行 [`docs/workflows/feishu-demand-writeback.md`](./docs/workflows/feishu-demand-writeback.md)。无明确验收或放弃意图则停下；只改「需求状态」。
-13. （可选总目录）若同级存在 [`../AgentWikiIndex/`](../AgentWikiIndex/)，改完「能力声明 / 兄弟关系」后执行：
+11. **飞书需求管理**：用户明确要求按需求 ID 从飞书提取 / 回写状态 / 跑 feishu-feature-enginer，或使用 `/team:feishu-feature-enginer` 时 → 读并执行 [`.cursor/commands/team/feishu-feature-enginer.md`](./.cursor/commands/team/feishu-feature-enginer.md)。**不**自动扫表；缺需求 ID 则先问；本条**不**写功能 PRD。口述需求仍走 `/team:product-manager`，不与本条互替。
+12. （可选总目录）若同级存在 [`../AgentWikiIndex/`](../AgentWikiIndex/)，改完「能力声明 / 兄弟关系」后执行：
    `python3 ../AgentWikiIndex/scripts/refresh_catalog.py`
    若不存在该目录，**跳过**，不要报错、不要去建。
-14. 团队命令在 [`.cursor/commands/team/`](./.cursor/commands/team/)，母版在 Vibecoding 团队成员库，命令全文不抄进本文件。
-15. 改外观前先读 [`docs/DESIGN.md`](./docs/DESIGN.md)。
-16. 踩坑记录与检索用技能 `huyuan-ai-dev-faq-assistant`，FAQ 目录为 `docs/faqs`。技能正文不拷进本仓库。
-17. **后端 JS 检查**：改 `index.js`、其 `require` 到的 `src/` 业务文件，或 `scripts/run-studio.js` 时，文件须有 `// @ts-check` 与 JSDoc（外部参数先当 `unknown`，禁止 `any`）；改完跑 `pnpm run check:types`。页面 `src/studio/static/` 不在此列。
-18. 查代码时 **首选 Codebase Memory MCP**，再降级全文检索：
+13. 团队命令在 [`.cursor/commands/team/`](./.cursor/commands/team/)，母版在 Vibecoding 团队成员库，命令全文不抄进本文件。
+14. 改外观前先读 [`docs/DESIGN.md`](./docs/DESIGN.md)。
+15. 踩坑记录与检索用技能 `huyuan-ai-dev-faq-assistant`，FAQ 目录为 `docs/faqs`。技能正文不拷进本仓库。
+16. **后端 JS 检查**：改 `index.js`、其 `require` 到的 `src/` 业务文件，或 `scripts/run-studio.js` 时，文件须有 `// @ts-check` 与 JSDoc（外部参数先当 `unknown`，禁止 `any`）；改完跑 `pnpm run check:types`。页面 `src/studio/static/` 不在此列。
+17. 查代码时 **首选 Codebase Memory MCP**，再降级全文检索：
    - 本仓：`project="Users-peng.zhi-Documents-Codex-0007-e5b08fe7baa2e4b9a6e5a29ee995bfe5bc95e6938e"`，用 `search_graph` / `search_code` / `trace_path` / `get_code_snippet`
    - **降级**：MCP 未接入、项目不在列表、查询失败，或目标落在 `.cursor/`、`cache/`、`output/`、`temp/` 时，再用 `Grep` / `Read`
 

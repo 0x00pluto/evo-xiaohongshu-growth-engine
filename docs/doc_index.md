@@ -16,17 +16,14 @@
 - `specs/prds/prd-00015-studio-plain-copy.md`: 资料库与写笔记可见文案统一成运营能懂的一套词；删说明书灰字；不改交互与模型提示词
 - `docs/faqs/how-to-native-host-silent-register.md`: Native Host ASCII 安装；Windows 中文用户名改 ProgramData；Mac 仍用 Application Support；按 QuanMediaCrawl 路径算扩展 ID；host exited 排查
 - `docs/workflows/_TEMPLATE.md`: 业务 workflow 六段骨架；新建业务工作流时复制并改名，写完后删掉本行或改成真实条目
-- `docs/workflows/feishu-demand-to-prd.md`: 按需求 ID 从飞书需求池读行；可处理则开功能 PRD 并把状态改为进行中
-- `docs/workflows/feishu-demand-writeback.md`: 验收或放弃后只回填飞书「需求状态」（已完成 / 待评估）
-- `specs/prds/prd-00016-feishu-demand-loop.md`: 飞书需求池转入本仓 PRD、修完只回填需求状态；与口述需求路线并存
+- `specs/prds/prd-00016-feishu-demand-loop.md`: 飞书需求池转入本仓 PRD、修完只回填需求状态；与口述需求路线并存（历史流程 PRD；现行入口见 feishu-feature-enginer）
 - `specs/prds/prd-00017-xhs-learned-notes.md`: 对标笔记可反复学；图文哈希跳过未变并写回原柜子；资料库末尾对标笔记卡墙与浮层；来源飞书 20261110_0012
 - `docs/DESIGN.md`: 页侧视觉事实源（HTML、Alpine、daisyUI 5；配色为 Cal 色板；页头默认 text-xl / py-3；写笔记 / 以前的笔记 / 资料库同档；以前的笔记约 8 列竖卡墙与小红书式详情浮层；笔记页比例/风格/画面内容/我们的图同款展开条、预览画框跟有效比例、风格格 contain；排版含壳与侧栏 Lucide 图标/大屏收起、间距、两屏和手机框；等待用 Lottie 浮层；错误/短反馈用 toast（感叹号 error / 绿对勾 success + 出入场），禁无图标纯字条与页顶赤裸 text-error；要发什么紧凑贴底 CTA、无人设目的说明书；对标文案/产品资料库同风格 6 列竖卡；资料库末尾对标笔记卡墙与详情浮层、反复学比较徽标；加一条产品资料卡墙选库或写新、满 5 隐藏加号；新建风格/我们的图先出虚线上传框；新建含对标笔记进料；学风格用 image-scan + 轮播人话）；改外观前先读
 - `docs/references/xhs-prompt-taxonomy.md`: 人设×目的×形式提示词分类与组合校验原文，供操作台释义与写稿对照
 - `specs/prds/prd-wiki-index.md`: PRD 索引，不计入序号；产品经理追加一行，工程验收官可回写状态
-- `.cursor/commands/team/product-manager.md`: 产品经理，`/team:product-manager`，写 PRD
+- `.cursor/commands/team/product-manager.md`: 产品经理，`/team:product-manager`，写 PRD（≥3.2 承接飞书 `demand_*`）
 - `.cursor/commands/team/prd-accept.md`: 工程验收官，`/team:prd-accept`，回写 PRD 文末状态
 - `.cursor/commands/team/front-enginer.md`: 前端工程师，`/team:front-enginer`，HTML First
 - `.cursor/commands/team/test-enginer.md`: 测试工程师，`/team:test-enginer`，手工排障
 - `.cursor/commands/team/feature-dev.md`: 自主交付工程师，`/team:feature-dev`，S1 到 S3
-- `.cursor/commands/team/feishu-demand-to-prd.md`: 飞书需求转入，`/team:feishu-demand-to-prd <需求ID>`，读池写功能 PRD 并标进行中
-- `.cursor/commands/team/feishu-demand-writeback.md`: 飞书需求回填，`/team:feishu-demand-writeback <需求ID> 验收|放弃`，只改需求状态
+- `.cursor/commands/team/feishu-feature-enginer.md`: 飞书需求管理工程师，`/team:feishu-feature-enginer 取|回写 <需求ID>`，提取交接简报或只改需求状态
