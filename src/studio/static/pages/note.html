@@ -256,11 +256,13 @@
           </div>
           <div class="flex gap-2 overflow-x-auto p-1">
             <template x-for="item in slots" :key="drawKey(item)">
-              <div class="relative aspect-[3/4] w-16 shrink-0">
+              <div
+                class="slot-thumb relative aspect-[3/4] w-16 shrink-0"
+                :class="slotSelected(item) ? 'is-selected' : ''"
+              >
                 <button
-                  class="absolute inset-0 block overflow-hidden bg-base-100 text-left active:scale-95"
+                  class="absolute inset-0 z-[1] block overflow-hidden bg-base-100 text-left active:scale-95"
                   type="button"
-                  :class="slotSelected(item) ? 'ring-2 ring-base-content' : ''"
                   :aria-pressed="slotSelected(item) ? 'true' : 'false'"
                   :aria-label="item.label"
                   @click="selectImage(item)"
@@ -269,9 +271,21 @@
                   <span class="flex h-full w-full items-center justify-center px-1 text-center text-xs" x-show="!slotPreview(item) && (item.image.status === '生成中' || item.image.status === '失败' || item.image.status === '作废')" x-text="statusLabel(item.image.status)"></span>
                 </button>
                 <button
-                  class="btn btn-primary btn-square btn-xs absolute bottom-1 right-1 z-[1]"
+                  class="slot-copy-btn btn btn-ghost btn-square btn-xs absolute right-1 top-1 z-[2] min-h-6 min-w-6 border border-base-300 bg-base-100 p-0 shadow"
                   type="button"
-                  @click="onDraw(item)"
+                  x-show="slotCanCopy(item)"
+                  x-cloak
+                  aria-label="复制这张图片"
+                  :data-copied="copyFeedbackKey === promptKey(item) && copyFeedbackOk ? '' : null"
+                  :data-failed="copyFeedbackKey === promptKey(item) && copyFeedbackOk === false ? '' : null"
+                  @click.stop="onCopySlotImage(item)"
+                >
+                  <iconify-icon icon="lucide:copy" width="12" height="12" aria-hidden="true"></iconify-icon>
+                </button>
+                <button
+                  class="btn btn-primary btn-square btn-xs absolute bottom-1 right-1 z-[2]"
+                  type="button"
+                  @click.stop="onDraw(item)"
                   :disabled="slotDrawDisabled(item)"
                   :aria-label="drawLabel(item)"
                   :title="drawLabel(item)"
@@ -283,10 +297,22 @@
           </div>
           <div class="grid grid-cols-[repeat(15,minmax(0,1fr))] gap-2" x-show="activeVersions.length" x-cloak>
             <template x-for="(version, index) in activeVersions" :key="version.path">
-              <button class="relative aspect-[3/4] w-full overflow-hidden bg-base-100" type="button" :class="versionChosen(activeSlot, index) ? 'ring-2 ring-base-content' : ''" :aria-label="'第 ' + (index + 1) + ' 张'" :aria-pressed="versionChosen(activeSlot, index) ? 'true' : 'false'" @click="onChooseVersion(activeSlot, index + 1)" :disabled="job.running">
-                <img class="h-full w-full object-contain" x-show="versionPreview(version)" :src="versionPreview(version)" alt="" />
-                <span class="absolute bottom-0 right-0 bg-base-100 px-0.5 text-[10px] leading-none" x-text="index + 1"></span>
-              </button>
+              <div
+                class="slot-thumb relative aspect-[3/4] w-full"
+                :class="versionChosen(activeSlot, index) ? 'is-selected' : ''"
+              >
+                <button
+                  class="absolute inset-0 z-[1] block overflow-hidden bg-base-100"
+                  type="button"
+                  :aria-label="'第 ' + (index + 1) + ' 张'"
+                  :aria-pressed="versionChosen(activeSlot, index) ? 'true' : 'false'"
+                  @click="onChooseVersion(activeSlot, index + 1)"
+                  :disabled="job.running"
+                >
+                  <img class="h-full w-full object-contain" x-show="versionPreview(version)" :src="versionPreview(version)" alt="" />
+                  <span class="absolute bottom-0 right-0 bg-base-100 px-0.5 text-[10px] leading-none" x-text="index + 1"></span>
+                </button>
+              </div>
             </template>
           </div>
 
@@ -384,34 +410,41 @@
                   <div class="max-h-64 overflow-y-auto" role="list" aria-label="风格">
                     <div class="grid grid-cols-3 gap-2 sm:grid-cols-6">
                       <template x-for="album in selectableAlbums" :key="album.id">
-                        <button
-                          class="relative aspect-[3/4] w-full overflow-hidden rounded-lg bg-base-200 text-left"
-                          type="button"
-                          role="listitem"
-                          :class="selectedLook === album.id ? 'ring-2 ring-base-content' : ''"
-                          :aria-label="album.label"
-                          :aria-pressed="selectedLook === album.id ? 'true' : 'false'"
-                          :disabled="job.running"
-                          @click="selectAlbumStyle(album)"
-                        >
-                          <img class="absolute inset-0 h-full w-full object-contain" x-show="albumSamplePreview(album)" :src="albumSamplePreview(album)" alt="" />
-                          <span class="absolute inset-0 flex items-center justify-center text-[10px] text-base-content/40" x-show="!albumSamplePreview(album)">无样图</span>
+                        <div class="relative aspect-[3/4] w-full">
                           <span
-                            class="pointer-events-none absolute bottom-1.5 right-1.5 z-[1] flex h-5 w-5 items-center justify-center rounded-full bg-base-100/90 shadow-sm"
-                            aria-label="已通过安全检查"
+                            class="style-glow-ring"
+                            x-show="selectedLook === album.id"
+                            x-cloak
+                            aria-hidden="true"
+                          ></span>
+                          <button
+                            class="absolute inset-0 z-[1] overflow-hidden rounded-lg bg-base-200 text-left"
+                            type="button"
+                            role="listitem"
+                            :aria-label="album.label"
+                            :aria-pressed="selectedLook === album.id ? 'true' : 'false'"
+                            :disabled="job.running"
+                            @click="selectAlbumStyle(album)"
                           >
-                            <iconify-icon
-                              icon="lucide:shield-check"
-                              width="14"
-                              height="14"
-                              class="text-success"
-                              aria-hidden="true"
-                            ></iconify-icon>
-                          </span>
-                          <span class="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-1.5 pb-1.5 pt-6">
-                            <span class="line-clamp-2 text-xs leading-4 text-white" x-text="album.label"></span>
-                          </span>
-                        </button>
+                            <img class="absolute inset-0 h-full w-full object-contain" x-show="albumSamplePreview(album)" :src="albumSamplePreview(album)" alt="" />
+                            <span class="absolute inset-0 flex items-center justify-center text-[10px] text-base-content/40" x-show="!albumSamplePreview(album)">无样图</span>
+                            <span
+                              class="pointer-events-none absolute bottom-1.5 right-1.5 z-[1] flex h-5 w-5 items-center justify-center rounded-full bg-base-100/90 shadow-sm"
+                              aria-label="已通过安全检查"
+                            >
+                              <iconify-icon
+                                icon="lucide:shield-check"
+                                width="14"
+                                height="14"
+                                class="text-success"
+                                aria-hidden="true"
+                              ></iconify-icon>
+                            </span>
+                            <span class="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-1.5 pb-1.5 pt-6">
+                              <span class="line-clamp-2 text-xs leading-4 text-white" x-text="album.label"></span>
+                            </span>
+                          </button>
+                        </div>
                       </template>
                     </div>
                   </div>
@@ -598,12 +631,21 @@
               </div>
               <div class="min-h-0 flex-1 overflow-y-auto">
                 <div class="relative aspect-[3/4] bg-base-200">
-                  <img class="h-full w-full object-contain" x-show="activeSlot && slotPreview(activeSlot)" :src="activeSlot ? slotPreview(activeSlot) : ''" alt="" />
-                  <button class="btn btn-circle btn-xs absolute left-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100" type="button" x-show="hasGeneratedImage && imageTotal > 1" x-cloak @click="stepImage(-1)" aria-label="上一张">‹</button>
-                  <button class="btn btn-circle btn-xs absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100" type="button" x-show="hasGeneratedImage && imageTotal > 1" x-cloak @click="stepImage(1)" aria-label="下一张">›</button>
-                  <div class="absolute bottom-2 left-0 right-0 flex justify-center gap-1" x-show="imageTotal > 1">
+                  <button
+                    class="absolute inset-0 z-0 block h-full w-full overflow-hidden text-left"
+                    type="button"
+                    x-show="activeSlot && slotPreview(activeSlot)"
+                    x-cloak
+                    aria-label="全屏查看这张图"
+                    @click="openImageFullscreen()"
+                  >
+                    <img class="h-full w-full object-contain" :src="activeSlot ? slotPreview(activeSlot) : ''" alt="" />
+                  </button>
+                  <button class="btn btn-circle btn-xs absolute left-2 top-1/2 z-[1] -translate-y-1/2 opacity-0 group-hover:opacity-100" type="button" x-show="hasGeneratedImage && imageTotal > 1" x-cloak @click.stop="stepImage(-1)" aria-label="上一张">‹</button>
+                  <button class="btn btn-circle btn-xs absolute right-2 top-1/2 z-[1] -translate-y-1/2 opacity-0 group-hover:opacity-100" type="button" x-show="hasGeneratedImage && imageTotal > 1" x-cloak @click.stop="stepImage(1)" aria-label="下一张">›</button>
+                  <div class="absolute bottom-2 left-0 right-0 z-[1] flex justify-center gap-1" x-show="imageTotal > 1">
                     <template x-for="(item, index) in slots" :key="'dot-' + item.slot + '-' + item.index">
-                      <button class="h-1.5 w-1.5 rounded-full" type="button" :class="slotSelected(item) ? 'bg-[#FF2442]' : 'bg-white/80'" :aria-label="'第 ' + (index + 1) + ' 张'" :aria-current="slotSelected(item) ? 'true' : 'false'" @click="showSlide(index)"></button>
+                      <button class="h-1.5 w-1.5 rounded-full" type="button" :class="slotSelected(item) ? 'bg-[#FF2442]' : 'bg-white/80'" :aria-label="'第 ' + (index + 1) + ' 张'" :aria-current="slotSelected(item) ? 'true' : 'false'" @click.stop="showSlide(index)"></button>
                     </template>
                   </div>
                 </div>
@@ -986,6 +1028,38 @@
       </div>
     </div>
   </div>
+
+  <dialog
+    id="note-image-fullscreen"
+    class="note-image-fullscreen"
+    closedby="any"
+    x-ref="imageFullscreen"
+    aria-labelledby="note-image-fullscreen-title"
+    @click="onFullscreenDialogClick($event)"
+  >
+    <div class="relative flex max-h-[96dvh] max-w-[96vw] flex-col items-center gap-3 p-2">
+      <h2 id="note-image-fullscreen-title" class="sr-only">全屏预览</h2>
+      <button
+        class="btn btn-circle btn-sm absolute right-2 top-2 z-10 border border-base-300 bg-base-100"
+        type="button"
+        aria-label="关闭全屏"
+        @click="closeImageFullscreen()"
+      >×</button>
+      <button
+        class="block max-h-[90dvh] max-w-[96vw] cursor-zoom-out border-0 bg-transparent p-0"
+        type="button"
+        aria-label="关闭全屏预览"
+        @click="closeImageFullscreen()"
+      >
+        <img
+          class="max-h-[90dvh] max-w-[96vw] object-contain"
+          x-show="fullscreenPreview"
+          :src="fullscreenPreview"
+          alt=""
+        />
+      </button>
+    </div>
+  </dialog>
 
   <div
     id="upload-ref-pick-library-modal"

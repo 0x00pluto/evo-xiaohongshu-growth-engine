@@ -73,6 +73,10 @@ function notePage() {
     promptOpen: {},
     bodyDraft: '',
     activeKey: 'cover-0',
+    copyFeedbackKey: '',
+    copyFeedbackOk: null,
+    copyFeedbackTimer: null,
+    fullscreenPreview: '',
     albumStyleOpen: false,
     aspectPanelOpen: false,
     albums: [],
@@ -801,6 +805,15 @@ function notePage() {
     versionChosen(item, index) {
       return Boolean(item && item.image && item.image.selected === index + 1);
     },
+    slotCanCopy(item) {
+      return Boolean(
+        item
+        && item.image
+        && item.image.status === '成功'
+        && item.image.path
+        && this.slotPreview(item)
+      );
+    },
     drawKey(item) {
       // 键带上能不能点，以及这张图的修订号。列表复用旧节点时，disabled 和图片都会停在第一次的结果。
       const status = item && item.image && item.image.status ? item.image.status : '空';
@@ -1380,6 +1393,101 @@ function notePage() {
       this.dismissToast();
       if (!window.studioHost.go) return;
       await window.studioHost.go('history');
+    },
+    markCopyFeedback(key, ok) {
+      if (this.copyFeedbackTimer) {
+        clearTimeout(this.copyFeedbackTimer);
+        this.copyFeedbackTimer = null;
+      }
+      this.copyFeedbackKey = key;
+      this.copyFeedbackOk = ok;
+      this.copyFeedbackTimer = setTimeout(() => {
+        this.copyFeedbackKey = '';
+        this.copyFeedbackOk = null;
+        this.copyFeedbackTimer = null;
+      }, 2000);
+    },
+    async dataUrlToPngBlob(dataUrl) {
+      const raw = String(dataUrl || '').trim();
+      if (!raw) throw new Error('empty');
+      const img = new Image();
+      img.decoding = 'async';
+      img.src = raw;
+      if (typeof img.decode === 'function') await img.decode();
+      else {
+        await new Promise((resolve, reject) => {
+          img.onload = () => resolve();
+          img.onerror = () => reject(new Error('load'));
+        });
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth || img.width;
+      canvas.height = img.naturalHeight || img.height;
+      if (!canvas.width || !canvas.height) throw new Error('size');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('ctx');
+      ctx.drawImage(img, 0, 0);
+      const blob = await new Promise((resolve, reject) => {
+        canvas.toBlob((part) => {
+          if (part) resolve(part);
+          else reject(new Error('toBlob'));
+        }, 'image/png');
+      });
+      return blob;
+    },
+    async onCopySlotImage(item) {
+      if (!this.slotCanCopy(item)) return;
+      const key = this.promptKey(item);
+      const dataUrl = this.slotPreview(item);
+      try {
+        const blob = await this.dataUrlToPngBlob(dataUrl);
+        if (!navigator.clipboard || typeof navigator.clipboard.write !== 'function' || typeof ClipboardItem === 'undefined') {
+          throw new Error('clipboard');
+        }
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+        this.markCopyFeedback(key, true);
+        this.showToast('已复制', { type: 'success' });
+      } catch (err) {
+        this.markCopyFeedback(key, false);
+        this.showToast('没有复制成功');
+      }
+    },
+    openImageFullscreen() {
+      const src = this.activeSlot ? this.slotPreview(this.activeSlot) : '';
+      if (!src) return;
+      this.fullscreenPreview = src;
+      const dialog = this.$refs.imageFullscreen;
+      if (!dialog || typeof dialog.showModal !== 'function') return;
+      if (!dialog.open) dialog.showModal();
+      this.ensureFullscreenLightDismiss(dialog);
+    },
+    closeImageFullscreen() {
+      const dialog = this.$refs.imageFullscreen;
+      if (dialog && dialog.open) dialog.close();
+    },
+    onFullscreenDialogClick(event) {
+      const dialog = this.$refs.imageFullscreen;
+      if (!dialog) return;
+      if (event.target === dialog) dialog.close();
+    },
+    ensureFullscreenLightDismiss(dialog) {
+      if (!dialog || dialog.dataset.lightDismissBound === '1') return;
+      if (typeof HTMLDialogElement !== 'undefined' && 'closedBy' in HTMLDialogElement.prototype) {
+        dialog.dataset.lightDismissBound = '1';
+        return;
+      }
+      const outside = (e, node) => {
+        const r = node.getBoundingClientRect();
+        return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+      };
+      let pressedOutside = false;
+      dialog.addEventListener('pointerdown', (e) => {
+        pressedOutside = outside(e, dialog);
+      });
+      dialog.addEventListener('pointerup', (e) => {
+        if (pressedOutside && outside(e, dialog) && dialog.open) dialog.close();
+      });
+      dialog.dataset.lightDismissBound = '1';
     },
     async writeClipboard(text) {
       try {

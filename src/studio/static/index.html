@@ -121,6 +121,71 @@
         transform: none;
       }
     }
+    /* 成稿图条：选中用细边；风格浮层选中卡用外圈流光 */
+    .slot-thumb.is-selected {
+      box-shadow: 0 0 0 2px var(--color-base-content);
+    }
+    .style-glow-ring {
+      pointer-events: none;
+      position: absolute;
+      inset: -3px;
+      z-index: 0;
+      overflow: hidden;
+      border-radius: 0.5rem;
+    }
+    .style-glow-ring::before {
+      content: "";
+      position: absolute;
+      inset: -60%;
+      background: conic-gradient(
+        from 0deg,
+        transparent 0 62%,
+        rgba(255, 255, 255, 0.15) 70%,
+        var(--color-base-content) 78%,
+        rgba(255, 255, 255, 0.85) 84%,
+        var(--color-base-content) 90%,
+        transparent 98% 100%
+      );
+      opacity: 0.95;
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      .style-glow-ring::before {
+        animation: style-glow-spin 1.5s linear infinite;
+      }
+    }
+    @keyframes style-glow-spin {
+      to {
+        transform: rotate(1turn);
+      }
+    }
+    @media (hover: hover) {
+      .slot-copy-btn {
+        opacity: 0;
+      }
+      .slot-thumb:hover .slot-copy-btn,
+      .slot-thumb:focus-within .slot-copy-btn,
+      .slot-copy-btn:focus-visible,
+      .slot-copy-btn[data-copied],
+      .slot-copy-btn[data-failed] {
+        opacity: 1;
+      }
+    }
+    dialog.note-image-fullscreen:modal {
+      overscroll-behavior: contain;
+      margin: auto;
+      max-width: min(96vw, 56rem);
+      max-height: 96dvh;
+      width: auto;
+      height: auto;
+      border: 0;
+      background: transparent;
+      padding: 0;
+    }
+    dialog.note-image-fullscreen::backdrop {
+      overflow: hidden;
+      overscroll-behavior: contain;
+      background-color: rgba(0, 0, 0, 0.72);
+    }
   </style>
 </head>
 <body class="min-h-screen bg-base-100 text-base-content" x-data="shell()" x-cloak>
