@@ -118,19 +118,34 @@ test('本机服务的 loadLatest 在空目录返回空态', async () => {
     assert.match(noteJs, /素人:\s*\['种草',\s*'搜索'\]/);
     assert.match(noteJs, /官号:\s*\['引流',\s*'曝光',\s*'搜索',\s*'转化'\]/);
     assert.match(noteJs, /员工:\s*\['种草',\s*'引流',\s*'搜索',\s*'转化'\]/);
-    assert.match(noteJs, /我们的 logo，放在右上角。/);
+    assert.match(noteJs, /createNoteUploadRefs/);
+    assert.match(noteJs, /createNoteSamples/);
+    assert.match(noteJs, /createNoteReferences/);
     assert.match(noteJs, /REFERENCES_MAX = 5/);
-    assert.match(noteJs, /listLibraryArticleSamples/);
-    assert.match(noteJs, /saveLibraryArticleSample/);
-    assert.match(noteJs, /listLibraryReferenceDocs/);
-    assert.match(noteJs, /saveLibraryReferenceDoc/);
-    assert.match(noteJs, /pickLibraryReference/);
-    assert.match(noteJs, /isReferenceAlreadyOnNote/);
-    assert.match(noteJs, /filterAvailableReferenceDocs/);
-    assert.match(noteJs, /openCreateReferenceFromPick/);
-    assert.match(noteJs, /splitPasteToSample/);
-    assert.match(noteJs, /splitPasteToDoc/);
     assert.match(noteJs, /get canGenerateDraft/);
+
+    const uploadRefsJsFile = await fetch(`${started.url}pages/note/upload-refs.js`);
+    assert.equal(uploadRefsJsFile.status, 200);
+    const uploadRefsJs = await uploadRefsJsFile.text();
+    assert.match(uploadRefsJs, /我们的 logo，放在右上角。/);
+
+    const samplesJsFile = await fetch(`${started.url}pages/note/samples.js`);
+    assert.equal(samplesJsFile.status, 200);
+    const samplesJs = await samplesJsFile.text();
+    assert.match(samplesJs, /listLibraryArticleSamples/);
+    assert.match(samplesJs, /saveLibraryArticleSample/);
+    assert.match(samplesJs, /splitPasteToSample/);
+
+    const referencesJsFile = await fetch(`${started.url}pages/note/references.js`);
+    assert.equal(referencesJsFile.status, 200);
+    const referencesJs = await referencesJsFile.text();
+    assert.match(referencesJs, /listLibraryReferenceDocs/);
+    assert.match(referencesJs, /saveLibraryReferenceDoc/);
+    assert.match(referencesJs, /pickLibraryReference/);
+    assert.match(referencesJs, /isReferenceAlreadyOnNote/);
+    assert.match(referencesJs, /filterAvailableReferenceDocs/);
+    assert.match(referencesJs, /openCreateReferenceFromPick/);
+    assert.match(referencesJs, /splitPasteToDoc/);
 
     const libraryFile = await fetch(`${started.url}pages/library.html`);
     assert.equal(libraryFile.status, 200);
