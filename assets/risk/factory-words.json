@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "source": "prd-00019",
+  "source": "prd-00019 + feishu-xhs-forbidden-words",
   "scope": "xhs-note-visible-copy",
   "libraries": [
     {
@@ -19,37 +19,3085 @@
   "words": [
     {
       "libraryId": "ad_extreme",
-      "text": "最好",
+      "text": "100%",
       "severity": "要改口",
+      "industry": "通用",
+      "replacement": "尽量"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "NO.1",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "世界级",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "中国第一",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "人人都在用",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "全国第一",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "全球第一",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "全网第一",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "唯一",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "国家级",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "天花板",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "完美",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "巅峰",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "必买",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "必看",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "必选",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "无敌",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "最优",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "最佳",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "最值得",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "最受欢迎",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "最好",
+      "severity": "不能发",
+      "industry": "通用",
       "replacement": "更合适"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "最强",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "最推荐",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "最高级",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "极品",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "极致",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "独家",
+      "severity": "不能发",
+      "industry": "通用"
     },
     {
       "libraryId": "ad_extreme",
       "text": "第一",
       "severity": "要改口",
+      "industry": "通用",
       "replacement": "靠前"
     },
     {
       "libraryId": "ad_extreme",
-      "text": "100%",
-      "severity": "要改口",
-      "replacement": "尽量"
+      "text": "第一品牌",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "绝对",
+      "severity": "不能发",
+      "industry": "通用"
     },
     {
       "libraryId": "ad_extreme",
       "text": "绝对有效",
       "severity": "要改口",
+      "industry": "通用",
       "replacement": "按说明使用"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "行业标杆",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "行业第一",
+      "severity": "不能发",
+      "industry": "通用",
+      "replacement": "专注于某一细分领域"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "遥遥领先",
+      "severity": "不能发",
+      "industry": "通用",
+      "replacement": "在某些方面具有自身特点"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "销量冠军",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "顶级",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "顶配",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "首创",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "首选",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "+V",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "QQ号",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "VX",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "V我",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "主页有微",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "主页有联系方式",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "主页留联系方式",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "主页联系",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "二维码",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "其他平台见",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "加V",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "加好友",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "加微信",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "加联系方式",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "外部链接",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "头像有微",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "引流",
+      "severity": "要改口",
+      "industry": "通用"
     },
     {
       "libraryId": "offsite_traffic",
       "text": "微信",
-      "severity": "不能发"
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "微信二维码",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "微信号",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "微信同号",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "微我",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "手机号",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "扫码咨询",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "扫码添加",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "添加好友",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "点击链接",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "电话号码",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "看主页",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "社交媒体账号",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "私信我",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "私信领取",
+      "severity": "不能发",
+      "industry": "通用",
+      "replacement": "通过平台允许的内容功能获取信息"
     },
     {
       "libraryId": "offsite_traffic",
       "text": "私域",
-      "severity": "不能发"
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "站外沟通",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "第三方平台账号",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "联系方式",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "获客",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "跳转第三方",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "进群",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "通过其他平台联系",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "邮箱",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "100%成功",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "一定被淘汰",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "一次解决",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "不买就亏",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "专业团队",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "人人适用",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "人生彻底毁了",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "代理",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "伪造证书",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "低俗",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "侮辱",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保平安",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证成功",
+      "severity": "不能发",
+      "industry": "通用",
+      "replacement": "根据实际条件制定方案"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证收益",
+      "severity": "不能发",
+      "industry": "通用",
+      "replacement": "客观介绍历史表现及相关风险"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证获批",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "假冒专家",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "假冒医生",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "假冒律师",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "假冒教授",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "催姻缘",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "免费领取",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "全面提升",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "关注",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "关注我",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "关注账号",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "再不做就晚了",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "加盟",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "包录取",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "包移民",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "包过",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "化煞",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "变现",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "名额有限",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "咨询",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "国际认证",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "孩子输在起跑线",
+      "severity": "要改口",
+      "industry": "通用",
+      "replacement": "不同成长阶段的教育需求"
+    },
+    {
+      "libraryId": "banned",
+      "text": "官方指定",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "官方认证",
+      "severity": "要改口",
+      "industry": "通用",
+      "replacement": "明确具体认证机构和认证内容"
+    },
+    {
+      "libraryId": "banned",
+      "text": "家庭危机",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "开运",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "彻底解决",
+      "severity": "要改口",
+      "industry": "通用",
+      "replacement": "提供相应解决思路"
+    },
+    {
+      "libraryId": "banned",
+      "text": "必然失败",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "快速见效",
+      "severity": "要改口",
+      "industry": "通用",
+      "replacement": "具体进度视实际情况而定"
+    },
+    {
+      "libraryId": "banned",
+      "text": "性暗示",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "成交",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "战略合作伙伴",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "所有人都适合",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "招商",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "招财",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "接单",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "提升财运",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "收藏",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "改变命运",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "改命",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "改善运势",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "改运",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "政府合作",
+      "severity": "要改口",
+      "industry": "通用",
+      "replacement": "有真实合作关系及相应证明再使用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "无任何风险",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "无需任何条件",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "旺事业",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "旺夫",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "旺子",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "旺桃花",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "旺财",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "普通人没机会",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "权威专家",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "正能量磁场",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "歧视",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "永久保持",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "永久有效",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "消灾",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "点赞",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "百分百有效",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "稳赚不赔",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "立竿见影",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "经营",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "绝对安全",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "能量提升",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "色情",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "落后别人一大截",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "虚构合作案例",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "虚构客户评价",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "虚构服务经历",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "虚构机构",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "虚构认证",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "行业专家",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "评论",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "评论区扣1",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "评论区留言",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "财富危机",
+      "severity": "要改口",
+      "industry": "通用",
+      "replacement": "家庭资产管理中的常见问题"
+    },
+    {
+      "libraryId": "banned",
+      "text": "资深导师",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "转发",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "转运",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "转运消灾",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "轻松实现",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "辟邪",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "错过后悔一辈子",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "错过最佳时机",
+      "severity": "要改口",
+      "industry": "通用",
+      "replacement": "不同阶段的选择与规划"
+    },
+    {
+      "libraryId": "banned",
+      "text": "阶层固化",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "零风险",
+      "severity": "不能发",
+      "industry": "通用",
+      "replacement": "如实说明可能存在的风险"
+    },
+    {
+      "libraryId": "banned",
+      "text": "领取资料",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "首席顾问",
+      "severity": "要改口",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "低分逆袭",
+      "severity": "要改口",
+      "industry": "家庭教育与全球化规划",
+      "replacement": "不同学术背景下的申请策略"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保底名校",
+      "severity": "要改口",
+      "industry": "家庭教育与全球化规划"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保录取",
+      "severity": "不能发",
+      "industry": "家庭教育与全球化规划",
+      "replacement": "申请规划与材料准备"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证入学",
+      "severity": "不能发",
+      "industry": "家庭教育与全球化规划"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证升学",
+      "severity": "不能发",
+      "industry": "家庭教育与全球化规划"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证拿到Offer",
+      "severity": "不能发",
+      "industry": "家庭教育与全球化规划"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证高考提分",
+      "severity": "不能发",
+      "industry": "家庭教育与全球化规划"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保过班",
+      "severity": "要改口",
+      "industry": "家庭教育与全球化规划"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保过语言考试",
+      "severity": "不能发",
+      "industry": "家庭教育与全球化规划"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保进名校",
+      "severity": "不能发",
+      "industry": "家庭教育与全球化规划"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保进藤校",
+      "severity": "不能发",
+      "industry": "家庭教育与全球化规划"
+    },
+    {
+      "libraryId": "banned",
+      "text": "内部名额",
+      "severity": "不能发",
+      "industry": "家庭教育与全球化规划"
+    },
+    {
+      "libraryId": "banned",
+      "text": "内部招生",
+      "severity": "不能发",
+      "industry": "家庭教育与全球化规划"
+    },
+    {
+      "libraryId": "banned",
+      "text": "内部渠道",
+      "severity": "要改口",
+      "industry": "家庭教育与全球化规划",
+      "replacement": "院校公开招生信息"
+    },
+    {
+      "libraryId": "banned",
+      "text": "包录取",
+      "severity": "不能发",
+      "industry": "家庭教育与全球化规划"
+    },
+    {
+      "libraryId": "banned",
+      "text": "升学保证",
+      "severity": "要改口",
+      "industry": "家庭教育与全球化规划"
+    },
+    {
+      "libraryId": "banned",
+      "text": "升学无忧",
+      "severity": "要改口",
+      "industry": "家庭教育与全球化规划"
+    },
+    {
+      "libraryId": "banned",
+      "text": "名师一对一",
+      "severity": "要改口",
+      "industry": "家庭教育与全球化规划"
+    },
+    {
+      "libraryId": "banned",
+      "text": "名师押题",
+      "severity": "要改口",
+      "industry": "家庭教育与全球化规划"
+    },
+    {
+      "libraryId": "banned",
+      "text": "名校捷径",
+      "severity": "要改口",
+      "industry": "家庭教育与全球化规划"
+    },
+    {
+      "libraryId": "banned",
+      "text": "名校直通车",
+      "severity": "要改口",
+      "industry": "家庭教育与全球化规划"
+    },
+    {
+      "libraryId": "banned",
+      "text": "名校资源",
+      "severity": "要改口",
+      "industry": "家庭教育与全球化规划"
+    },
+    {
+      "libraryId": "banned",
+      "text": "快速提分",
+      "severity": "要改口",
+      "industry": "家庭教育与全球化规划"
+    },
+    {
+      "libraryId": "banned",
+      "text": "押题命中",
+      "severity": "要改口",
+      "industry": "家庭教育与全球化规划"
+    },
+    {
+      "libraryId": "banned",
+      "text": "提分神器",
+      "severity": "要改口",
+      "industry": "家庭教育与全球化规划"
+    },
+    {
+      "libraryId": "banned",
+      "text": "满分课程",
+      "severity": "要改口",
+      "industry": "家庭教育与全球化规划"
+    },
+    {
+      "libraryId": "banned",
+      "text": "百分百录取",
+      "severity": "不能发",
+      "industry": "家庭教育与全球化规划"
+    },
+    {
+      "libraryId": "banned",
+      "text": "考试包过",
+      "severity": "要改口",
+      "industry": "家庭教育与全球化规划"
+    },
+    {
+      "libraryId": "banned",
+      "text": "轻松留学",
+      "severity": "要改口",
+      "industry": "家庭教育与全球化规划"
+    },
+    {
+      "libraryId": "banned",
+      "text": "100%盈利",
+      "severity": "不能发",
+      "industry": "财富管理与家族传承"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保收益",
+      "severity": "不能发",
+      "industry": "财富管理与家族传承"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保本保息",
+      "severity": "不能发",
+      "industry": "财富管理与家族传承"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保本理财",
+      "severity": "要改口",
+      "industry": "财富管理与家族传承"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证分红",
+      "severity": "要改口",
+      "industry": "财富管理与家族传承",
+      "replacement": "依据合同约定及实际情况说明"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证回报",
+      "severity": "要改口",
+      "industry": "财富管理与家族传承"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证收益",
+      "severity": "不能发",
+      "industry": "财富管理与家族传承"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保险收益承诺",
+      "severity": "要改口",
+      "industry": "财富管理与家族传承"
+    },
+    {
+      "libraryId": "banned",
+      "text": "内幕消息",
+      "severity": "不能发",
+      "industry": "财富管理与家族传承"
+    },
+    {
+      "libraryId": "banned",
+      "text": "内部配额",
+      "severity": "不能发",
+      "industry": "财富管理与家族传承"
+    },
+    {
+      "libraryId": "banned",
+      "text": "固定高回报",
+      "severity": "不能发",
+      "industry": "财富管理与家族传承"
+    },
+    {
+      "libraryId": "banned",
+      "text": "快速回本",
+      "severity": "要改口",
+      "industry": "财富管理与家族传承"
+    },
+    {
+      "libraryId": "banned",
+      "text": "快速翻倍",
+      "severity": "不能发",
+      "industry": "财富管理与家族传承"
+    },
+    {
+      "libraryId": "banned",
+      "text": "收益保证",
+      "severity": "要改口",
+      "industry": "财富管理与家族传承"
+    },
+    {
+      "libraryId": "banned",
+      "text": "收益最大化",
+      "severity": "要改口",
+      "industry": "财富管理与家族传承",
+      "replacement": "综合评估风险与收益"
+    },
+    {
+      "libraryId": "banned",
+      "text": "无条件理赔",
+      "severity": "要改口",
+      "industry": "财富管理与家族传承"
+    },
+    {
+      "libraryId": "banned",
+      "text": "无风险套利",
+      "severity": "不能发",
+      "industry": "财富管理与家族传承"
+    },
+    {
+      "libraryId": "banned",
+      "text": "永久免税",
+      "severity": "要改口",
+      "industry": "财富管理与家族传承"
+    },
+    {
+      "libraryId": "banned",
+      "text": "稳赚",
+      "severity": "不能发",
+      "industry": "财富管理与家族传承"
+    },
+    {
+      "libraryId": "banned",
+      "text": "稳赚不赔",
+      "severity": "不能发",
+      "industry": "财富管理与家族传承",
+      "replacement": "介绍投资逻辑及风险因素"
+    },
+    {
+      "libraryId": "banned",
+      "text": "稳赚基金",
+      "severity": "要改口",
+      "industry": "财富管理与家族传承"
+    },
+    {
+      "libraryId": "banned",
+      "text": "稳赚策略",
+      "severity": "要改口",
+      "industry": "财富管理与家族传承"
+    },
+    {
+      "libraryId": "banned",
+      "text": "绝对安全",
+      "severity": "要改口",
+      "industry": "财富管理与家族传承"
+    },
+    {
+      "libraryId": "banned",
+      "text": "财富增值",
+      "severity": "要改口",
+      "industry": "财富管理与家族传承"
+    },
+    {
+      "libraryId": "banned",
+      "text": "财富密码",
+      "severity": "要改口",
+      "industry": "财富管理与家族传承"
+    },
+    {
+      "libraryId": "banned",
+      "text": "财富自由",
+      "severity": "要改口",
+      "industry": "财富管理与家族传承",
+      "replacement": "家庭长期财务目标"
+    },
+    {
+      "libraryId": "banned",
+      "text": "资产翻倍",
+      "severity": "要改口",
+      "industry": "财富管理与家族传承"
+    },
+    {
+      "libraryId": "banned",
+      "text": "资金安全保障",
+      "severity": "要改口",
+      "industry": "财富管理与家族传承"
+    },
+    {
+      "libraryId": "banned",
+      "text": "避税",
+      "severity": "要改口",
+      "industry": "财富管理与家族传承",
+      "replacement": "合规税务规划"
+    },
+    {
+      "libraryId": "banned",
+      "text": "零税负",
+      "severity": "要改口",
+      "industry": "财富管理与家族传承"
+    },
+    {
+      "libraryId": "banned",
+      "text": "零风险投资",
+      "severity": "不能发",
+      "industry": "财富管理与家族传承"
+    },
+    {
+      "libraryId": "banned",
+      "text": "非法荐股",
+      "severity": "不能发",
+      "industry": "财富管理与家族传承"
+    },
+    {
+      "libraryId": "banned",
+      "text": "高收益理财",
+      "severity": "要改口",
+      "industry": "财富管理与家族传承"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保值增值",
+      "severity": "要改口",
+      "industry": "高端房产与品质居住"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证升值",
+      "severity": "不能发",
+      "industry": "高端房产与品质居住",
+      "replacement": "区域历史价格及市场情况分析"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证回报",
+      "severity": "不能发",
+      "industry": "高端房产与品质居住"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证学区",
+      "severity": "不能发",
+      "industry": "高端房产与品质居住"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证租金",
+      "severity": "不能发",
+      "industry": "高端房产与品质居住"
+    },
+    {
+      "libraryId": "banned",
+      "text": "全城第一豪宅",
+      "severity": "要改口",
+      "industry": "高端房产与品质居住"
+    },
+    {
+      "libraryId": "banned",
+      "text": "内部房源",
+      "severity": "不能发",
+      "industry": "高端房产与品质居住"
+    },
+    {
+      "libraryId": "banned",
+      "text": "包租",
+      "severity": "不能发",
+      "industry": "高端房产与品质居住"
+    },
+    {
+      "libraryId": "banned",
+      "text": "学区房保证",
+      "severity": "要改口",
+      "industry": "高端房产与品质居住"
+    },
+    {
+      "libraryId": "banned",
+      "text": "房价必涨",
+      "severity": "要改口",
+      "industry": "高端房产与品质居住"
+    },
+    {
+      "libraryId": "banned",
+      "text": "投资稳赚",
+      "severity": "要改口",
+      "industry": "高端房产与品质居住"
+    },
+    {
+      "libraryId": "banned",
+      "text": "最佳地段",
+      "severity": "要改口",
+      "industry": "高端房产与品质居住",
+      "replacement": "区位条件及周边配套介绍"
+    },
+    {
+      "libraryId": "banned",
+      "text": "永不损坏",
+      "severity": "要改口",
+      "industry": "高端房产与品质居住"
+    },
+    {
+      "libraryId": "banned",
+      "text": "永久产权",
+      "severity": "不能发",
+      "industry": "高端房产与品质居住",
+      "replacement": "依据实际产权及法律文件说明"
+    },
+    {
+      "libraryId": "banned",
+      "text": "永久升值",
+      "severity": "要改口",
+      "industry": "高端房产与品质居住"
+    },
+    {
+      "libraryId": "banned",
+      "text": "永久增值",
+      "severity": "不能发",
+      "industry": "高端房产与品质居住"
+    },
+    {
+      "libraryId": "banned",
+      "text": "永久防水",
+      "severity": "要改口",
+      "industry": "高端房产与品质居住"
+    },
+    {
+      "libraryId": "banned",
+      "text": "百分百产权",
+      "severity": "不能发",
+      "industry": "高端房产与品质居住"
+    },
+    {
+      "libraryId": "banned",
+      "text": "百分百无污染",
+      "severity": "要改口",
+      "industry": "高端房产与品质居住"
+    },
+    {
+      "libraryId": "banned",
+      "text": "百分百隔音",
+      "severity": "要改口",
+      "industry": "高端房产与品质居住"
+    },
+    {
+      "libraryId": "banned",
+      "text": "稀缺资产",
+      "severity": "要改口",
+      "industry": "高端房产与品质居住"
+    },
+    {
+      "libraryId": "banned",
+      "text": "稳赚不赔",
+      "severity": "不能发",
+      "industry": "高端房产与品质居住"
+    },
+    {
+      "libraryId": "banned",
+      "text": "稳赚投资",
+      "severity": "要改口",
+      "industry": "高端房产与品质居住",
+      "replacement": "房产投资风险与成本分析"
+    },
+    {
+      "libraryId": "banned",
+      "text": "终身质保",
+      "severity": "要改口",
+      "industry": "高端房产与品质居住"
+    },
+    {
+      "libraryId": "banned",
+      "text": "绝对环保",
+      "severity": "要改口",
+      "industry": "高端房产与品质居住"
+    },
+    {
+      "libraryId": "banned",
+      "text": "绝版房源",
+      "severity": "要改口",
+      "industry": "高端房产与品质居住",
+      "replacement": "介绍具体房源特点"
+    },
+    {
+      "libraryId": "banned",
+      "text": "零甲醛",
+      "severity": "要改口",
+      "industry": "高端房产与品质居住",
+      "replacement": "依据检测报告说明甲醛指标"
+    },
+    {
+      "libraryId": "banned",
+      "text": "零风险装修",
+      "severity": "要改口",
+      "industry": "高端房产与品质居住"
+    },
+    {
+      "libraryId": "banned",
+      "text": "零风险购房",
+      "severity": "不能发",
+      "industry": "高端房产与品质居住"
+    },
+    {
+      "libraryId": "banned",
+      "text": "一次见效",
+      "severity": "不能发",
+      "industry": "医疗健康与养老",
+      "replacement": "实际效果因人而异"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证增高",
+      "severity": "不能发",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证瘦身",
+      "severity": "不能发",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "修复身体",
+      "severity": "要改口",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "冻龄",
+      "severity": "要改口",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "包治",
+      "severity": "不能发",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "基因修复",
+      "severity": "要改口",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "完全康复",
+      "severity": "要改口",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "年轻十岁",
+      "severity": "要改口",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "延长寿命",
+      "severity": "要改口",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "彻底康复",
+      "severity": "不能发",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "快速减脂",
+      "severity": "要改口",
+      "industry": "医疗健康与养老",
+      "replacement": "科学体重管理方法"
+    },
+    {
+      "libraryId": "banned",
+      "text": "快速恢复",
+      "severity": "要改口",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "抗衰老",
+      "severity": "要改口",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "排毒",
+      "severity": "要改口",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "提高免疫力",
+      "severity": "要改口",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "改善所有慢性病",
+      "severity": "要改口",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "改善疾病",
+      "severity": "要改口",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "效果立竿见影",
+      "severity": "要改口",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "无副作用",
+      "severity": "不能发",
+      "industry": "医疗健康与养老",
+      "replacement": "依据产品说明及专业评估介绍风险"
+    },
+    {
+      "libraryId": "banned",
+      "text": "无痕",
+      "severity": "要改口",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "无痛无创",
+      "severity": "不能发",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "根治",
+      "severity": "不能发",
+      "industry": "医疗健康与养老",
+      "replacement": "具体医疗方案及适用条件"
+    },
+    {
+      "libraryId": "banned",
+      "text": "永不复发",
+      "severity": "不能发",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "永不生病",
+      "severity": "要改口",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "永久定型",
+      "severity": "不能发",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "永久年轻",
+      "severity": "不能发",
+      "industry": "医疗健康与养老",
+      "replacement": "日常健康管理与生活方式"
+    },
+    {
+      "libraryId": "banned",
+      "text": "永久抗衰",
+      "severity": "不能发",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "永久祛皱",
+      "severity": "不能发",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "永久美白",
+      "severity": "不能发",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "治愈",
+      "severity": "不能发",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "激活细胞",
+      "severity": "要改口",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "燃脂",
+      "severity": "要改口",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "疾病预防保证",
+      "severity": "要改口",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "百分百安全",
+      "severity": "不能发",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "百分百有效",
+      "severity": "不能发",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "童颜",
+      "severity": "要改口",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "细胞修复",
+      "severity": "要改口",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "绝对无风险",
+      "severity": "不能发",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "返老还童",
+      "severity": "不能发",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "逆转衰老",
+      "severity": "不能发",
+      "industry": "医疗健康与养老",
+      "replacement": "年龄相关健康管理知识"
+    },
+    {
+      "libraryId": "banned",
+      "text": "逆龄",
+      "severity": "要改口",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "长寿秘诀",
+      "severity": "要改口",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "零创伤",
+      "severity": "要改口",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "零恢复期",
+      "severity": "不能发",
+      "industry": "医疗健康与养老"
+    },
+    {
+      "libraryId": "banned",
+      "text": "VIP通道",
+      "severity": "要改口",
+      "industry": "高端旅游与旅行体验"
+    },
+    {
+      "libraryId": "banned",
+      "text": "世界第一酒店",
+      "severity": "要改口",
+      "industry": "高端旅游与旅行体验"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证入住",
+      "severity": "不能发",
+      "industry": "高端旅游与旅行体验",
+      "replacement": "依据酒店订单确认入住安排"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证入境",
+      "severity": "不能发",
+      "industry": "高端旅游与旅行体验"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证出签",
+      "severity": "不能发",
+      "industry": "高端旅游与旅行体验",
+      "replacement": "根据申请条件整理签证材料"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证升舱",
+      "severity": "不能发",
+      "industry": "高端旅游与旅行体验"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证成行",
+      "severity": "要改口",
+      "industry": "高端旅游与旅行体验",
+      "replacement": "依据实际预订及出行条件说明"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证航班",
+      "severity": "不能发",
+      "industry": "高端旅游与旅行体验"
+    },
+    {
+      "libraryId": "banned",
+      "text": "免排队",
+      "severity": "要改口",
+      "industry": "高端旅游与旅行体验"
+    },
+    {
+      "libraryId": "banned",
+      "text": "免签保证",
+      "severity": "不能发",
+      "industry": "高端旅游与旅行体验"
+    },
+    {
+      "libraryId": "banned",
+      "text": "免签包过",
+      "severity": "要改口",
+      "industry": "高端旅游与旅行体验"
+    },
+    {
+      "libraryId": "banned",
+      "text": "全球最美",
+      "severity": "要改口",
+      "industry": "高端旅游与旅行体验",
+      "replacement": "介绍当地景观特色"
+    },
+    {
+      "libraryId": "banned",
+      "text": "全网最低价",
+      "severity": "要改口",
+      "industry": "高端旅游与旅行体验"
+    },
+    {
+      "libraryId": "banned",
+      "text": "内部房",
+      "severity": "要改口",
+      "industry": "高端旅游与旅行体验"
+    },
+    {
+      "libraryId": "banned",
+      "text": "内部渠道",
+      "severity": "要改口",
+      "industry": "高端旅游与旅行体验"
+    },
+    {
+      "libraryId": "banned",
+      "text": "内部票",
+      "severity": "要改口",
+      "industry": "高端旅游与旅行体验"
+    },
+    {
+      "libraryId": "banned",
+      "text": "包过签证",
+      "severity": "不能发",
+      "industry": "高端旅游与旅行体验"
+    },
+    {
+      "libraryId": "banned",
+      "text": "特殊签证渠道",
+      "severity": "要改口",
+      "industry": "高端旅游与旅行体验"
+    },
+    {
+      "libraryId": "banned",
+      "text": "特殊通道",
+      "severity": "要改口",
+      "industry": "高端旅游与旅行体验"
+    },
+    {
+      "libraryId": "banned",
+      "text": "独家资源",
+      "severity": "要改口",
+      "industry": "高端旅游与旅行体验",
+      "replacement": "介绍实际合作资源"
+    },
+    {
+      "libraryId": "banned",
+      "text": "百分百成团",
+      "severity": "要改口",
+      "industry": "高端旅游与旅行体验"
+    },
+    {
+      "libraryId": "banned",
+      "text": "百分百过签",
+      "severity": "不能发",
+      "industry": "高端旅游与旅行体验"
+    },
+    {
+      "libraryId": "banned",
+      "text": "绝对安全",
+      "severity": "要改口",
+      "industry": "高端旅游与旅行体验",
+      "replacement": "介绍安全保障措施与风险提示"
+    },
+    {
+      "libraryId": "banned",
+      "text": "零风险出行",
+      "severity": "不能发",
+      "industry": "高端旅游与旅行体验"
+    },
+    {
+      "libraryId": "banned",
+      "text": "顶级体验",
+      "severity": "要改口",
+      "industry": "高端旅游与旅行体验"
+    },
+    {
+      "libraryId": "banned",
+      "text": "世界级工艺",
+      "severity": "要改口",
+      "industry": "高端消费与艺术收藏"
+    },
+    {
+      "libraryId": "banned",
+      "text": "传世之作",
+      "severity": "要改口",
+      "industry": "高端消费与艺术收藏"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保值率第一",
+      "severity": "不能发",
+      "industry": "高端消费与艺术收藏"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证升值",
+      "severity": "不能发",
+      "industry": "高端消费与艺术收藏"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证回购",
+      "severity": "不能发",
+      "industry": "高端消费与艺术收藏"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证增值",
+      "severity": "不能发",
+      "industry": "高端消费与艺术收藏"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证拍卖成交",
+      "severity": "不能发",
+      "industry": "高端消费与艺术收藏"
+    },
+    {
+      "libraryId": "banned",
+      "text": "升值空间巨大",
+      "severity": "要改口",
+      "industry": "高端消费与艺术收藏"
+    },
+    {
+      "libraryId": "banned",
+      "text": "唯一真迹",
+      "severity": "要改口",
+      "industry": "高端消费与艺术收藏"
+    },
+    {
+      "libraryId": "banned",
+      "text": "国家级珍藏",
+      "severity": "要改口",
+      "industry": "高端消费与艺术收藏"
+    },
+    {
+      "libraryId": "banned",
+      "text": "孤品",
+      "severity": "要改口",
+      "industry": "高端消费与艺术收藏"
+    },
+    {
+      "libraryId": "banned",
+      "text": "完美无瑕",
+      "severity": "不能发",
+      "industry": "高端消费与艺术收藏"
+    },
+    {
+      "libraryId": "banned",
+      "text": "投资价值极高",
+      "severity": "要改口",
+      "industry": "高端消费与艺术收藏"
+    },
+    {
+      "libraryId": "banned",
+      "text": "投资回报率",
+      "severity": "要改口",
+      "industry": "高端消费与艺术收藏"
+    },
+    {
+      "libraryId": "banned",
+      "text": "招财",
+      "severity": "不能发",
+      "industry": "高端消费与艺术收藏"
+    },
+    {
+      "libraryId": "banned",
+      "text": "收藏级",
+      "severity": "要改口",
+      "industry": "高端消费与艺术收藏"
+    },
+    {
+      "libraryId": "banned",
+      "text": "无瑕疵",
+      "severity": "要改口",
+      "industry": "高端消费与艺术收藏"
+    },
+    {
+      "libraryId": "banned",
+      "text": "旺财",
+      "severity": "不能发",
+      "industry": "高端消费与艺术收藏"
+    },
+    {
+      "libraryId": "banned",
+      "text": "未来升值空间",
+      "severity": "要改口",
+      "industry": "高端消费与艺术收藏"
+    },
+    {
+      "libraryId": "banned",
+      "text": "极品宝石",
+      "severity": "要改口",
+      "industry": "高端消费与艺术收藏"
+    },
+    {
+      "libraryId": "banned",
+      "text": "永不掉色",
+      "severity": "不能发",
+      "industry": "高端消费与艺术收藏"
+    },
+    {
+      "libraryId": "banned",
+      "text": "永不褪色",
+      "severity": "要改口",
+      "industry": "高端消费与艺术收藏"
+    },
+    {
+      "libraryId": "banned",
+      "text": "永久保值",
+      "severity": "不能发",
+      "industry": "高端消费与艺术收藏"
+    },
+    {
+      "libraryId": "banned",
+      "text": "永久增值",
+      "severity": "不能发",
+      "industry": "高端消费与艺术收藏"
+    },
+    {
+      "libraryId": "banned",
+      "text": "永久防水",
+      "severity": "要改口",
+      "industry": "高端消费与艺术收藏"
+    },
+    {
+      "libraryId": "banned",
+      "text": "百分百天然",
+      "severity": "要改口",
+      "industry": "高端消费与艺术收藏"
+    },
+    {
+      "libraryId": "banned",
+      "text": "百分百真迹",
+      "severity": "不能发",
+      "industry": "高端消费与艺术收藏",
+      "replacement": "依据可靠鉴定资料说明作品来源"
+    },
+    {
+      "libraryId": "banned",
+      "text": "百分百纯金",
+      "severity": "不能发",
+      "industry": "高端消费与艺术收藏"
+    },
+    {
+      "libraryId": "banned",
+      "text": "稀世珍品",
+      "severity": "要改口",
+      "industry": "高端消费与艺术收藏"
+    },
+    {
+      "libraryId": "banned",
+      "text": "稳赚不赔",
+      "severity": "不能发",
+      "industry": "高端消费与艺术收藏"
+    },
+    {
+      "libraryId": "banned",
+      "text": "纯天然无优化",
+      "severity": "要改口",
+      "industry": "高端消费与艺术收藏"
+    },
+    {
+      "libraryId": "banned",
+      "text": "绝世珍品",
+      "severity": "要改口",
+      "industry": "高端消费与艺术收藏"
+    },
+    {
+      "libraryId": "banned",
+      "text": "绝对不掉钻",
+      "severity": "要改口",
+      "industry": "高端消费与艺术收藏"
+    },
+    {
+      "libraryId": "banned",
+      "text": "绝对保真",
+      "severity": "不能发",
+      "industry": "高端消费与艺术收藏"
+    },
+    {
+      "libraryId": "banned",
+      "text": "绝对纯天然",
+      "severity": "不能发",
+      "industry": "高端消费与艺术收藏",
+      "replacement": "依据检测结果客观描述"
+    },
+    {
+      "libraryId": "banned",
+      "text": "绝版珍藏",
+      "severity": "要改口",
+      "industry": "高端消费与艺术收藏"
+    },
+    {
+      "libraryId": "banned",
+      "text": "转运",
+      "severity": "不能发",
+      "industry": "高端消费与艺术收藏"
+    },
+    {
+      "libraryId": "banned",
+      "text": "辟邪",
+      "severity": "不能发",
+      "industry": "高端消费与艺术收藏"
+    },
+    {
+      "libraryId": "banned",
+      "text": "顶级收藏",
+      "severity": "要改口",
+      "industry": "高端消费与艺术收藏"
+    },
+    {
+      "libraryId": "banned",
+      "text": "顶级珠宝",
+      "severity": "要改口",
+      "industry": "高端消费与艺术收藏"
+    },
+    {
+      "libraryId": "banned",
+      "text": "专业康复",
+      "severity": "要改口",
+      "industry": "高端运动与休闲社交"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证减肥",
+      "severity": "不能发",
+      "industry": "高端运动与休闲社交"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证增高",
+      "severity": "不能发",
+      "industry": "高端运动与休闲社交"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证康复",
+      "severity": "不能发",
+      "industry": "高端运动与休闲社交",
+      "replacement": "运动恢复与专业评估"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证拿证",
+      "severity": "要改口",
+      "industry": "高端运动与休闲社交"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证比赛获奖",
+      "severity": "要改口",
+      "industry": "高端运动与休闲社交"
+    },
+    {
+      "libraryId": "banned",
+      "text": "包学会",
+      "severity": "要改口",
+      "industry": "高端运动与休闲社交",
+      "replacement": "介绍课程安排和训练内容"
+    },
+    {
+      "libraryId": "banned",
+      "text": "包拿证",
+      "severity": "要改口",
+      "industry": "高端运动与休闲社交"
+    },
+    {
+      "libraryId": "banned",
+      "text": "包过考试",
+      "severity": "要改口",
+      "industry": "高端运动与休闲社交"
+    },
+    {
+      "libraryId": "banned",
+      "text": "快速燃脂",
+      "severity": "要改口",
+      "industry": "高端运动与休闲社交",
+      "replacement": "运动方式及身体活动知识"
+    },
+    {
+      "libraryId": "banned",
+      "text": "快速瘦身",
+      "severity": "不能发",
+      "industry": "高端运动与休闲社交"
+    },
+    {
+      "libraryId": "banned",
+      "text": "无风险训练",
+      "severity": "不能发",
+      "industry": "高端运动与休闲社交"
+    },
+    {
+      "libraryId": "banned",
+      "text": "极速塑形",
+      "severity": "要改口",
+      "industry": "高端运动与休闲社交"
+    },
+    {
+      "libraryId": "banned",
+      "text": "根治运动损伤",
+      "severity": "不能发",
+      "industry": "高端运动与休闲社交"
+    },
+    {
+      "libraryId": "banned",
+      "text": "永久不反弹",
+      "severity": "不能发",
+      "industry": "高端运动与休闲社交"
+    },
+    {
+      "libraryId": "banned",
+      "text": "永久瘦身",
+      "severity": "要改口",
+      "industry": "高端运动与休闲社交"
+    },
+    {
+      "libraryId": "banned",
+      "text": "百分百塑形",
+      "severity": "不能发",
+      "industry": "高端运动与休闲社交"
+    },
+    {
+      "libraryId": "banned",
+      "text": "百分百晋级",
+      "severity": "要改口",
+      "industry": "高端运动与休闲社交"
+    },
+    {
+      "libraryId": "banned",
+      "text": "躺瘦",
+      "severity": "要改口",
+      "industry": "高端运动与休闲社交"
+    },
+    {
+      "libraryId": "banned",
+      "text": "逆龄运动",
+      "severity": "要改口",
+      "industry": "高端运动与休闲社交"
+    },
+    {
+      "libraryId": "banned",
+      "text": "速成教练",
+      "severity": "要改口",
+      "industry": "高端运动与休闲社交"
+    },
+    {
+      "libraryId": "banned",
+      "text": "零基础速成",
+      "severity": "要改口",
+      "industry": "高端运动与休闲社交"
+    },
+    {
+      "libraryId": "banned",
+      "text": "优质女性",
+      "severity": "要改口",
+      "industry": "高端婚恋与婚礼服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "优质对象保证",
+      "severity": "要改口",
+      "industry": "高端婚恋与婚礼服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "优质男性",
+      "severity": "要改口",
+      "industry": "高端婚恋与婚礼服务",
+      "replacement": "介绍择偶标准与个人条件"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证娶到富豪",
+      "severity": "不能发",
+      "industry": "高端婚恋与婚礼服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证嫁入豪门",
+      "severity": "不能发",
+      "industry": "高端婚恋与婚礼服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证幸福",
+      "severity": "不能发",
+      "industry": "高端婚恋与婚礼服务",
+      "replacement": "分享婚姻沟通与关系建设知识"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证找到对象",
+      "severity": "不能发",
+      "industry": "高端婚恋与婚礼服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证牵手",
+      "severity": "要改口",
+      "industry": "高端婚恋与婚礼服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证结婚",
+      "severity": "不能发",
+      "industry": "高端婚恋与婚礼服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证脱单",
+      "severity": "不能发",
+      "industry": "高端婚恋与婚礼服务",
+      "replacement": "婚恋需求与择偶偏好分析"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证零失误",
+      "severity": "要改口",
+      "industry": "高端婚恋与婚礼服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "全球第一婚礼策划",
+      "severity": "要改口",
+      "industry": "高端婚恋与婚礼服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "全程无忧",
+      "severity": "要改口",
+      "industry": "高端婚恋与婚礼服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "内部资源",
+      "severity": "要改口",
+      "industry": "高端婚恋与婚礼服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "包成功",
+      "severity": "不能发",
+      "industry": "高端婚恋与婚礼服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "名媛圈",
+      "severity": "要改口",
+      "industry": "高端婚恋与婚礼服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "婚恋成功率100%",
+      "severity": "要改口",
+      "industry": "高端婚恋与婚礼服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "富豪相亲",
+      "severity": "要改口",
+      "industry": "高端婚恋与婚礼服务",
+      "replacement": "不同人群的婚恋需求"
+    },
+    {
+      "libraryId": "banned",
+      "text": "成功人士专属",
+      "severity": "要改口",
+      "industry": "高端婚恋与婚礼服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "最完美婚礼",
+      "severity": "要改口",
+      "industry": "高端婚恋与婚礼服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "百分百匹配",
+      "severity": "不能发",
+      "industry": "高端婚恋与婚礼服务",
+      "replacement": "依据双方实际需求进行匹配"
+    },
+    {
+      "libraryId": "banned",
+      "text": "百分百脱单",
+      "severity": "不能发",
+      "industry": "高端婚恋与婚礼服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "精准匹配",
+      "severity": "要改口",
+      "industry": "高端婚恋与婚礼服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "精英圈层",
+      "severity": "要改口",
+      "industry": "高端婚恋与婚礼服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "绝不踩雷",
+      "severity": "要改口",
+      "industry": "高端婚恋与婚礼服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "绝对满意",
+      "severity": "要改口",
+      "industry": "高端婚恋与婚礼服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "绝对靠谱",
+      "severity": "不能发",
+      "industry": "高端婚恋与婚礼服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "顶级婚恋资源",
+      "severity": "要改口",
+      "industry": "高端婚恋与婚礼服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "高净值男士",
+      "severity": "要改口",
+      "industry": "高端婚恋与婚礼服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "上市捷径",
+      "severity": "要改口",
+      "industry": "企业家商业发展服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "业绩翻倍",
+      "severity": "要改口",
+      "industry": "企业家商业发展服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "买卖发票",
+      "severity": "不能发",
+      "industry": "企业家商业发展服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证上市",
+      "severity": "不能发",
+      "industry": "企业家商业发展服务",
+      "replacement": "企业上市准备与合规要求"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证不被查",
+      "severity": "不能发",
+      "industry": "企业家商业发展服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证增长",
+      "severity": "不能发",
+      "industry": "企业家商业发展服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证成交",
+      "severity": "要改口",
+      "industry": "企业家商业发展服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证爆款",
+      "severity": "要改口",
+      "industry": "企业家商业发展服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证盈利",
+      "severity": "不能发",
+      "industry": "企业家商业发展服务",
+      "replacement": "企业盈利模式分析"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证签单",
+      "severity": "不能发",
+      "industry": "企业家商业发展服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证获得政策扶持",
+      "severity": "不能发",
+      "industry": "企业家商业发展服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证融资",
+      "severity": "不能发",
+      "industry": "企业家商业发展服务",
+      "replacement": "融资条件及融资方案分析"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证贷款审批",
+      "severity": "不能发",
+      "industry": "企业家商业发展服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证避税",
+      "severity": "不能发",
+      "industry": "企业家商业发展服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "偷税",
+      "severity": "不能发",
+      "industry": "企业家商业发展服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "内部关系",
+      "severity": "要改口",
+      "industry": "企业家商业发展服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "利润最大化",
+      "severity": "要改口",
+      "industry": "企业家商业发展服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "利润翻倍",
+      "severity": "要改口",
+      "industry": "企业家商业发展服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "加盟稳赚",
+      "severity": "要改口",
+      "industry": "企业家商业发展服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "包业绩增长",
+      "severity": "要改口",
+      "industry": "企业家商业发展服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "包拿政府补贴",
+      "severity": "不能发",
+      "industry": "企业家商业发展服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "包过税务稽查",
+      "severity": "不能发",
+      "industry": "企业家商业发展服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "合理避税",
+      "severity": "要改口",
+      "industry": "企业家商业发展服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "快速变现",
+      "severity": "要改口",
+      "industry": "企业家商业发展服务",
+      "replacement": "商业模式及收入结构研究"
+    },
+    {
+      "libraryId": "banned",
+      "text": "快速增长",
+      "severity": "要改口",
+      "industry": "企业家商业发展服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "快速节税",
+      "severity": "要改口",
+      "industry": "企业家商业发展服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "快速起号",
+      "severity": "要改口",
+      "industry": "企业家商业发展服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "招商必成",
+      "severity": "要改口",
+      "industry": "企业家商业发展服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "政府资源",
+      "severity": "要改口",
+      "industry": "企业家商业发展服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "特殊渠道",
+      "severity": "要改口",
+      "industry": "企业家商业发展服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "百分百合规",
+      "severity": "要改口",
+      "industry": "企业家商业发展服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "百分百成功",
+      "severity": "不能发",
+      "industry": "企业家商业发展服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "百分百获客",
+      "severity": "要改口",
+      "industry": "企业家商业发展服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "税务优化",
+      "severity": "要改口",
+      "industry": "企业家商业发展服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "税务洗白",
+      "severity": "不能发",
+      "industry": "企业家商业发展服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "税负清零",
+      "severity": "要改口",
+      "industry": "企业家商业发展服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "虚开发票",
+      "severity": "不能发",
+      "industry": "企业家商业发展服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "融资通道",
+      "severity": "要改口",
+      "industry": "企业家商业发展服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "财务自由",
+      "severity": "要改口",
+      "industry": "企业家商业发展服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "资源整合",
+      "severity": "要改口",
+      "industry": "企业家商业发展服务",
+      "replacement": "产业合作与资源协同"
+    },
+    {
+      "libraryId": "banned",
+      "text": "逃税",
+      "severity": "不能发",
+      "industry": "企业家商业发展服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "零成本管理",
+      "severity": "要改口",
+      "industry": "企业家商业发展服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "零税负",
+      "severity": "要改口",
+      "industry": "企业家商业发展服务",
+      "replacement": "合规税务管理"
+    },
+    {
+      "libraryId": "banned",
+      "text": "零风险创业",
+      "severity": "不能发",
+      "industry": "企业家商业发展服务"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证人员忠诚",
+      "severity": "要改口",
+      "industry": "私人家庭服务与生活管家"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证人员背景",
+      "severity": "不能发",
+      "industry": "私人家庭服务与生活管家"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证无事故",
+      "severity": "要改口",
+      "industry": "私人家庭服务与生活管家"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证服务效果",
+      "severity": "不能发",
+      "industry": "私人家庭服务与生活管家"
+    },
+    {
+      "libraryId": "banned",
+      "text": "保证隐私",
+      "severity": "不能发",
+      "industry": "私人家庭服务与生活管家",
+      "replacement": "介绍隐私保护制度"
+    },
+    {
+      "libraryId": "banned",
+      "text": "全天候无风险",
+      "severity": "要改口",
+      "industry": "私人家庭服务与生活管家"
+    },
+    {
+      "libraryId": "banned",
+      "text": "全球资源",
+      "severity": "要改口",
+      "industry": "私人家庭服务与生活管家"
+    },
+    {
+      "libraryId": "banned",
+      "text": "全程无忧",
+      "severity": "要改口",
+      "industry": "私人家庭服务与生活管家",
+      "replacement": "说明具体服务保障范围"
+    },
+    {
+      "libraryId": "banned",
+      "text": "内部渠道",
+      "severity": "要改口",
+      "industry": "私人家庭服务与生活管家"
+    },
+    {
+      "libraryId": "banned",
+      "text": "尊贵身份",
+      "severity": "要改口",
+      "industry": "私人家庭服务与生活管家"
+    },
+    {
+      "libraryId": "banned",
+      "text": "无条件赔偿",
+      "severity": "不能发",
+      "industry": "私人家庭服务与生活管家"
+    },
+    {
+      "libraryId": "banned",
+      "text": "永久保障",
+      "severity": "不能发",
+      "industry": "私人家庭服务与生活管家"
+    },
+    {
+      "libraryId": "banned",
+      "text": "永久售后",
+      "severity": "要改口",
+      "industry": "私人家庭服务与生活管家"
+    },
+    {
+      "libraryId": "banned",
+      "text": "特权服务",
+      "severity": "要改口",
+      "industry": "私人家庭服务与生活管家",
+      "replacement": "介绍具体服务范围"
+    },
+    {
+      "libraryId": "banned",
+      "text": "特殊关系",
+      "severity": "要改口",
+      "industry": "私人家庭服务与生活管家"
+    },
+    {
+      "libraryId": "banned",
+      "text": "百分百可靠",
+      "severity": "要改口",
+      "industry": "私人家庭服务与生活管家"
+    },
+    {
+      "libraryId": "banned",
+      "text": "百分百放心",
+      "severity": "不能发",
+      "industry": "私人家庭服务与生活管家"
+    },
+    {
+      "libraryId": "banned",
+      "text": "私人专属",
+      "severity": "要改口",
+      "industry": "私人家庭服务与生活管家"
+    },
+    {
+      "libraryId": "banned",
+      "text": "私人资源",
+      "severity": "要改口",
+      "industry": "私人家庭服务与生活管家"
+    },
+    {
+      "libraryId": "banned",
+      "text": "绝对保密",
+      "severity": "要改口",
+      "industry": "私人家庭服务与生活管家"
+    },
+    {
+      "libraryId": "banned",
+      "text": "绝对安全",
+      "severity": "不能发",
+      "industry": "私人家庭服务与生活管家",
+      "replacement": "介绍实际安全管理措施"
+    },
+    {
+      "libraryId": "banned",
+      "text": "绝对放心",
+      "severity": "要改口",
+      "industry": "私人家庭服务与生活管家"
+    },
+    {
+      "libraryId": "banned",
+      "text": "零风险服务",
+      "severity": "不能发",
+      "industry": "私人家庭服务与生活管家"
+    },
+    {
+      "libraryId": "banned",
+      "text": "顶级管家",
+      "severity": "要改口",
+      "industry": "私人家庭服务与生活管家",
+      "replacement": "介绍管家服务内容及经验"
     }
   ]
 }
