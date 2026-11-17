@@ -132,6 +132,13 @@
             await loadScript('lib/risk-ai-poll-wait.js');
             await loadScript('lib/risk-client.js');
           }
+          if (id === 'note') {
+            await loadScript('pages/note/references.js');
+            await loadScript('pages/note/samples.js');
+            await loadScript('pages/note/upload-refs.js');
+            await loadScript('pages/note/images.js');
+            await loadScript('pages/note/albums.js');
+          }
           await loadScript(`pages/${id}.js`);
           // 资料库壳下面还有资源 Tab 模块，须在 initTree 前挂好。
           if (id === 'library') {

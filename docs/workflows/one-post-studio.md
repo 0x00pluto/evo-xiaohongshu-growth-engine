@@ -1,6 +1,6 @@
 # 一篇图文操作台
 
-同一张页面有两种入口。在 Dex Buddy 里，按钮走 `window.dex.call`。用本机命令打开时，按钮走 `POST /api/one-post/<方法>`。成稿、提示词和生图仍是 `src/one-post`，操作台不另写一套业务。
+同一张页面有两种入口。在 Dex Buddy 里，按钮走 `window.dex.call`。用本机命令打开时，按钮走 `POST /api/one-post/<方法>`。成稿、提示词和生图仍是 `src/one-post`：`createRunner` 在 `src/one-post/run.js`，域方法袋在 `src/one-post/runner/`（draft 再分 copy/prompts/images/posts；xhs-notes 再分 resolve/import/library；另有 albums / upload-refs / library-copy / risk）；操作台不另写一套业务。写笔记页 JS 在 `src/studio/static/pages/note.js` 与 `pages/note/`。
 
 ## 入口
 

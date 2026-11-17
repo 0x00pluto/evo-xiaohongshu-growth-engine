@@ -4,7 +4,7 @@
 
 ## 页侧
 
-- 一份 HTML。状态用 Alpine。需要控件时用 daisyUI 5 浅色。
+- 一份 HTML。状态用 Alpine。需要控件时用 daisyUI 5 浅色。写笔记页逻辑在 `pages/note.js` 页壳 + `pages/note/*` 分职责 mixin（产品资料 / 对标文案 / 我们的图 / 槽位图 / 风格比例）；危险词继续 `lib/risk-client.js`。
 - 页面底保持白。主按钮是近黑，不是蓝，也不是主题默认紫。
 - 色值只用下面这组 daisyUI 语义变量。组件里不手写另一套颜色。
 - 圆角和按钮尺寸跟随 daisyUI 5 浅色主题的默认控件，不另写一套。
