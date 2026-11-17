@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "source": "prd-00019",
+  "scope": "xhs-note-visible-copy",
+  "libraries": [
+    {
+      "id": "ad_extreme",
+      "name": "广告法极限词"
+    },
+    {
+      "id": "offsite_traffic",
+      "name": "站外引流"
+    },
+    {
+      "id": "banned",
+      "name": "违禁表达"
+    }
+  ],
+  "words": [
+    {
+      "libraryId": "ad_extreme",
+      "text": "最好",
+      "severity": "要改口",
+      "replacement": "更合适"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "第一",
+      "severity": "要改口",
+      "replacement": "靠前"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "100%",
+      "severity": "要改口",
+      "replacement": "尽量"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "绝对有效",
+      "severity": "要改口",
+      "replacement": "按说明使用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "微信",
+      "severity": "不能发"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "私域",
+      "severity": "不能发"
+    }
+  ]
+}

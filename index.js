@@ -95,6 +95,7 @@ module.exports = {
       userReferenceDocsDir: path.join(dataDir, 'runtime', 'materials', 'reference-docs'),
       userXhsNotesDir: path.join(dataDir, 'runtime', 'materials', 'xhs-notes'),
       userXhsNotesCacheDir: path.join(cacheDir, 'xhs-notes'),
+      userRiskDir: path.join(dataDir, 'runtime', 'risk'),
       // 设置页保存不重跑 apply；真正发请求时再读 pluginEnv / .env。
       readEnv: () => resolveEnv(ctx),
       ctx,
@@ -376,6 +377,45 @@ module.exports = {
        */
       deleteLibraryUploadRef(payload) {
         return runner.deleteLibraryUploadRef(asObject(payload));
+      },
+      getRiskSetup() {
+        return runner.getRiskSetup();
+      },
+      /**
+       * @param {unknown} payload
+       */
+      setRiskSelection(payload) {
+        return runner.setRiskSelection(asObject(payload));
+      },
+      /**
+       * @param {unknown} payload
+       */
+      checkRisk(payload) {
+        return runner.checkRisk(asObject(payload));
+      },
+      /**
+       * @param {unknown} payload
+       */
+      saveRiskCheck(payload) {
+        return runner.saveRiskCheck(asObject(payload));
+      },
+      /**
+       * @param {unknown} payload
+       */
+      addPersonalRiskWords(payload) {
+        return runner.addPersonalRiskWords(asObject(payload));
+      },
+      /**
+       * @param {unknown} payload
+       */
+      deletePersonalRiskWord(payload) {
+        return runner.deletePersonalRiskWord(asObject(payload));
+      },
+      /**
+       * @param {unknown} payload
+       */
+      reviewRiskWithAi(payload) {
+        return runner.reviewRiskWithAi(asObject(payload));
       },
       startNew() {
         return runner.startNew();

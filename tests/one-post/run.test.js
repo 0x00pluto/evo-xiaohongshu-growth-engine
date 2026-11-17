@@ -2390,3 +2390,170 @@ test('杂志换手帐本地重套，换信息图才再跑策划', async () => {
   assert.equal(info.prompts.look, ALBUM_INFOGRAPHIC);
   assert.match(info.prompts.cover, /栏目标签/);
 });
+
+test('saveRiskCheck 不冲掉 running 的 AI，但会作废指纹不符的 done', async () => {
+  const root = tempDir();
+  const promptsDir = path.join(root, 'prompts');
+  const postsDir = path.join(root, 'posts');
+  writePrompts(promptsDir);
+  const runner = createRunner({
+    postsDir,
+    promptsDir,
+    userRiskDir: path.join(root, 'risk'),
+    random: firstPick,
+    complete: async (prompt) => responseFor(prompt, 0),
+  });
+  assert.equal((await runner.generateDraft(draftArgs({ galleryCount: 0 }))).ok, true);
+  await untilIdle(runner);
+  const latest = runner.loadLatest();
+  assert.ok(latest.id, '应有当前篇');
+  const draftPath = path.join(postsDir, latest.id, 'draft.json');
+
+  /** @param {Record<string, unknown>} ai */
+  function writeAi(ai) {
+    const draft = JSON.parse(fs.readFileSync(draftPath, 'utf8'));
+    draft.risk = draft.risk && typeof draft.risk === 'object' ? draft.risk : {};
+    draft.risk.ai = ai;
+    fs.writeFileSync(draftPath, `${JSON.stringify(draft, null, 2)}\n`);
+  }
+
+  const fields = [
+    { id: 'title', text: latest.draft.title || '标题' },
+    { id: 'body', text: latest.draft.body || '正文' },
+    { id: 'topics', text: Array.isArray(latest.draft.topics) ? latest.draft.topics.join(' ') : '' },
+  ];
+  const libraryIds = ['ad_extreme', 'offsite_traffic', 'banned'];
+
+  writeAi({
+    id: 'risk-ai-keep-running',
+    status: 'running',
+    error: '',
+    fingerprint: 'old-ai-fp',
+    suggestions: [],
+    idempotencyKey: 'risk-review:risk-ai-keep-running',
+  });
+  const keepRunning = runner.saveRiskCheck({
+    fields,
+    libraryIds,
+    fingerprint: 'new-check-fp-running',
+  });
+  assert.equal(keepRunning.ok, true, keepRunning.message || 'saveRiskCheck running');
+  assert.equal(keepRunning.risk.ai.status, 'running');
+  assert.equal(keepRunning.risk.ai.id, 'risk-ai-keep-running');
+  assert.equal(keepRunning.risk.ai.idempotencyKey, 'risk-review:risk-ai-keep-running');
+  assert.equal(keepRunning.risk.ai.fingerprint, 'old-ai-fp');
+
+  writeAi({
+    id: 'risk-ai-stale-done',
+    status: 'done',
+    error: '',
+    fingerprint: 'old-done-fp',
+    suggestions: [{ id: 's1', text: '最好', fieldId: 'body', start: 0, end: 2, reason: 'x', replacement: '更合适', status: '还没改' }],
+    idempotencyKey: '',
+  });
+  const clearDone = runner.saveRiskCheck({
+    fields,
+    libraryIds,
+    fingerprint: 'new-check-fp-done',
+  });
+  assert.equal(clearDone.ok, true, clearDone.message || 'saveRiskCheck done');
+  assert.equal(clearDone.risk.ai.status, 'idle');
+  assert.equal(clearDone.risk.ai.id, 'risk-ai-stale-done');
+  assert.equal(clearDone.risk.ai.fingerprint, '');
+  assert.deepEqual(clearDone.risk.ai.suggestions, []);
+});
+
+test('saveRiskCheck 同正文不同词库指纹时保留 done 的 AI', async () => {
+  const root = tempDir();
+  const promptsDir = path.join(root, 'prompts');
+  const postsDir = path.join(root, 'posts');
+  writePrompts(promptsDir);
+  const runner = createRunner({
+    postsDir,
+    promptsDir,
+    userRiskDir: path.join(root, 'risk'),
+    random: firstPick,
+    complete: async (prompt) => responseFor(prompt, 0),
+  });
+  assert.equal((await runner.generateDraft(draftArgs({ galleryCount: 0 }))).ok, true);
+  await untilIdle(runner);
+  const latest = runner.loadLatest();
+  assert.ok(latest.id, '应有当前篇');
+  const draftPath = path.join(postsDir, latest.id, 'draft.json');
+
+  const fields = [
+    { id: 'title', text: latest.draft.title || '标题' },
+    { id: 'body', text: latest.draft.body || '正文' },
+    { id: 'topics', text: Array.isArray(latest.draft.topics) ? latest.draft.topics.join(' ') : '' },
+  ];
+  const textFp = JSON.stringify({ fields });
+  const legacyAiFp = JSON.stringify({
+    fields,
+    selection: {
+      ad_extreme: true,
+      offsite_traffic: true,
+      banned: true,
+      personal: true,
+    },
+  });
+  const draft = JSON.parse(fs.readFileSync(draftPath, 'utf8'));
+  draft.risk = draft.risk && typeof draft.risk === 'object' ? draft.risk : {};
+  draft.risk.ai = {
+    id: 'risk-ai-keep-done',
+    status: 'done',
+    error: '',
+    fingerprint: legacyAiFp,
+    suggestions: [{
+      id: 's1',
+      text: '最好',
+      fieldId: 'body',
+      start: 0,
+      end: 2,
+      reason: 'x',
+      replacement: '更合适',
+      status: '还没改',
+    }],
+    idempotencyKey: '',
+  };
+  fs.writeFileSync(draftPath, `${JSON.stringify(draft, null, 2)}\n`);
+
+  const kept = runner.saveRiskCheck({
+    fields,
+    libraryIds: ['banned'],
+    fingerprint: JSON.stringify({
+      fields,
+      selection: {
+        ad_extreme: false,
+        offsite_traffic: false,
+        banned: true,
+        personal: false,
+      },
+    }),
+  });
+  assert.equal(kept.ok, true, kept.message || 'saveRiskCheck keep ai');
+  assert.equal(kept.risk.ai.status, 'done');
+  assert.equal(kept.risk.ai.id, 'risk-ai-keep-done');
+  assert.equal(kept.risk.ai.fingerprint, legacyAiFp);
+  assert.equal(kept.risk.ai.suggestions.length, 1);
+
+  const textOnlyDraft = JSON.parse(fs.readFileSync(draftPath, 'utf8'));
+  textOnlyDraft.risk.ai.fingerprint = textFp;
+  fs.writeFileSync(draftPath, `${JSON.stringify(textOnlyDraft, null, 2)}\n`);
+  const keptText = runner.saveRiskCheck({
+    fields,
+    libraryIds: ['ad_extreme', 'banned'],
+    fingerprint: JSON.stringify({
+      fields,
+      selection: {
+        ad_extreme: true,
+        offsite_traffic: false,
+        banned: true,
+        personal: false,
+      },
+    }),
+  });
+  assert.equal(keptText.ok, true, keptText.message || 'saveRiskCheck keep text-fp ai');
+  assert.equal(keptText.risk.ai.status, 'done');
+  assert.equal(keptText.risk.ai.fingerprint, textFp);
+  assert.equal(keptText.risk.ai.suggestions.length, 1);
+});

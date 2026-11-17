@@ -226,7 +226,7 @@
     <div class="flex flex-col gap-4">
       <div class="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div class="flex min-w-0 flex-col gap-4">
-        <div class="relative flex flex-col gap-3 rounded-lg bg-base-200 p-3">
+        <div class="relative z-20 flex flex-col gap-3 rounded-lg bg-base-200 p-3">
           <div
             class="absolute inset-0 z-30 flex flex-col items-center justify-center gap-2 rounded-lg bg-base-200/80"
             x-show="job.running"
@@ -349,7 +349,7 @@
                 </button>
                 <div
                   id="aspect-ratio-panel"
-                  class="absolute left-0 top-full z-10 mt-1 min-w-[18rem] rounded-lg border border-base-300 bg-base-100 p-3 shadow-md sm:min-w-[22rem]"
+                  class="absolute left-0 top-full z-40 mt-1 min-w-[18rem] rounded-lg border border-base-300 bg-base-100 p-3 shadow-md sm:min-w-[22rem]"
                   x-show="aspectPanelOpen"
                   x-cloak
                 >
@@ -403,7 +403,7 @@
                 </button>
                 <div
                   id="album-style-panel"
-                  class="absolute left-0 top-full z-10 mt-1 w-[min(100vw-3rem,28rem)] rounded-lg border border-base-300 bg-base-100 p-3 shadow-md"
+                  class="absolute left-0 top-full z-40 mt-1 w-[min(100vw-3rem,28rem)] rounded-lg border border-base-300 bg-base-100 p-3 shadow-md"
                   x-show="albumStyleOpen"
                   x-cloak
                 >
@@ -502,7 +502,7 @@
 
             <div
               id="slot-prompt-panel"
-              class="absolute left-0 right-0 top-full z-10 mt-1 rounded-lg border border-base-300 bg-base-100 p-3 shadow-md"
+              class="absolute left-0 right-0 top-full z-40 mt-1 rounded-lg border border-base-300 bg-base-100 p-3 shadow-md"
               x-show="activeSlot && canOpenSlotPrompt && slotPromptExpanded"
               x-cloak
             >
@@ -513,7 +513,7 @@
 
             <div
               id="upload-refs-panel"
-              class="absolute left-0 right-0 top-full z-10 mt-1 flex flex-col gap-2 rounded-lg border border-base-300 bg-base-100 p-3 shadow-md"
+              class="absolute left-0 right-0 top-full z-40 mt-1 flex flex-col gap-2 rounded-lg border border-base-300 bg-base-100 p-3 shadow-md"
               x-show="uploadRefsPanelOpen"
               x-cloak
             >
@@ -593,16 +593,189 @@
             </div>
           </div>
         </div>
-        <article id="post-preview" class="flex flex-col gap-4 rounded-lg border border-base-300 bg-base-100 p-4" aria-label="这篇文案">
+        <article id="post-preview" class="relative flex flex-col gap-4 rounded-lg border border-base-300 bg-base-100 p-4" aria-label="这篇文案">
+          <div
+            class="absolute inset-0 z-30 flex flex-col items-center justify-center gap-2 rounded-lg bg-base-100/80"
+            x-show="riskLoadingVisible"
+            x-cloak
+            role="status"
+            aria-live="polite"
+            aria-busy="true"
+          >
+            <lottie-player
+              src="animations/job-running.json"
+              background="transparent"
+              speed="1"
+              style="width: 8rem; height: 8rem"
+              loop
+              autoplay
+              @ready="$el.play()"
+            ></lottie-player>
+            <p class="text-sm" x-text="riskLoadingLineText()"></p>
+          </div>
           <div class="flex items-center gap-3">
             <label class="sr-only" for="draft-title">标题</label>
-            <input id="draft-title" class="min-w-0 flex-1 border-0 bg-transparent p-0 text-base font-medium shadow-none outline-none ring-0 focus:outline-none focus:ring-0" type="text" x-model="copyDraft.title" :readonly="job.running" @blur="persist()" />
+            <div class="relative min-w-0 flex-1">
+              <input
+                id="draft-title"
+                class="relative z-0 min-w-0 w-full border-0 bg-transparent p-0 text-base font-medium shadow-none outline-none ring-0 focus:outline-none focus:ring-0"
+                :class="riskHasInlineMarks() ? 'text-transparent' : ''"
+                :style="riskHasInlineMarks() ? 'caret-color:#171717' : ''"
+                type="text"
+                x-model="copyDraft.title"
+                :readonly="job.running"
+                @blur="persist()"
+              />
+              <div
+                class="pointer-events-none absolute inset-0 z-10 overflow-hidden whitespace-nowrap text-base font-medium leading-normal text-base-content"
+                aria-hidden="true"
+                x-show="riskHasInlineMarks()"
+                x-cloak
+                @click="riskOpenMarkFromEvent($event)"
+                @mouseover="riskOpenMarkFromEvent($event)"
+                x-html="riskOverlayHtml('title')"
+              ></div>
+            </div>
             <span class="shrink-0 text-sm tabular-nums" :class="charCount(copyDraft.title) > 20 ? 'text-error' : 'text-base-content/50'" x-text="charCount(copyDraft.title) + ' / 20'"></span>
+          </div>
+          <div class="relative flex flex-wrap items-center gap-2" @click.outside="riskOptionsOpen = false">
+            <div class="join relative">
+              <button
+                class="btn btn-sm join-item gap-1.5 border border-base-300 bg-base-100 font-normal"
+                type="button"
+                :disabled="riskBusy || (riskAiBusy && !riskAiNeedsRetry) || job.running"
+                @click="riskRunCheck()"
+              >
+                <iconify-icon icon="lucide:shield-alert" width="14" height="14" aria-hidden="true"></iconify-icon>
+                <span>查危险词</span>
+              </button>
+              <button
+                class="btn btn-sm join-item border border-base-300 bg-base-100 px-2"
+                type="button"
+                :aria-expanded="riskOptionsOpen ? 'true' : 'false'"
+                aria-controls="note-risk-options"
+                aria-label="危险词选项"
+                :disabled="job.running"
+                @click="riskToggleOptions()"
+              >
+                <iconify-icon
+                  icon="lucide:chevron-down"
+                  width="14"
+                  height="14"
+                  aria-hidden="true"
+                  class="shrink-0 transition-transform"
+                  :class="riskOptionsOpen ? 'rotate-180' : ''"
+                ></iconify-icon>
+              </button>
+              <div
+                id="note-risk-options"
+                class="absolute left-0 top-full z-40 mt-1 w-72 rounded-lg border border-base-300 bg-base-100 p-3 shadow-md"
+                x-show="riskOptionsOpen"
+                x-cloak
+              >
+                <p class="text-xs text-base-content/60" x-text="riskScopeText()"></p>
+                <fieldset class="mt-3">
+                  <legend class="text-sm font-medium">词库</legend>
+                  <div class="mt-2 flex flex-col gap-2">
+                    <template x-for="lib in riskLibraries" :key="'note-lib-' + lib.id">
+                      <label class="inline-flex min-h-9 cursor-pointer items-center gap-2 text-sm" :class="riskLibraryDisabled(lib) ? 'opacity-50' : ''">
+                        <input
+                          class="checkbox checkbox-sm"
+                          type="checkbox"
+                          :id="'note-risk-lib-' + lib.id"
+                          :checked="Boolean(riskSelection[lib.id]) && !riskLibraryDisabled(lib)"
+                          :disabled="riskLibraryDisabled(lib) || job.running"
+                          @change="riskLibraryDisabled(lib) ? ($event.target.checked = false) : riskToggleLibrary(lib.id, $event.target.checked)"
+                        />
+                        <span x-text="lib.name + (lib.empty ? '（空）' : '')"></span>
+                      </label>
+                    </template>
+                  </div>
+                </fieldset>
+                <label class="mt-3 inline-flex min-h-9 cursor-pointer items-center gap-2 text-sm">
+                  <input class="checkbox checkbox-sm" type="checkbox" x-model="riskIncludeAi" />
+                  <span>AI 查词</span>
+                </label>
+                <button
+                  class="mt-3 w-full rounded-md bg-base-200 px-2 py-2 text-left text-sm font-medium"
+                  type="button"
+                  :disabled="!riskHasInlineMarks()"
+                  @click="riskScrollToFirstMark(); riskOptionsOpen = false"
+                  x-text="riskInlineStatusText() || '还没有标出危险词'"
+                ></button>
+              </div>
+            </div>
+            <p class="text-xs text-base-content/50" x-show="riskAiNeedsRetry" x-cloak x-text="riskAiMessage"></p>
           </div>
           <div class="flex flex-col gap-2">
             <label class="sr-only" for="draft-body">正文</label>
-            <textarea id="draft-body" class="field-sizing-content w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-sm leading-6 shadow-none outline-none ring-0 focus:outline-none focus:ring-0" rows="1" x-model="bodyDraft" :readonly="job.running" @input="onBodyDraft()" @blur="persist()"></textarea>
+            <div class="relative">
+              <textarea
+                id="draft-body"
+                class="field-sizing-content relative z-0 w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-sm leading-6 shadow-none outline-none ring-0 focus:outline-none focus:ring-0"
+                :style="(riskHasInlineMarks() ? 'caret-color:#171717;' : '') + 'overflow-wrap:anywhere;word-break:normal;'"
+                :class="riskHasInlineMarks() ? 'text-transparent' : ''"
+                rows="1"
+                x-model="bodyDraft"
+                :readonly="job.running"
+                @input="onBodyDraft()"
+                @blur="persist()"
+              ></textarea>
+              <div
+                class="pointer-events-none absolute inset-0 z-10 overflow-hidden whitespace-pre-wrap text-sm leading-6 text-base-content"
+                style="overflow-wrap: anywhere; word-break: normal;"
+                aria-hidden="true"
+                x-show="riskHasInlineMarks()"
+                x-cloak
+                @click="riskOpenMarkFromEvent($event)"
+                @mouseover="riskOpenMarkFromEvent($event)"
+                x-html="riskOverlayHtml('body')"
+              ></div>
+            </div>
             <p class="text-right text-sm tabular-nums" :class="charCount(bodyDraft) > 1000 ? 'text-error' : 'text-base-content/50'" x-text="charCount(bodyDraft) + ' / 1000'"></p>
+          </div>
+          <div
+            class="pointer-events-auto fixed z-50 w-72 rounded-lg border border-base-300 bg-base-100 p-3 shadow-lg"
+            role="dialog"
+            aria-label="改词建议"
+            x-show="riskPopover.open && riskActiveMark()"
+            x-cloak
+            :style="riskPopover.style"
+            @click.outside="riskCloseMarkPopover()"
+          >
+            <template x-if="riskActiveMark()">
+              <div class="flex flex-col gap-2 text-sm">
+                <p class="text-xs text-base-content/50" x-text="riskActiveMark().badge"></p>
+                <p
+                  class="font-medium"
+                  :class="riskActiveMark().uiState === 'applied' ? 'text-success' : (riskActiveMark().uiState === 'discarded' ? 'text-warning' : 'text-error')"
+                  x-text="riskActiveMark().text"
+                ></p>
+                <p class="text-base-content/70" x-show="riskActiveMark().uiState === 'applied' && riskActiveMark().originalText">原来：<span x-text="riskActiveMark().originalText"></span></p>
+                <p class="text-base-content/70" x-show="riskActiveMark().uiState !== 'applied'" x-text="riskActiveMark().reason"></p>
+                <p x-show="riskActiveMark().uiState !== 'applied' && riskActiveMark().replacement">建议：<span x-text="riskActiveMark().replacement"></span></p>
+                <div class="flex flex-wrap gap-2">
+                  <button
+                    class="btn btn-primary btn-xs"
+                    type="button"
+                    x-show="riskActiveMark().uiState !== 'applied' && riskActiveMark().replacement"
+                    @click="riskApplyActiveMark()"
+                  >替换</button>
+                  <button
+                    class="btn btn-ghost btn-xs"
+                    type="button"
+                    x-show="riskActiveMark().uiState === 'applied'"
+                    @click="riskUndoActiveMark()"
+                  >撤回</button>
+                  <button
+                    class="btn btn-ghost btn-xs"
+                    type="button"
+                    x-show="riskActiveMark().uiState === 'pending'"
+                    @click="riskDiscardActiveMark()"
+                  >放弃</button>
+                </div>
+              </div>
+            </template>
           </div>
         </article>
         </div>

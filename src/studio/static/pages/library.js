@@ -10,6 +10,7 @@ function libraryPage() {
       { id: 'article-samples', label: '对标文案' },
       { id: 'reference-docs', label: '产品资料' },
       { id: 'xhs-notes', label: '对标笔记' },
+      { id: 'risk-words', label: '个人违禁词库' },
     ],
     activeTab: 'albums',
     createOpen: false,
@@ -20,10 +21,17 @@ function libraryPage() {
     intakeDragOver: false,
     intakeBusy: false,
 
-    init() {},
+    init() {
+      const intent = window.studioHost && window.studioHost.intent;
+      if (intent && typeof intent.tab === 'string' && intent.tab) {
+        this.selectTab(intent.tab);
+        window.studioHost.intent = null;
+      }
+    },
 
     selectTab(id) {
       if (!id) return;
+      if (!(this.tabs || []).some((tab) => tab.id === id)) return;
       this.activeTab = id;
     },
 

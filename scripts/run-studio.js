@@ -74,6 +74,13 @@ const METHODS = new Set([
   'saveUploadRefToLibrary',
   'pickLibraryUploadRef',
   'deleteLibraryUploadRef',
+  'getRiskSetup',
+  'setRiskSelection',
+  'checkRisk',
+  'saveRiskCheck',
+  'addPersonalRiskWords',
+  'deletePersonalRiskWord',
+  'reviewRiskWithAi',
 ]);
 const LOCAL_HOSTS = new Set(['127.0.0.1', 'localhost', '::1']);
 
@@ -198,6 +205,7 @@ function createStudio(options) {
     userReferenceDocsDir: path.join(root, 'runtime', 'materials', 'reference-docs'),
     userXhsNotesDir: path.join(root, 'runtime', 'materials', 'xhs-notes'),
     userXhsNotesCacheDir: path.join(root, 'cache', 'xhs-notes'),
+    userRiskDir: path.join(root, 'runtime', 'risk'),
     env,
     // 独立运行没有宿主 ctx.models；把合并后的 .env 交给 bindModels。
     ctx: undefined,

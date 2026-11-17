@@ -60,7 +60,30 @@ const STATUSES = new Set(['空', '生成中', '成功', '失败', '作废']);
  *   billing: BillingAttempts;
  *   job: { running: boolean; step: string; error: string };
  *   aspectRatioLocked: string;
+ *   risk: RiskState;
  * }} DraftState
+ * @typedef {{
+ *   fingerprint: string;
+ *   status: string;
+ *   message: string;
+ *   libraries: string[];
+ *   cannotCount: number;
+ *   rewriteCount: number;
+ *   hits: unknown[];
+ *   checkedAt: number;
+ * }} RiskCheckState
+ * @typedef {{
+ *   id: string;
+ *   status: 'idle' | 'running' | 'done' | 'error';
+ *   error: string;
+ *   fingerprint: string;
+ *   suggestions: unknown[];
+ *   idempotencyKey: string;
+ * }} RiskAiState
+ * @typedef {{
+ *   check: RiskCheckState;
+ *   ai: RiskAiState;
+ * }} RiskState
  * @typedef {{
  *   exists: () => boolean;
  *   file: string;
@@ -160,6 +183,47 @@ function emptyState() {
     billing: { copy: 0, promptsPlan: 0, promptsScenes: 0 },
     job: { running: false, step: '', error: '' },
     aspectRatioLocked: '',
+    risk: emptyRisk(),
+  };
+}
+
+/**
+ * @returns {RiskCheckState}
+ */
+function emptyRiskCheck() {
+  return {
+    fingerprint: '',
+    status: '',
+    message: '',
+    libraries: [],
+    cannotCount: 0,
+    rewriteCount: 0,
+    hits: [],
+    checkedAt: 0,
+  };
+}
+
+/**
+ * @returns {RiskAiState}
+ */
+function emptyRiskAi() {
+  return {
+    id: '',
+    status: 'idle',
+    error: '',
+    fingerprint: '',
+    suggestions: [],
+    idempotencyKey: '',
+  };
+}
+
+/**
+ * @returns {RiskState}
+ */
+function emptyRisk() {
+  return {
+    check: emptyRiskCheck(),
+    ai: emptyRiskAi(),
   };
 }
 
@@ -463,7 +527,50 @@ function normalize(raw, promptsDir, userAlbumsDir) {
     step: typeof job.step === 'string' ? job.step : '',
     error: typeof job.error === 'string' ? job.error : '',
   };
+  base.risk = normalizeRisk(source.risk);
   return base;
+}
+
+/**
+ * @param {unknown} raw
+ * @returns {RiskState}
+ */
+function normalizeRisk(raw) {
+  const empty = emptyRisk();
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return empty;
+  const bag = /** @type {Record<string, unknown>} */ (raw);
+  const checkRaw = bag.check && typeof bag.check === 'object' && !Array.isArray(bag.check)
+    ? /** @type {Record<string, unknown>} */ (bag.check)
+    : {};
+  const aiRaw = bag.ai && typeof bag.ai === 'object' && !Array.isArray(bag.ai)
+    ? /** @type {Record<string, unknown>} */ (bag.ai)
+    : {};
+  const aiStatus = aiRaw.status === 'running' || aiRaw.status === 'done' || aiRaw.status === 'error'
+    ? aiRaw.status
+    : 'idle';
+  const checkedAt = Number(checkRaw.checkedAt);
+  return {
+    check: {
+      fingerprint: typeof checkRaw.fingerprint === 'string' ? checkRaw.fingerprint : '',
+      status: typeof checkRaw.status === 'string' ? checkRaw.status : '',
+      message: typeof checkRaw.message === 'string' ? checkRaw.message : '',
+      libraries: Array.isArray(checkRaw.libraries)
+        ? checkRaw.libraries.map((item) => String(item))
+        : [],
+      cannotCount: Number.isFinite(Number(checkRaw.cannotCount)) ? Number(checkRaw.cannotCount) : 0,
+      rewriteCount: Number.isFinite(Number(checkRaw.rewriteCount)) ? Number(checkRaw.rewriteCount) : 0,
+      hits: Array.isArray(checkRaw.hits) ? checkRaw.hits.slice() : [],
+      checkedAt: Number.isFinite(checkedAt) ? checkedAt : 0,
+    },
+    ai: {
+      id: typeof aiRaw.id === 'string' ? aiRaw.id : '',
+      status: aiStatus,
+      error: typeof aiRaw.error === 'string' ? aiRaw.error : '',
+      fingerprint: typeof aiRaw.fingerprint === 'string' ? aiRaw.fingerprint : '',
+      suggestions: Array.isArray(aiRaw.suggestions) ? aiRaw.suggestions.slice() : [],
+      idempotencyKey: typeof aiRaw.idempotencyKey === 'string' ? aiRaw.idempotencyKey : '',
+    },
+  };
 }
 
 /**
@@ -513,8 +620,12 @@ function createStore(latestDir, options) {
 
 module.exports = {
   createStore,
+  emptyRisk,
+  emptyRiskAi,
+  emptyRiskCheck,
   emptyState,
   galleryFile,
   nextImageFile,
   normalize,
+  normalizeRisk,
 };

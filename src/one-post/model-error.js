@@ -48,7 +48,61 @@ function formatModelError(err, fallback) {
   return code && !text.includes(`（${code}）`) ? `${text}（${code}）` : text;
 }
 
+/**
+ * 断线 / 超时 / 同 key 冲突：可用同一把 Idempotency-Key 再取。
+ * @param {unknown} err
+ * @returns {boolean}
+ */
+function isIdempotencyConflict(err) {
+  if (errorCode(err) === 'IDEMPOTENCY_CONFLICT') return true;
+  const text = errorText(err) || (err instanceof Error ? err.message : String(err || ''));
+  return text.includes('IDEMPOTENCY_CONFLICT')
+    || text.includes('相同幂等键')
+    || text.includes('同 key 正在处理');
+}
+
+/**
+ * @param {unknown} err
+ * @returns {boolean}
+ */
+function isReplayableModelError(err) {
+  if (isIdempotencyConflict(err)) return true;
+  if (errorCode(err) === 'NETWORK_ERROR') return true;
+  const text = (errorText(err) || (err instanceof Error ? err.message : String(err || ''))).toLowerCase();
+  if (text.includes('fetch failed')) return true;
+  if (text.includes('network_error')) return true;
+  const raw = errorText(err) || (err instanceof Error ? err.message : String(err || ''));
+  if (raw.startsWith('无法连接')) return true;
+  if (raw.includes('网关读取超时')) return true;
+  return false;
+}
+
+/**
+ * 文案是否像可重放的取回失败（前端轮询结果用）。
+ * @param {unknown} message
+ * @returns {boolean}
+ */
+function isReplayableErrorMessage(message) {
+  const text = typeof message === 'string' ? message.trim() : '';
+  if (!text) return false;
+  const lower = text.toLowerCase();
+  return lower.includes('fetch failed')
+    || lower.includes('network_error')
+    || text.includes('NETWORK_ERROR')
+    || text.includes('IDEMPOTENCY_CONFLICT')
+    || text.includes('相同幂等键')
+    || text.includes('同 key 正在处理')
+    || text.startsWith('无法连接')
+    || text.includes('网关读取超时')
+    || text.includes('请再点一次取回')
+    || text.includes('不会重复扣费')
+    || text.includes('取回失败');
+}
+
 module.exports = {
   errorCode,
   formatModelError,
+  isIdempotencyConflict,
+  isReplayableErrorMessage,
+  isReplayableModelError,
 };

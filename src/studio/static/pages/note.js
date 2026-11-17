@@ -14,6 +14,8 @@ function notePage() {
 
   return {
     ...window.createStudioToast(),
+    ...window.createRiskPanel(),
+    riskPersistToDraft: true,
     business: '',
     sampleTitle: '',
     sampleBody: '',
@@ -719,6 +721,67 @@ function notePage() {
       const topics = this.formatTopics(this.draft.topics);
       return [title, body, topics].filter(Boolean).join('\n\n');
     },
+    riskGetFields() {
+      const draft = this.draft || this.emptyCopyDraft;
+      return [
+        { id: 'title', text: String(draft.title || '') },
+        { id: 'body', text: String(draft.body || '') },
+        { id: 'topics', text: this.formatTopics(draft.topics) },
+      ];
+    },
+    riskReadField(fieldId) {
+      const draft = this.draft || this.emptyCopyDraft;
+      if (fieldId === 'title') return String(draft.title || '');
+      if (fieldId === 'body') return String(draft.body || '');
+      if (fieldId === 'topics') return this.formatTopics(draft.topics);
+      return '';
+    },
+    riskWriteField(fieldId, text) {
+      if (!this.draft) {
+        this.draft = {
+          title: '',
+          body: '',
+          topics: [],
+        };
+      }
+      if (fieldId === 'title') {
+        this.draft.title = String(text || '');
+      } else if (fieldId === 'body') {
+        this.draft.body = String(text || '');
+        this.syncBodyDraft();
+      } else if (fieldId === 'topics') {
+        const topics = [...String(text || '').matchAll(/#([^#\n]+)/g)]
+          .map((item) => item[1].trim())
+          .filter(Boolean);
+        this.draft.topics = topics;
+        this.syncBodyDraft();
+      }
+      this.persist();
+    },
+    riskFieldElement(fieldId) {
+      if (fieldId === 'title') return document.getElementById('draft-title');
+      if (fieldId === 'body' || fieldId === 'topics') return document.getElementById('draft-body');
+      return null;
+    },
+    riskMapHitToElement(hit) {
+      if (!hit) return null;
+      if (hit.fieldId === 'title') {
+        const el = this.riskFieldElement('title');
+        return el ? { el, start: hit.start, end: hit.end } : null;
+      }
+      if (hit.fieldId === 'body') {
+        const el = this.riskFieldElement('body');
+        return el ? { el, start: hit.start, end: hit.end } : null;
+      }
+      if (hit.fieldId === 'topics') {
+        const el = this.riskFieldElement('topics');
+        if (!el) return null;
+        const body = String((this.draft && this.draft.body) || '').replace(/\s+$/, '');
+        const offset = body ? body.length + 2 : 0;
+        return { el, start: offset + hit.start, end: offset + hit.end };
+      }
+      return null;
+    },
     albumWaitName() {
       const style = this.prompts && String(this.prompts.style || '').trim();
       const look = String(this.selectedLook || (this.prompts && this.prompts.look) || '').trim();
@@ -998,6 +1061,30 @@ function notePage() {
       if (this.postId !== prevId) this.selectedLook = stamped;
       else if (!this.selectedLook) this.selectedLook = stamped;
       this.syncSlots();
+      // 成稿后回填/自动本机查词；词库按正文+勾选，AI 按正文；不占 job.running
+      if (this.draft && this.postId) {
+        const fp = this.riskFingerprint();
+        const hydrated = next.risk ? this.riskApplyFromDraft(next.risk, fp) : false;
+        if (!hydrated || this.riskLastFingerprint !== fp) {
+          void this.riskEnsureAutoCheck();
+        }
+      } else if (this.postId !== prevId) {
+        this.riskStopAiPoll();
+        this.riskHits = [];
+        this.riskStatus = '';
+        this.riskMessage = '';
+        this.riskCannotCount = 0;
+        this.riskRewriteCount = 0;
+        this.riskAiSuggestions = [];
+        this.riskAiMessage = '';
+        this.riskAiBusy = false;
+        this.riskAiRecovering = false;
+        this.riskAiId = '';
+        this.riskLastFingerprint = '';
+        this.riskLastAiFingerprint = '';
+        this.riskUndo = null;
+        this.riskCloseMarkPopover();
+      }
       this.syncBodyDraft();
       this.loadUploadRefPreviews();
     },
@@ -1198,6 +1285,7 @@ function notePage() {
     async init() {
       if (!this.hostReady) return;
       await this.loadAlbums();
+      await this.riskLoadSetup();
       const intent = window.studioHost.intent;
       window.studioHost.intent = null;
       if (intent && intent.postId) {
@@ -1257,6 +1345,9 @@ function notePage() {
         },
       };
     },
+    riskCanPersistDraft() {
+      return Boolean(this.postId && this.draft);
+    },
     async persist() {
       if (!this.hostReady || this.job.running || !this.postId || !this.draft) return;
       const result = await this.call('saveEditor', this.editorPayload());
@@ -1266,6 +1357,8 @@ function notePage() {
         return;
       }
       await this.refresh();
+      // 文案变了则指纹变，自动重查
+      await this.riskEnsureAutoCheck();
     },
     noteRejection(result) {
       if (!result || result.ok !== false) return false;

@@ -22,3 +22,4 @@
 | 00016 | `specs/prds/prd-00016-feishu-demand-loop.md` | 飞书需求池按需求 ID 转入本仓功能 PRD，修完只回填需求状态；不改表结构；工程 accepted |
 | 00017 | `specs/prds/prd-00017-xhs-learned-notes.md` | 对标笔记可反复学；图文按哈希跳过未变并写回原柜子；资料库末尾对标笔记卡墙与浮层；来源飞书 20261110_0012；工程 accepted |
 | 00018 | `specs/prds/prd-00018-image-select-copy-preview.md` | 风格浮层选中样图持续流光、成稿图复制 PNG、笔记预览主图全屏；合并飞书 20261111_0015 与 20261112_0016；工程 accepted |
+| 00019 | `specs/prds/prd-00019-danger-word-check.md` | 发之前本机查危险词；笔记旁与危险词页同一套规则；人自己改或点一条才写入；有命中也不锁复制。Release 1 才用 AI 再看一遍；工程 accepted |

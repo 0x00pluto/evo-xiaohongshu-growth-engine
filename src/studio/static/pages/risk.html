@@ -1,0 +1,163 @@
+<div class="mx-auto flex w-full max-w-3xl flex-col gap-4" x-data="riskPage()" x-init="init()">
+  <header class="flex items-center justify-between gap-3 px-4 py-3 lg:px-6">
+    <h1 class="text-xl font-medium">危险词</h1>
+  </header>
+
+  <div
+    class="toast toast-top toast-center z-[70] pointer-events-none"
+    x-show="toastText"
+    x-cloak
+  >
+    <div
+      class="pointer-events-auto flex max-w-md items-start gap-3 rounded-box bg-base-100 px-4 py-3 shadow-lg"
+      :role="toastType === 'success' ? 'status' : 'alert'"
+      x-show="toastOpen"
+      x-transition:enter="transition ease-out duration-200 motion-reduce:transition-none"
+      x-transition:enter-start="opacity-0 -translate-y-2"
+      x-transition:enter-end="opacity-100 translate-y-0"
+      x-transition:leave="transition ease-in duration-150 motion-reduce:transition-none"
+      x-transition:leave-start="opacity-100 translate-y-0"
+      x-transition:leave-end="opacity-0 -translate-y-2"
+    >
+      <span
+        class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+        :class="toastType === 'success' ? 'bg-success/15 text-success' : 'bg-error/15 text-error'"
+      >
+        <iconify-icon
+          :icon="toastType === 'success' ? 'lucide:circle-check' : 'lucide:circle-alert'"
+          width="20"
+          height="20"
+          aria-hidden="true"
+        ></iconify-icon>
+      </span>
+      <span class="text-sm leading-5 text-base-content" x-text="toastText"></span>
+    </div>
+  </div>
+
+  <section class="flex flex-col gap-4 px-4 pb-8 lg:px-6" aria-labelledby="risk-check-title">
+    <div class="rounded-lg border border-base-300 bg-base-100 p-4">
+      <h2 id="risk-check-title" class="text-base font-medium">查危险词</h2>
+      <p class="mt-1 text-sm text-base-content/60" x-text="riskPasteScopeText()"></p>
+
+      <fieldset class="mt-4">
+        <legend class="text-sm font-medium">词库</legend>
+        <div class="mt-2 flex flex-wrap gap-3">
+          <template x-for="lib in riskLibraries" :key="lib.id">
+            <label class="inline-flex min-h-11 cursor-pointer items-center gap-2 text-sm" :class="riskLibraryDisabled(lib) ? 'opacity-50' : ''">
+              <input
+                class="checkbox checkbox-sm"
+                type="checkbox"
+                :id="'risk-lib-' + lib.id"
+                :checked="Boolean(riskSelection[lib.id]) && !riskLibraryDisabled(lib)"
+                :disabled="riskLibraryDisabled(lib)"
+                @change="riskLibraryDisabled(lib) ? ($event.target.checked = false) : riskToggleLibrary(lib.id, $event.target.checked)"
+              />
+              <span x-text="lib.name + (lib.empty ? '（空）' : '')"></span>
+            </label>
+          </template>
+          <label class="inline-flex min-h-11 cursor-pointer items-center gap-2 text-sm">
+            <input class="checkbox checkbox-sm" type="checkbox" x-model="riskIncludeAi" />
+            <span>AI 查词</span>
+          </label>
+        </div>
+      </fieldset>
+
+      <label class="mt-4 block text-sm font-medium" for="risk-paste">这段文字</label>
+      <textarea
+        id="risk-paste"
+        class="textarea textarea-bordered mt-2 min-h-40 w-full text-sm leading-6"
+        x-model="pasteText"
+        placeholder="粘贴还没进笔记的文字"
+      ></textarea>
+
+      <div class="mt-3 flex flex-wrap items-center gap-2">
+        <button
+          class="btn btn-primary btn-sm"
+          type="button"
+          :disabled="riskBusy || (riskAiBusy && !riskAiNeedsRetry)"
+          @click="riskRunCheck()"
+        >查危险词</button>
+        <button class="btn btn-ghost btn-sm" type="button" :disabled="!pasteText.trim()" @click="onCopyPaste()">复制这段</button>
+      </div>
+      <p class="mt-2 text-sm text-base-content/60" x-show="riskLoadingVisible" x-cloak x-text="riskLoadingLineText()"></p>
+      <p class="mt-2 text-sm" x-show="riskAiNeedsRetry" x-cloak x-text="riskAiMessage"></p>
+
+      <div
+        class="mt-3 rounded-lg bg-base-200 p-3 text-sm"
+        role="status"
+        aria-live="polite"
+        x-show="riskStatus"
+        x-cloak
+      >
+        <p class="font-medium" x-text="riskSummaryText()"></p>
+        <ul class="mt-2 flex flex-col gap-1" x-show="riskHits.length">
+          <template x-for="hit in riskHits" :key="hit.id">
+            <li class="rounded-md border border-base-300 bg-base-100 px-2 py-1.5">
+              <button class="w-full text-left" type="button" @click="riskLocateHit(hit)">
+                <span class="text-xs text-base-content/50" x-text="hit.fieldLabel"></span>
+                <span
+                  class="ml-2 text-sm font-medium"
+                  :class="hit.severity === '不能发' ? 'text-error' : 'text-warning'"
+                  x-text="hit.text"
+                ></span>
+                <span class="ml-2 text-xs text-base-content/60" x-text="hit.libraryName + ' · ' + hit.severity"></span>
+              </button>
+              <div class="mt-1 flex flex-wrap gap-2" x-show="hit.replacement">
+                <button class="btn btn-ghost btn-xs" type="button" @click="riskApplyReplacement(hit)">词库替换</button>
+                <button
+                  class="btn btn-ghost btn-xs"
+                  type="button"
+                  x-show="riskUndo && riskUndo.hitId === hit.id"
+                  @click="riskUndoReplacement()"
+                >撤回</button>
+              </div>
+            </li>
+          </template>
+        </ul>
+      </div>
+
+      <div class="mt-3 rounded-lg border border-base-300 p-3" x-show="riskAiBusy || riskAiRecovering || riskAiSuggestions.length || riskAiMessage" x-cloak>
+        <p class="text-sm font-medium">AI 建议<span class="ml-1 text-xs font-normal text-base-content/50" x-show="riskAiSuggestions.length" x-text="'（' + riskAiSuggestions.length + '）'"></span></p>
+        <p class="mt-1 text-sm text-base-content/60" x-show="riskAiBusy || riskAiRecovering" x-text="riskAiStatusText()"></p>
+        <p class="mt-1 text-sm" x-show="!riskAiBusy && !riskAiRecovering && riskAiMessage" x-text="riskAiMessage"></p>
+        <ul class="mt-2 flex flex-col gap-1" x-show="riskAiSuggestions.length">
+          <template x-for="item in riskAiSuggestions" :key="item.id">
+            <li class="rounded-md bg-base-200 px-2 py-1.5 text-sm">
+              <div class="flex items-start gap-2">
+                <button class="min-w-0 flex-1 text-left" type="button" @click="riskToggleAiItem(item.id)">
+                  <span class="line-clamp-1 font-medium" x-text="item.text"></span>
+                  <span class="ml-2 text-xs text-base-content/50" x-text="item.status"></span>
+                </button>
+                <button
+                  class="btn btn-ghost btn-xs shrink-0"
+                  type="button"
+                  x-show="item.status !== '已改这一处'"
+                  @click="riskApplyAiSuggestion(item)"
+                >用这条替换</button>
+                <button
+                  class="btn btn-ghost btn-xs shrink-0"
+                  type="button"
+                  x-show="riskUndo && riskUndo.hitId === item.id"
+                  @click="riskUndoReplacement()"
+                >撤回</button>
+              </div>
+              <div class="mt-1 space-y-0.5 text-xs text-base-content/70" x-show="riskAiOpenId === item.id" x-cloak>
+                <p x-text="item.reason"></p>
+                <p>建议：<span x-text="item.replacement"></span></p>
+              </div>
+            </li>
+          </template>
+        </ul>
+      </div>
+    </div>
+
+    <p class="text-sm text-base-content/60">
+      在资料库里改个人违禁词库。
+      <button
+        class="btn btn-link btn-xs h-auto min-h-0 p-0 align-baseline"
+        type="button"
+        @click="goLibraryPersonal()"
+      >打开资料库 · 个人违禁词库</button>
+    </p>
+  </section>
+</div>

@@ -95,7 +95,7 @@
         { id: 'library', label: '资料库', ready: true, icon: 'lucide:library' },
         { id: 'topics', label: '选题', ready: false, icon: 'lucide:lightbulb' },
         { id: 'role', label: '角色', ready: false, icon: 'lucide:user-round' },
-        { id: 'risk', label: '危险词', ready: false, icon: 'lucide:shield-alert' },
+        { id: 'risk', label: '危险词', ready: true, icon: 'lucide:shield-alert' },
         { id: 'results', label: '记下结果', ready: false, icon: 'lucide:clipboard-check' },
         { id: 'words', label: '词库', ready: false, icon: 'lucide:book-a' },
         { id: 'follow', label: '承接', ready: false, icon: 'lucide:handshake' },
@@ -127,6 +127,11 @@
         if (!slot) return;
         try {
           await loadScript('lib/studio-toast.js');
+          if (id === 'note' || id === 'risk') {
+            await loadScript('lib/risk-inline-mark.js');
+            await loadScript('lib/risk-ai-poll-wait.js');
+            await loadScript('lib/risk-client.js');
+          }
           await loadScript(`pages/${id}.js`);
           // 资料库壳下面还有资源 Tab 模块，须在 initTree 前挂好。
           if (id === 'library') {
@@ -137,6 +142,7 @@
             await loadScript('pages/library/reference-docs.js');
             await loadScript('pages/library/learned-notes.js');
             await loadScript('pages/library/xhs-note.js');
+            await loadScript('pages/library/risk-words.js');
           }
           const response = await fetch(`pages/${id}.html`);
           if (!response.ok) throw new Error('没有打开这一页');
