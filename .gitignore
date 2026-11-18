@@ -7,6 +7,7 @@ Thumbs.db
 cache/
 temp/
 output/
+/configs/
 runtime/
 
 # Native Messaging 包装器（绝对路径，启动时静默生成）

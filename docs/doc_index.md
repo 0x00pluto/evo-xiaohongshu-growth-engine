@@ -5,9 +5,13 @@
 - `docs/mvp-map.md`: 增长引擎竖切地图；每刀出口是一篇可复制去发的稿；studio 只放页面，业务在 src 其他包
 - `docs/builtin-workflows/post-task-reflect.md`: 任务后反思（白痴指数 → 删 → 程序化 → 鲁棒 → 加速）；用户明确要求时触发，不自动跑
 - `docs/builtin-workflows/extract-experience.md`: 提取经验 → 项目无关最佳实践；用户明确要求时触发；落盘须问或读 experience_target，默认本仓 docs/best-practices/
-- `docs/builtin-workflows/consolidate-memory.md`: 记忆巩固与遗忘（冲突消解 → 情景提纯 → 剪枝）；仅用户显式触发；与反思 / 提取经验互不串联
+- `docs/builtin-workflows/write-memo.md`: 写备忘：本仓稳定约束落盘；仅用户明确要求「写成备忘 / 记进 memos」时触发
+- `docs/builtin-workflows/consolidate-memory.md`: 记忆巩固与遗忘（冲突消解 → 情景提纯 → 剪枝）；仅用户显式触发
 - `docs/builtin-workflows/publish-evo-agent-pack.md`: 仅首次 / 改合同时发布或核对 evo_agent_pack.json 工牌；日常发版勿进门；打 tag 改走 cut-release-tag；不做安装器
 - `docs/builtin-workflows/cut-release-tag.md`: 日常发版唯一入口；汇总变更 → upgrades → 对齐工牌与（若有）plugin.manifest 同号 → tag → 推送 → gh 或网页建 Release；major 须人指定
+- `docs/builtin-workflows/intake-plugin.md`: 收纳插件：把来源项目收成 plugins/<id>/；仅用户显式触发；同 id 已装则按插件自身变更逐跳升级；不做卸插件
+- `docs/memos/_TEMPLATE.md`: 备忘 frontmatter + 正文骨架（不占序号）
+- `docs/memos/memo-wiki-index.md`: Memo 索引（不计入五位序号）；下一号 00001
 - `docs/workflows/one-post-studio.md`: 一篇图文操作台与资料库（风格 / 我们的图 / 对标文案 / 产品资料 / 个人违禁词库 / 末尾对标笔记浏览与反复学；新建风格与我们的图先出虚线上传框；成稿后自动本机查危险词并写入草稿；词库勾选不立刻查、点查危险词才查；词库与 AI 分轨叠加、正文未变可缓存；危险词/AI 文内红标浮窗改词；AI 查词先落任务 ID、同 key 可取回、查词不冲 running；侧栏危险词页只粘贴试查；个人违禁词库在资料库 Tab、runtime/risk/；笔记页 JS 在 pages/note.js + pages/note/，宿主方法袋在 src/one-post/runner/（draft 与 xhs-notes 已再分子文件）；写成笔记与刷图、AI 查词在开始前查买断；本机命令改页面会自动刷新；Dex Buddy 打包版用插件页「加载本地目录」，SDK 1.0.4 接口层 + standalone；插件包范围见 dex-buddy-plugin.pack
 - `docs/workflows/image-prompt-safety.md`: 生图说法对照库（默认空 rules）+ 学风格探针；文案加词 vs 图片踩线分工；历史绿盾；flagged 资料库可见、写笔记不展示
 - `specs/prds/prd-00012-learn-xhs-note.md`: 资料库贴小红书链接；解析链接单独入库；正文进范文、首图与一张内页进图册；写稿仍走范文加业务一句
