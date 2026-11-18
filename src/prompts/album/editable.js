@@ -42,15 +42,21 @@ function extractEditablePrompt(prompt) {
 }
 
 /**
- * 把可改段嵌回存盘全文。可改段删空则该槽存成空字符串。
+ * 把可改段嵌回存盘全文。可改段删空且全文含第 11 槽时，该槽存成空字符串；
+ * 全文非空却抽不出第 11 槽时保留原文，避免空可改段把整段抹掉。
  * @param {string} full
  * @param {string} edit
  * @returns {string}
  */
 function embedEditablePrompt(full, edit) {
   const piece = String(edit || '').trim();
-  if (!piece) return '';
   const stored = String(full || '');
+  if (!piece) {
+    if (!stored.trim()) return '';
+    const range = editableRange(stored);
+    if (!range) return stored;
+    return '';
+  }
   const range = editableRange(stored);
   if (!range) return stored;
   return `${stored.slice(0, range.start)}${piece}${stored.slice(range.end)}`;

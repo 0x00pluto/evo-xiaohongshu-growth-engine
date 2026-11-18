@@ -125,11 +125,12 @@ function blankPrompts() {
 }
 
 /**
+ * 封面与配图里是否还有非空的画面内容全文。
+ * basis 单独留着不算；否则空全文会被当成「已套词」而拦在定画面之前。
  * @param {DraftState} state
  * @returns {boolean}
  */
 function hasStampedPrompts(state) {
-  if (state.prompts && state.prompts.basis) return true;
   if (String(state.prompts && state.prompts.cover || '').trim()) return true;
   const gallery = state.prompts && Array.isArray(state.prompts.gallery) ? state.prompts.gallery : [];
   return gallery.some((item) => String(item).trim());
@@ -149,16 +150,49 @@ function copyIsStale(state) {
 }
 
 /**
- * @param {DraftState} state
  * @param {ImageOnly} only
  * @returns {string}
  */
-function slotBlockReason(state, only) {
+function slotMissingContentMessage(only) {
+  return only.slot === 'cover'
+    ? '还没有封面的画面内容'
+    : `还没有配图 ${only.index} 的画面内容`;
+}
+
+/**
+ * @param {ImageOnly} only
+ * @returns {string}
+ */
+function slotEmptyContentMessage(only) {
+  return only.slot === 'cover'
+    ? '封面的画面内容是空的'
+    : `配图 ${only.index} 的画面内容是空的`;
+}
+
+/**
+ * @param {DraftState} state
+ * @param {ImageOnly} only
+ * @param {string} [requestedLook]
+ * @returns {string}
+ */
+function slotBlockReason(state, only, requestedLook) {
   if (!state.draft) return '还没有稿面';
-  if (only.slot === 'gallery' && only.index > state.galleryCount) return '还没有这一张的提示词';
+  if (only.slot === 'gallery' && only.index > state.galleryCount) {
+    return slotMissingContentMessage(only);
+  }
   if (!hasStampedPrompts(state) || copyIsStale(state)) return '';
-  if (only.slot === 'gallery' && only.index > state.prompts.gallery.length) return '还没有这一张的提示词';
-  if (!slotPromptText(state, only)) return '还没有这一张的提示词';
+  if (only.slot === 'gallery' && only.index > state.prompts.gallery.length) {
+    return slotMissingContentMessage(only);
+  }
+  if (!slotPromptText(state, only)) {
+    const stampedLook = state.prompts && typeof state.prompts.look === 'string'
+      ? state.prompts.look.trim()
+      : '';
+    const look = typeof requestedLook === 'string' ? requestedLook.trim() : '';
+    // 换了风格：空槽交给定画面 / 重套，不能卡在「这一张是空的」。
+    if (look && stampedLook && look !== stampedLook) return '';
+    return slotEmptyContentMessage(only);
+  }
   return '';
 }
 

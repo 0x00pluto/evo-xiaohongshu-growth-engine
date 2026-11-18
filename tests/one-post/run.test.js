@@ -1350,7 +1350,8 @@ test('不带槽位不能生图，再抽只换这一张', async () => {
   assert.equal(cleared.ok, true);
   const emptyGallery = await runner.generateImages({ slot: 'gallery', index: 1 });
   assert.equal(emptyGallery.ok, false);
-  assert.equal(emptyGallery.message, '还没有这一张的提示词');
+  assert.equal(emptyGallery.message, '配图 1 的画面内容是空的');
+  assert.equal(runner.loadLatest().prompts.cover, first.prompts.cover);
   const coverStill = await runner.generateImages({
     slot: 'cover',
     prompts: { cover: '改过的封面提示词', gallery: [''] },
@@ -2556,4 +2557,122 @@ test('saveRiskCheck 同正文不同词库指纹时保留 done 的 AI', async () 
   assert.equal(keptText.risk.ai.status, 'done');
   assert.equal(keptText.risk.ai.fingerprint, textFp);
   assert.equal(keptText.risk.ai.suggestions.length, 1);
+});
+
+test('basis 还在但画面内容全空：换风格再画会定画面', async () => {
+  const root = tempDir();
+  const promptsDir = path.join(root, 'prompts');
+  writePrompts(promptsDir);
+  const seen = [];
+  const runner = createRunner({
+    postsDir: path.join(root, 'posts'),
+    promptsDir,
+    random: firstPick,
+    complete: async (prompt) => {
+      seen.push(prompt);
+      return responseFor(prompt, 1);
+    },
+    generateImage: async ({ outputPath }) => {
+      fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+      fs.writeFileSync(outputPath, 'png');
+    },
+  });
+  await runner.generateDraft(draftArgs({ galleryCount: 1 }));
+  await untilIdle(runner);
+  await stampAndDraw(runner, { slot: 'cover' });
+  const stamped = runner.loadLatest();
+  assert.ok(stamped.prompts.basis);
+  assert.equal(stamped.prompts.look, ALBUM_MAGAZINE);
+  const cleared = runner.saveEditor({
+    prompts: { cover: '', gallery: [''] },
+  });
+  assert.equal(cleared.ok, true);
+  const empty = runner.loadLatest();
+  assert.equal(empty.prompts.cover, '');
+  assert.deepEqual(empty.prompts.gallery, ['']);
+  assert.ok(empty.prompts.basis);
+  seen.length = 0;
+  const started = await runner.generateImages({
+    slot: 'cover',
+    look: ALBUM_SCRAPBOOK,
+    promptEdits: { cover: '', gallery: [''] },
+  });
+  assert.equal(started.ok, true, started.message || '换风格应定画面');
+  const done = await untilIdle(runner);
+  assert.equal(seenHasPrefix(seen, 'PLAN'), true);
+  assert.ok(String(done.prompts.cover || '').trim());
+  assert.equal(done.prompts.look, ALBUM_SCRAPBOOK);
+  assert.equal(done.images.cover.status, '成功');
+});
+
+test('basis 还在但画面内容全空：同风格再画也会定画面', async () => {
+  const root = tempDir();
+  const promptsDir = path.join(root, 'prompts');
+  writePrompts(promptsDir);
+  const seen = [];
+  const runner = createRunner({
+    postsDir: path.join(root, 'posts'),
+    promptsDir,
+    random: firstPick,
+    complete: async (prompt) => {
+      seen.push(prompt);
+      return responseFor(prompt, 1);
+    },
+    generateImage: async ({ outputPath }) => {
+      fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+      fs.writeFileSync(outputPath, 'png');
+    },
+  });
+  await runner.generateDraft(draftArgs({ galleryCount: 1 }));
+  await untilIdle(runner);
+  await stampAndDraw(runner, { slot: 'gallery', index: 1 });
+  runner.saveEditor({ prompts: { cover: '', gallery: [''] } });
+  seen.length = 0;
+  const started = await runner.generateImages({
+    slot: 'cover',
+    look: ALBUM_MAGAZINE,
+    promptEdits: { cover: '', gallery: [''] },
+  });
+  assert.equal(started.ok, true, started.message || '同风格空全文应定画面');
+  const done = await untilIdle(runner);
+  assert.equal(seenHasPrefix(seen, 'PLAN'), true);
+  assert.ok(String(done.prompts.cover || '').trim());
+  assert.equal(done.prompts.look, ALBUM_MAGAZINE);
+  assert.equal(done.images.cover.status, '成功');
+});
+
+test('同风格下仅配图为空：拒绝且不抹封面全文', async () => {
+  const root = tempDir();
+  const promptsDir = path.join(root, 'prompts');
+  writePrompts(promptsDir);
+  const runner = createRunner({
+    postsDir: path.join(root, 'posts'),
+    promptsDir,
+    random: firstPick,
+    complete: async (prompt) => responseFor(prompt, 1),
+    generateImage: async ({ outputPath }) => {
+      fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+      fs.writeFileSync(outputPath, 'png');
+    },
+  });
+  await runner.generateDraft(draftArgs({ galleryCount: 1 }));
+  await untilIdle(runner);
+  await stampAndDraw(runner, { slot: 'cover' });
+  const stamped = runner.loadLatest();
+  const coverBefore = stamped.prompts.cover;
+  assert.ok(String(coverBefore || '').trim());
+  runner.saveEditor({
+    prompts: { cover: coverBefore, gallery: [''] },
+  });
+  const rejected = await runner.generateImages({
+    slot: 'gallery',
+    index: 1,
+    look: ALBUM_MAGAZINE,
+    promptEdits: { cover: '', gallery: [''] },
+  });
+  assert.equal(rejected.ok, false);
+  assert.equal(rejected.message, '配图 1 的画面内容是空的');
+  const after = runner.loadLatest();
+  assert.equal(after.prompts.cover, coverBefore);
+  assert.deepEqual(after.prompts.gallery, ['']);
 });

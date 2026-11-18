@@ -53,6 +53,12 @@ test('可改段删空则该槽存成空字符串', () => {
   assert.equal(extractEditablePrompt(''), '');
 });
 
+test('空可改段不抹掉没有第 11 槽的非空全文', () => {
+  const legacy = '竖版 3:4\n1. 背景：白\n没有主题绘画内容这一槽';
+  assert.equal(embedEditablePrompt(legacy, ''), legacy);
+  assert.equal(embedEditablePrompt(legacy, '  '), legacy);
+});
+
 test('反解杂志帧后，手帐结构对得上、信息图对不上', () => {
   const full = magazinePrompt('画面甲', '一句上图');
   const decoded = decodeFilledPrompt(full, ALBUM_MAGAZINE, promptsDir);

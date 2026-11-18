@@ -354,18 +354,17 @@ function attachDraftImages(ctx) {
     const only = requestedSlot(source);
     if (!only) return { ok: false, message: '要指明封面或配图序号' };
     const state = ctx.store.read();
-    applyPromptText(state, source);
-    applyPromptEdits(state, source);
     const albumLook = typeof source.look === 'string' ? source.look.trim() : '';
     if (albumLook && !isAlbum(albumLook, promptsDir, userAlbumsDir)) {
-      ctx.store.write(state);
       return { ok: false, message: '图册不在允许列表', field: 'look' };
     }
-    const reason = slotBlockReason(state, only);
+    // 先判能不能画：拒绝时不写可改段，避免空字符串先抹掉全文。
+    const reason = slotBlockReason(state, only, albumLook);
     if (reason) {
-      ctx.store.write(state);
       return { ok: false, message: reason };
     }
+    applyPromptText(state, source);
+    applyPromptEdits(state, source);
     ctx.store.write(state);
     return withEntitlement('generateImages', () => acceptGenerateImages(only, albumLook));
   }

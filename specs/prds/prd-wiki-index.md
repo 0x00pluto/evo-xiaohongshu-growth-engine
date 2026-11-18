@@ -23,3 +23,4 @@
 | 00017 | `specs/prds/prd-00017-xhs-learned-notes.md` | 对标笔记可反复学；图文按哈希跳过未变并写回原柜子；资料库末尾对标笔记卡墙与浮层；来源飞书 20261110_0012；工程 accepted |
 | 00018 | `specs/prds/prd-00018-image-select-copy-preview.md` | 风格浮层选中样图持续流光、成稿图复制 PNG、笔记预览主图全屏；合并飞书 20261111_0015 与 20261112_0016；工程 accepted |
 | 00019 | `specs/prds/prd-00019-danger-word-check.md` | 发之前本机查危险词；笔记旁与危险词页同一套规则；人自己改或点一条才写入；有命中也不锁复制。Release 1 才用 AI 再看一遍；工程 accepted |
+| 00020 | `specs/prds/prd-00020-album-switch-missing-prompt.md` | 换风格后再画这一张要先定出画面内容；拒绝或失败不得先把已有画面内容写成空。来源飞书 20261117_0022；工程 accepted |
