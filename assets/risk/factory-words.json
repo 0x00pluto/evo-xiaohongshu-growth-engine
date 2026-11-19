@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "source": "prd-00019 + feishu-xhs-forbidden-words",
+  "source": "prd-00019 + feishu-xhs-forbidden-words + wiki-GD8pwc1SpifQ3gkz60fcPRM2n2g",
   "scope": "xhs-note-visible-copy",
   "libraries": [
     {
@@ -3098,6 +3098,145 @@
       "severity": "要改口",
       "industry": "私人家庭服务与生活管家",
       "replacement": "介绍管家服务内容及经验"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "全网首发",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "ad_extreme",
+      "text": "万能",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "截流",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "截流运营",
+      "severity": "不能发",
+      "industry": "通用",
+      "replacement": "内容运营复盘"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "矩阵运营",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "offsite_traffic",
+      "text": "多账号导流",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "非正规",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "破解",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "免费看",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "串流",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "机顶盒",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "外挂",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "翻墙",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "模拟器",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "自动化脚本",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "自动采集",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "批量抓取",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "脚本私信",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "自动发笔记",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "自动回私信",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "脚本托管",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "批量铺量",
+      "severity": "不能发",
+      "industry": "通用"
+    },
+    {
+      "libraryId": "banned",
+      "text": "AI批量运营",
+      "severity": "不能发",
+      "industry": "通用"
     }
   ]
 }

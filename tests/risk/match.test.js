@@ -131,3 +131,29 @@ test('出厂词带来源行业：代表词与去重键', () => {
   assert.equal(hit.hits[0].text, '稳赚不赔');
   assert.equal(hit.hits[0].severity, '不能发');
 });
+
+test('飞书备忘新增词：命中长词不拆、合规说法不误伤', () => {
+  const hit = checkRiskText({
+    fields: [{
+      id: 'body',
+      text: '截流运营用自动化脚本，全网首发；内容运营与账号运营最近复盘。',
+    }],
+    libraryIds: ['ad_extreme', 'offsite_traffic', 'banned'],
+    factoryWords: factory.words,
+    libraries: factory.libraries,
+  });
+  assert.equal(hit.status, 'hits');
+  const texts = hit.hits.map((item) => item.text).sort();
+  assert.deepEqual(texts, ['全网首发', '截流运营', '自动化脚本'].sort());
+  assert.equal(hit.hits.filter((item) => item.text === '截流').length, 0);
+  assert.equal(hit.hits.filter((item) => item.text === '内容运营').length, 0);
+  assert.equal(hit.hits.filter((item) => item.text === '账号运营').length, 0);
+  assert.equal(hit.hits.filter((item) => item.text === '最近').length, 0);
+  assert.equal(hit.hits.filter((item) => item.text === '最').length, 0);
+
+  const jieLiu = hit.hits.find((item) => item.text === '截流运营');
+  assert.ok(jieLiu);
+  assert.equal(jieLiu.libraryId, 'offsite_traffic');
+  assert.equal(jieLiu.severity, '不能发');
+  assert.equal(jieLiu.replacement, '内容运营复盘');
+});
