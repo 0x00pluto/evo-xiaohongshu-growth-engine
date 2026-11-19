@@ -102,7 +102,35 @@
                 ></span>
                 <span class="ml-2 text-xs text-base-content/60" x-text="hit.libraryName + ' · ' + hit.severity"></span>
               </button>
-              <div class="mt-1 flex flex-wrap gap-2" x-show="hit.replacement">
+              <div class="mt-1 flex flex-col gap-1" x-show="hit.severity === '不能发' && hit.uiState !== 'applied'">
+                <label class="text-xs text-base-content/60" :for="'risk-paste-rep-' + hit.id">替换成</label>
+                <input
+                  class="input input-bordered input-xs w-full"
+                  type="text"
+                  :id="'risk-paste-rep-' + hit.id"
+                  :name="'riskPasteRep-' + hit.id"
+                  autocomplete="off"
+                  :value="riskPasteDraftFor(hit)"
+                  @input="riskSetPasteDraft(hit, $event.target.value)"
+                  :aria-invalid="!String(riskPasteDraftFor(hit) || '').trim()"
+                />
+                <p class="text-xs text-base-content/50" x-show="!String(riskPasteDraftFor(hit) || '').trim()" x-cloak>先写一句再点替换</p>
+                <div class="flex flex-wrap gap-2">
+                  <button
+                    class="btn btn-ghost btn-xs"
+                    type="button"
+                    :disabled="!String(riskPasteDraftFor(hit) || '').trim()"
+                    @click="riskApplyPasteHit(hit)"
+                  >替换</button>
+                  <button
+                    class="btn btn-ghost btn-xs"
+                    type="button"
+                    x-show="riskUndo && riskUndo.hitId === hit.id"
+                    @click="riskUndoReplacement()"
+                  >撤回</button>
+                </div>
+              </div>
+              <div class="mt-1 flex flex-wrap gap-2" x-show="hit.severity !== '不能发' && hit.replacement">
                 <button class="btn btn-ghost btn-xs" type="button" @click="riskApplyReplacement(hit)">词库替换</button>
                 <button
                   class="btn btn-ghost btn-xs"

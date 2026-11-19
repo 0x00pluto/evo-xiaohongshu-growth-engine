@@ -753,12 +753,38 @@
                 ></p>
                 <p class="text-base-content/70" x-show="riskActiveMark().uiState === 'applied' && riskActiveMark().originalText">原来：<span x-text="riskActiveMark().originalText"></span></p>
                 <p class="text-base-content/70" x-show="riskActiveMark().uiState !== 'applied'" x-text="riskActiveMark().reason"></p>
-                <p x-show="riskActiveMark().uiState !== 'applied' && riskActiveMark().replacement">建议：<span x-text="riskActiveMark().replacement"></span></p>
+                <div
+                  class="flex flex-col gap-1"
+                  x-show="riskActiveMark().uiState !== 'applied' && riskMarkIsCannotSend(riskActiveMark())"
+                >
+                  <label class="text-xs text-base-content/60" for="risk-popover-replacement">替换成</label>
+                  <input
+                    id="risk-popover-replacement"
+                    class="input input-bordered input-xs w-full"
+                    type="text"
+                    name="riskReplacement"
+                    autocomplete="off"
+                    :aria-invalid="!String(riskPopover.draftReplacement || '').trim()"
+                    aria-describedby="risk-popover-replacement-hint"
+                    x-model="riskPopover.draftReplacement"
+                    @keydown="riskPopoverReplaceOnEnter($event)"
+                  />
+                  <p
+                    id="risk-popover-replacement-hint"
+                    class="text-xs text-base-content/50"
+                    x-show="!String(riskPopover.draftReplacement || '').trim()"
+                    x-cloak
+                  >先写一句再点替换</p>
+                </div>
+                <p
+                  x-show="riskActiveMark().uiState !== 'applied' && !riskMarkIsCannotSend(riskActiveMark()) && riskActiveMark().replacement"
+                >建议：<span x-text="riskActiveMark().replacement"></span></p>
                 <div class="flex flex-wrap gap-2">
                   <button
                     class="btn btn-primary btn-xs"
                     type="button"
-                    x-show="riskActiveMark().uiState !== 'applied' && riskActiveMark().replacement"
+                    x-show="riskActiveMark().uiState !== 'applied' && riskPopoverCanReplace()"
+                    :disabled="riskMarkIsCannotSend(riskActiveMark()) && !String(riskPopover.draftReplacement || '').trim()"
                     @click="riskApplyActiveMark()"
                   >替换</button>
                   <button
@@ -770,7 +796,7 @@
                   <button
                     class="btn btn-ghost btn-xs"
                     type="button"
-                    x-show="riskActiveMark().uiState === 'pending'"
+                    x-show="riskActiveMark().uiState === 'pending' && !riskMarkIsCannotSend(riskActiveMark())"
                     @click="riskDiscardActiveMark()"
                   >放弃</button>
                 </div>

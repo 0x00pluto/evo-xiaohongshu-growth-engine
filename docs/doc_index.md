@@ -25,6 +25,9 @@
 - `specs/prds/prd-00018-image-select-copy-preview.md`: 风格浮层选中样图持续流光、成稿图复制 PNG、笔记预览主图全屏；合并飞书 20261111_0015 与 20261112_0016
 - `specs/prds/prd-00019-danger-word-check.md`: 发之前本机查危险词；成稿自动查并进草稿；勾选不立刻查；词库与 AI 分轨（AI 只跟正文）；同 key 可取回；个人违禁词库在资料库；点一条才写入；有不能发也不锁复制
 - `specs/prds/prd-00020-album-switch-missing-prompt.md`: 换风格后再画这一张要先定出画面内容再出图；拒绝或失败不得先把已有画面内容写成空；来源飞书 20261117_0022
+- `specs/prds/prd-00021-block-word-dismiss.md`: 不能发必须可替换（词库默认句 + 浮窗可改），去掉放弃；出厂补齐替换；飞书规则镜像进 docs 且不进插件包；工程 accepted
+- `docs/references/xhs-platform-forbidden-words.md`: 飞书《小红书平台违禁词》镜像；维护出厂危险词对照用；不进插件包
+- `docs/references/xhs-violation-case-notes.md`: 飞书《实操总结违规词与违规点》镜像；维护出厂危险词与 AI 复查对照用；不进插件包
 - `docs/DESIGN.md`: 页侧视觉事实源（HTML、Alpine、daisyUI 5；配色为 Cal 色板；页头默认 text-xl / py-3；写笔记 / 以前的笔记 / 资料库同档；以前的笔记约 8 列竖卡墙与小红书式详情浮层；笔记页比例/风格/画面内容/我们的图同款展开条、预览画框跟有效比例、风格格 contain；危险词/AI 文内红标浮窗改词、查危险词勾选不立刻查与缓存 toast；笔记页 JS 按 pages/note/ mixin、宿主按 src/one-post/runner/ 分域；排版含壳与侧栏 Lucide 图标/大屏收起、间距、两屏和手机框；等待用 Lottie 浮层；错误/短反馈用 toast（感叹号 error / 绿对勾 success + 出入场），禁无图标纯字条与页顶赤裸 text-error；要发什么紧凑贴底 CTA、无人设目的说明书；对标文案/产品资料库同风格 6 列竖卡；资料库末尾对标笔记卡墙与详情浮层、反复学比较徽标；加一条产品资料卡墙选库或写新、满 5 隐藏加号；新建风格/我们的图先出虚线上传框；新建含对标笔记进料；学风格用 image-scan + 轮播人话）；改外观前先读
 - `docs/references/xhs-prompt-taxonomy.md`: 人设×目的×形式提示词分类与组合校验原文，供操作台释义与写稿对照
 - `specs/prds/prd-wiki-index.md`: PRD 索引，不计入序号；产品经理追加一行，工程验收官可回写状态

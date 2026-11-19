@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "source": "prd-00019 + feishu-xhs-forbidden-words + wiki-GD8pwc1SpifQ3gkz60fcPRM2n2g",
+  "source": "prd-00019 + feishu-xhs-forbidden-words + wiki-GD8pwc1SpifQ3gkz60fcPRM2n2g + prd-00021-replacements",
   "scope": "xhs-note-visible-copy",
   "libraries": [
     {
@@ -28,19 +28,22 @@
       "libraryId": "ad_extreme",
       "text": "NO.1",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "表现突出的一款"
     },
     {
       "libraryId": "ad_extreme",
       "text": "世界级",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "面向全球市场的"
     },
     {
       "libraryId": "ad_extreme",
       "text": "中国第一",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "国内口碑较好"
     },
     {
       "libraryId": "ad_extreme",
@@ -52,31 +55,36 @@
       "libraryId": "ad_extreme",
       "text": "全国第一",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "国内口碑较好"
     },
     {
       "libraryId": "ad_extreme",
       "text": "全球第一",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "在部分市场表现突出"
     },
     {
       "libraryId": "ad_extreme",
       "text": "全网第一",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "口碑较好"
     },
     {
       "libraryId": "ad_extreme",
       "text": "唯一",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "具有自身特色的"
     },
     {
       "libraryId": "ad_extreme",
       "text": "国家级",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "有相关资质的"
     },
     {
       "libraryId": "ad_extreme",
@@ -88,7 +96,8 @@
       "libraryId": "ad_extreme",
       "text": "完美",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "更贴合需求的"
     },
     {
       "libraryId": "ad_extreme",
@@ -118,19 +127,22 @@
       "libraryId": "ad_extreme",
       "text": "无敌",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "表现出色的"
     },
     {
       "libraryId": "ad_extreme",
       "text": "最优",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "更合适的"
     },
     {
       "libraryId": "ad_extreme",
       "text": "最佳",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "一种值得了解的"
     },
     {
       "libraryId": "ad_extreme",
@@ -155,7 +167,8 @@
       "libraryId": "ad_extreme",
       "text": "最强",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "表现突出的"
     },
     {
       "libraryId": "ad_extreme",
@@ -167,25 +180,29 @@
       "libraryId": "ad_extreme",
       "text": "最高级",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "高规格的"
     },
     {
       "libraryId": "ad_extreme",
       "text": "极品",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "精选的"
     },
     {
       "libraryId": "ad_extreme",
       "text": "极致",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "注重细节的"
     },
     {
       "libraryId": "ad_extreme",
       "text": "独家",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "特色的"
     },
     {
       "libraryId": "ad_extreme",
@@ -198,13 +215,15 @@
       "libraryId": "ad_extreme",
       "text": "第一品牌",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "口碑较好的品牌"
     },
     {
       "libraryId": "ad_extreme",
       "text": "绝对",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "相对更稳妥的"
     },
     {
       "libraryId": "ad_extreme",
@@ -243,7 +262,8 @@
       "libraryId": "ad_extreme",
       "text": "顶级",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "注重品质的"
     },
     {
       "libraryId": "ad_extreme",
@@ -255,7 +275,8 @@
       "libraryId": "ad_extreme",
       "text": "首创",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "较早推出的"
     },
     {
       "libraryId": "ad_extreme",
@@ -267,97 +288,113 @@
       "libraryId": "offsite_traffic",
       "text": "+V",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除站外联系或导流表达，改用站内承接"
     },
     {
       "libraryId": "offsite_traffic",
       "text": "QQ号",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除站外联系方式引导"
     },
     {
       "libraryId": "offsite_traffic",
       "text": "VX",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除站外联系或导流表达，改用站内承接"
     },
     {
       "libraryId": "offsite_traffic",
       "text": "V我",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除站外联系或导流表达，改用站内承接"
     },
     {
       "libraryId": "offsite_traffic",
       "text": "主页有微",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除站外联系或导流表达，改用站内承接"
     },
     {
       "libraryId": "offsite_traffic",
       "text": "主页有联系方式",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除站外联系或导流表达，改用站内承接"
     },
     {
       "libraryId": "offsite_traffic",
       "text": "主页留联系方式",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除站外联系或导流表达，改用站内承接"
     },
     {
       "libraryId": "offsite_traffic",
       "text": "主页联系",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除站外联系或导流表达，改用站内承接"
     },
     {
       "libraryId": "offsite_traffic",
       "text": "二维码",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除站外联系方式引导"
     },
     {
       "libraryId": "offsite_traffic",
       "text": "其他平台见",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除站外联系或导流表达，改用站内承接"
     },
     {
       "libraryId": "offsite_traffic",
       "text": "加V",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除站外联系方式引导"
     },
     {
       "libraryId": "offsite_traffic",
       "text": "加好友",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除站外联系或导流表达，改用站内承接"
     },
     {
       "libraryId": "offsite_traffic",
       "text": "加微信",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除站外联系方式引导"
     },
     {
       "libraryId": "offsite_traffic",
       "text": "加联系方式",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除站外联系或导流表达，改用站内承接"
     },
     {
       "libraryId": "offsite_traffic",
       "text": "外部链接",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除站外联系或导流表达，改用站内承接"
     },
     {
       "libraryId": "offsite_traffic",
       "text": "头像有微",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除站外联系或导流表达，改用站内承接"
     },
     {
       "libraryId": "offsite_traffic",
@@ -369,85 +406,99 @@
       "libraryId": "offsite_traffic",
       "text": "微信",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除站外联系方式引导"
     },
     {
       "libraryId": "offsite_traffic",
       "text": "微信二维码",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除站外联系方式引导"
     },
     {
       "libraryId": "offsite_traffic",
       "text": "微信号",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除站外联系方式引导"
     },
     {
       "libraryId": "offsite_traffic",
       "text": "微信同号",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除站外联系方式引导"
     },
     {
       "libraryId": "offsite_traffic",
       "text": "微我",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除站外联系或导流表达，改用站内承接"
     },
     {
       "libraryId": "offsite_traffic",
       "text": "手机号",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除站外联系方式引导"
     },
     {
       "libraryId": "offsite_traffic",
       "text": "扫码咨询",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除站外联系或导流表达，改用站内承接"
     },
     {
       "libraryId": "offsite_traffic",
       "text": "扫码添加",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除站外联系或导流表达，改用站内承接"
     },
     {
       "libraryId": "offsite_traffic",
       "text": "添加好友",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除站外联系或导流表达，改用站内承接"
     },
     {
       "libraryId": "offsite_traffic",
       "text": "点击链接",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除站外链接引导"
     },
     {
       "libraryId": "offsite_traffic",
       "text": "电话号码",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除站外联系或导流表达，改用站内承接"
     },
     {
       "libraryId": "offsite_traffic",
       "text": "看主页",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除站外联系或导流表达，改用站内承接"
     },
     {
       "libraryId": "offsite_traffic",
       "text": "社交媒体账号",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除站外联系或导流表达，改用站内承接"
     },
     {
       "libraryId": "offsite_traffic",
       "text": "私信我",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "通过平台允许的方式咨询"
     },
     {
       "libraryId": "offsite_traffic",
@@ -460,25 +511,29 @@
       "libraryId": "offsite_traffic",
       "text": "私域",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除站外联系或导流表达，改用站内承接"
     },
     {
       "libraryId": "offsite_traffic",
       "text": "站外沟通",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除站外联系或导流表达，改用站内承接"
     },
     {
       "libraryId": "offsite_traffic",
       "text": "第三方平台账号",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除站外联系或导流表达，改用站内承接"
     },
     {
       "libraryId": "offsite_traffic",
       "text": "联系方式",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除站外联系或导流表达，改用站内承接"
     },
     {
       "libraryId": "offsite_traffic",
@@ -490,37 +545,43 @@
       "libraryId": "offsite_traffic",
       "text": "跳转第三方",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除站外跳转引导"
     },
     {
       "libraryId": "offsite_traffic",
       "text": "进群",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除站外社群导流表达"
     },
     {
       "libraryId": "offsite_traffic",
       "text": "通过其他平台联系",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除站外联系或导流表达，改用站内承接"
     },
     {
       "libraryId": "offsite_traffic",
       "text": "邮箱",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除站外联系或导流表达，改用站内承接"
     },
     {
       "libraryId": "banned",
       "text": "100%成功",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "尽量"
     },
     {
       "libraryId": "banned",
       "text": "一定被淘汰",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -532,7 +593,8 @@
       "libraryId": "banned",
       "text": "不买就亏",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -550,7 +612,8 @@
       "libraryId": "banned",
       "text": "人生彻底毁了",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -562,25 +625,29 @@
       "libraryId": "banned",
       "text": "伪造证书",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "低俗",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "侮辱",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "保平安",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -600,37 +667,43 @@
       "libraryId": "banned",
       "text": "保证获批",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "假冒专家",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "假冒医生",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "假冒律师",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "假冒教授",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "催姻缘",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -654,19 +727,22 @@
       "libraryId": "banned",
       "text": "关注我",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "了解后续分享"
     },
     {
       "libraryId": "banned",
       "text": "关注账号",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "了解后续分享"
     },
     {
       "libraryId": "banned",
       "text": "再不做就晚了",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -678,25 +754,29 @@
       "libraryId": "banned",
       "text": "包录取",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "包移民",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "包过",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "化煞",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -752,7 +832,8 @@
       "libraryId": "banned",
       "text": "开运",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -765,7 +846,8 @@
       "libraryId": "banned",
       "text": "必然失败",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -778,7 +860,8 @@
       "libraryId": "banned",
       "text": "性暗示",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -808,7 +891,8 @@
       "libraryId": "banned",
       "text": "招财",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "介绍传统文化中的艺术寓意"
     },
     {
       "libraryId": "banned",
@@ -826,7 +910,8 @@
       "libraryId": "banned",
       "text": "收藏",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "先记下来"
     },
     {
       "libraryId": "banned",
@@ -838,7 +923,8 @@
       "libraryId": "banned",
       "text": "改命",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -850,7 +936,8 @@
       "libraryId": "banned",
       "text": "改运",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -863,7 +950,8 @@
       "libraryId": "banned",
       "text": "无任何风险",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -875,7 +963,8 @@
       "libraryId": "banned",
       "text": "旺事业",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -893,13 +982,15 @@
       "libraryId": "banned",
       "text": "旺桃花",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "旺财",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -923,7 +1014,8 @@
       "libraryId": "banned",
       "text": "歧视",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -935,31 +1027,36 @@
       "libraryId": "banned",
       "text": "永久有效",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "在约定条件下长期有效"
     },
     {
       "libraryId": "banned",
       "text": "消灾",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "点赞",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "互动交流"
     },
     {
       "libraryId": "banned",
       "text": "百分百有效",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "尽量"
     },
     {
       "libraryId": "banned",
       "text": "稳赚不赔",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "介绍投资逻辑及风险因素"
     },
     {
       "libraryId": "banned",
@@ -977,7 +1074,8 @@
       "libraryId": "banned",
       "text": "绝对安全",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "介绍实际安全管理措施"
     },
     {
       "libraryId": "banned",
@@ -989,7 +1087,8 @@
       "libraryId": "banned",
       "text": "色情",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -1001,31 +1100,36 @@
       "libraryId": "banned",
       "text": "虚构合作案例",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "虚构客户评价",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "虚构服务经历",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "虚构机构",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "虚构认证",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -1037,19 +1141,22 @@
       "libraryId": "banned",
       "text": "评论",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "交流看法"
     },
     {
       "libraryId": "banned",
       "text": "评论区扣1",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "交流看法"
     },
     {
       "libraryId": "banned",
       "text": "评论区留言",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "交流看法"
     },
     {
       "libraryId": "banned",
@@ -1068,19 +1175,22 @@
       "libraryId": "banned",
       "text": "转发",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "分享给有需要的人"
     },
     {
       "libraryId": "banned",
       "text": "转运",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "介绍传统文化中的艺术寓意"
     },
     {
       "libraryId": "banned",
       "text": "转运消灾",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -1092,13 +1202,15 @@
       "libraryId": "banned",
       "text": "辟邪",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "错过后悔一辈子",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -1156,25 +1268,29 @@
       "libraryId": "banned",
       "text": "保证入学",
       "severity": "不能发",
-      "industry": "家庭教育与全球化规划"
+      "industry": "家庭教育与全球化规划",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "保证升学",
       "severity": "不能发",
-      "industry": "家庭教育与全球化规划"
+      "industry": "家庭教育与全球化规划",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "保证拿到Offer",
       "severity": "不能发",
-      "industry": "家庭教育与全球化规划"
+      "industry": "家庭教育与全球化规划",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "保证高考提分",
       "severity": "不能发",
-      "industry": "家庭教育与全球化规划"
+      "industry": "家庭教育与全球化规划",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -1186,31 +1302,36 @@
       "libraryId": "banned",
       "text": "保过语言考试",
       "severity": "不能发",
-      "industry": "家庭教育与全球化规划"
+      "industry": "家庭教育与全球化规划",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "保进名校",
       "severity": "不能发",
-      "industry": "家庭教育与全球化规划"
+      "industry": "家庭教育与全球化规划",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "保进藤校",
       "severity": "不能发",
-      "industry": "家庭教育与全球化规划"
+      "industry": "家庭教育与全球化规划",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "内部名额",
       "severity": "不能发",
-      "industry": "家庭教育与全球化规划"
+      "industry": "家庭教育与全球化规划",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "内部招生",
       "severity": "不能发",
-      "industry": "家庭教育与全球化规划"
+      "industry": "家庭教育与全球化规划",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -1223,7 +1344,8 @@
       "libraryId": "banned",
       "text": "包录取",
       "severity": "不能发",
-      "industry": "家庭教育与全球化规划"
+      "industry": "家庭教育与全球化规划",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -1295,7 +1417,8 @@
       "libraryId": "banned",
       "text": "百分百录取",
       "severity": "不能发",
-      "industry": "家庭教育与全球化规划"
+      "industry": "家庭教育与全球化规划",
+      "replacement": "尽量"
     },
     {
       "libraryId": "banned",
@@ -1313,19 +1436,22 @@
       "libraryId": "banned",
       "text": "100%盈利",
       "severity": "不能发",
-      "industry": "财富管理与家族传承"
+      "industry": "财富管理与家族传承",
+      "replacement": "尽量"
     },
     {
       "libraryId": "banned",
       "text": "保收益",
       "severity": "不能发",
-      "industry": "财富管理与家族传承"
+      "industry": "财富管理与家族传承",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "保本保息",
       "severity": "不能发",
-      "industry": "财富管理与家族传承"
+      "industry": "财富管理与家族传承",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -1350,7 +1476,8 @@
       "libraryId": "banned",
       "text": "保证收益",
       "severity": "不能发",
-      "industry": "财富管理与家族传承"
+      "industry": "财富管理与家族传承",
+      "replacement": "客观介绍历史表现及相关风险"
     },
     {
       "libraryId": "banned",
@@ -1362,19 +1489,22 @@
       "libraryId": "banned",
       "text": "内幕消息",
       "severity": "不能发",
-      "industry": "财富管理与家族传承"
+      "industry": "财富管理与家族传承",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "内部配额",
       "severity": "不能发",
-      "industry": "财富管理与家族传承"
+      "industry": "财富管理与家族传承",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "固定高回报",
       "severity": "不能发",
-      "industry": "财富管理与家族传承"
+      "industry": "财富管理与家族传承",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -1386,7 +1516,8 @@
       "libraryId": "banned",
       "text": "快速翻倍",
       "severity": "不能发",
-      "industry": "财富管理与家族传承"
+      "industry": "财富管理与家族传承",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -1411,7 +1542,8 @@
       "libraryId": "banned",
       "text": "无风险套利",
       "severity": "不能发",
-      "industry": "财富管理与家族传承"
+      "industry": "财富管理与家族传承",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -1423,7 +1555,8 @@
       "libraryId": "banned",
       "text": "稳赚",
       "severity": "不能发",
-      "industry": "财富管理与家族传承"
+      "industry": "财富管理与家族传承",
+      "replacement": "房产投资风险与成本分析"
     },
     {
       "libraryId": "banned",
@@ -1498,13 +1631,15 @@
       "libraryId": "banned",
       "text": "零风险投资",
       "severity": "不能发",
-      "industry": "财富管理与家族传承"
+      "industry": "财富管理与家族传承",
+      "replacement": "如实说明可能存在的风险"
     },
     {
       "libraryId": "banned",
       "text": "非法荐股",
       "severity": "不能发",
-      "industry": "财富管理与家族传承"
+      "industry": "财富管理与家族传承",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -1529,19 +1664,22 @@
       "libraryId": "banned",
       "text": "保证回报",
       "severity": "不能发",
-      "industry": "高端房产与品质居住"
+      "industry": "高端房产与品质居住",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "保证学区",
       "severity": "不能发",
-      "industry": "高端房产与品质居住"
+      "industry": "高端房产与品质居住",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "保证租金",
       "severity": "不能发",
-      "industry": "高端房产与品质居住"
+      "industry": "高端房产与品质居住",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -1553,13 +1691,15 @@
       "libraryId": "banned",
       "text": "内部房源",
       "severity": "不能发",
-      "industry": "高端房产与品质居住"
+      "industry": "高端房产与品质居住",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "包租",
       "severity": "不能发",
-      "industry": "高端房产与品质居住"
+      "industry": "高端房产与品质居住",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -1609,7 +1749,8 @@
       "libraryId": "banned",
       "text": "永久增值",
       "severity": "不能发",
-      "industry": "高端房产与品质居住"
+      "industry": "高端房产与品质居住",
+      "replacement": "在约定条件下长期有效"
     },
     {
       "libraryId": "banned",
@@ -1621,7 +1762,8 @@
       "libraryId": "banned",
       "text": "百分百产权",
       "severity": "不能发",
-      "industry": "高端房产与品质居住"
+      "industry": "高端房产与品质居住",
+      "replacement": "尽量"
     },
     {
       "libraryId": "banned",
@@ -1645,7 +1787,8 @@
       "libraryId": "banned",
       "text": "稳赚不赔",
       "severity": "不能发",
-      "industry": "高端房产与品质居住"
+      "industry": "高端房产与品质居住",
+      "replacement": "介绍投资逻辑及风险因素"
     },
     {
       "libraryId": "banned",
@@ -1690,7 +1833,8 @@
       "libraryId": "banned",
       "text": "零风险购房",
       "severity": "不能发",
-      "industry": "高端房产与品质居住"
+      "industry": "高端房产与品质居住",
+      "replacement": "如实说明可能存在的风险"
     },
     {
       "libraryId": "banned",
@@ -1703,13 +1847,15 @@
       "libraryId": "banned",
       "text": "保证增高",
       "severity": "不能发",
-      "industry": "医疗健康与养老"
+      "industry": "医疗健康与养老",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "保证瘦身",
       "severity": "不能发",
-      "industry": "医疗健康与养老"
+      "industry": "医疗健康与养老",
+      "replacement": "科学运动与体重管理"
     },
     {
       "libraryId": "banned",
@@ -1727,7 +1873,8 @@
       "libraryId": "banned",
       "text": "包治",
       "severity": "不能发",
-      "industry": "医疗健康与养老"
+      "industry": "医疗健康与养老",
+      "replacement": "介绍适用条件与注意事项"
     },
     {
       "libraryId": "banned",
@@ -1757,7 +1904,8 @@
       "libraryId": "banned",
       "text": "彻底康复",
       "severity": "不能发",
-      "industry": "医疗健康与养老"
+      "industry": "医疗健康与养老",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -1825,7 +1973,8 @@
       "libraryId": "banned",
       "text": "无痛无创",
       "severity": "不能发",
-      "industry": "医疗健康与养老"
+      "industry": "医疗健康与养老",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -1838,7 +1987,8 @@
       "libraryId": "banned",
       "text": "永不复发",
       "severity": "不能发",
-      "industry": "医疗健康与养老"
+      "industry": "医疗健康与养老",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -1850,7 +2000,8 @@
       "libraryId": "banned",
       "text": "永久定型",
       "severity": "不能发",
-      "industry": "医疗健康与养老"
+      "industry": "医疗健康与养老",
+      "replacement": "在约定条件下长期有效"
     },
     {
       "libraryId": "banned",
@@ -1863,25 +2014,29 @@
       "libraryId": "banned",
       "text": "永久抗衰",
       "severity": "不能发",
-      "industry": "医疗健康与养老"
+      "industry": "医疗健康与养老",
+      "replacement": "在约定条件下长期有效"
     },
     {
       "libraryId": "banned",
       "text": "永久祛皱",
       "severity": "不能发",
-      "industry": "医疗健康与养老"
+      "industry": "医疗健康与养老",
+      "replacement": "在约定条件下长期有效"
     },
     {
       "libraryId": "banned",
       "text": "永久美白",
       "severity": "不能发",
-      "industry": "医疗健康与养老"
+      "industry": "医疗健康与养老",
+      "replacement": "在约定条件下长期有效"
     },
     {
       "libraryId": "banned",
       "text": "治愈",
       "severity": "不能发",
-      "industry": "医疗健康与养老"
+      "industry": "医疗健康与养老",
+      "replacement": "具体治疗思路与适用条件"
     },
     {
       "libraryId": "banned",
@@ -1905,13 +2060,15 @@
       "libraryId": "banned",
       "text": "百分百安全",
       "severity": "不能发",
-      "industry": "医疗健康与养老"
+      "industry": "医疗健康与养老",
+      "replacement": "尽量"
     },
     {
       "libraryId": "banned",
       "text": "百分百有效",
       "severity": "不能发",
-      "industry": "医疗健康与养老"
+      "industry": "医疗健康与养老",
+      "replacement": "尽量"
     },
     {
       "libraryId": "banned",
@@ -1929,13 +2086,15 @@
       "libraryId": "banned",
       "text": "绝对无风险",
       "severity": "不能发",
-      "industry": "医疗健康与养老"
+      "industry": "医疗健康与养老",
+      "replacement": "相对更稳妥的"
     },
     {
       "libraryId": "banned",
       "text": "返老还童",
       "severity": "不能发",
-      "industry": "医疗健康与养老"
+      "industry": "医疗健康与养老",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -1966,7 +2125,8 @@
       "libraryId": "banned",
       "text": "零恢复期",
       "severity": "不能发",
-      "industry": "医疗健康与养老"
+      "industry": "医疗健康与养老",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -1991,7 +2151,8 @@
       "libraryId": "banned",
       "text": "保证入境",
       "severity": "不能发",
-      "industry": "高端旅游与旅行体验"
+      "industry": "高端旅游与旅行体验",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -2004,7 +2165,8 @@
       "libraryId": "banned",
       "text": "保证升舱",
       "severity": "不能发",
-      "industry": "高端旅游与旅行体验"
+      "industry": "高端旅游与旅行体验",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -2017,7 +2179,8 @@
       "libraryId": "banned",
       "text": "保证航班",
       "severity": "不能发",
-      "industry": "高端旅游与旅行体验"
+      "industry": "高端旅游与旅行体验",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -2029,7 +2192,8 @@
       "libraryId": "banned",
       "text": "免签保证",
       "severity": "不能发",
-      "industry": "高端旅游与旅行体验"
+      "industry": "高端旅游与旅行体验",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -2072,7 +2236,8 @@
       "libraryId": "banned",
       "text": "包过签证",
       "severity": "不能发",
-      "industry": "高端旅游与旅行体验"
+      "industry": "高端旅游与旅行体验",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -2103,7 +2268,8 @@
       "libraryId": "banned",
       "text": "百分百过签",
       "severity": "不能发",
-      "industry": "高端旅游与旅行体验"
+      "industry": "高端旅游与旅行体验",
+      "replacement": "尽量"
     },
     {
       "libraryId": "banned",
@@ -2116,7 +2282,8 @@
       "libraryId": "banned",
       "text": "零风险出行",
       "severity": "不能发",
-      "industry": "高端旅游与旅行体验"
+      "industry": "高端旅游与旅行体验",
+      "replacement": "如实说明可能存在的风险"
     },
     {
       "libraryId": "banned",
@@ -2140,31 +2307,36 @@
       "libraryId": "banned",
       "text": "保值率第一",
       "severity": "不能发",
-      "industry": "高端消费与艺术收藏"
+      "industry": "高端消费与艺术收藏",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "保证升值",
       "severity": "不能发",
-      "industry": "高端消费与艺术收藏"
+      "industry": "高端消费与艺术收藏",
+      "replacement": "区域历史价格及市场情况分析"
     },
     {
       "libraryId": "banned",
       "text": "保证回购",
       "severity": "不能发",
-      "industry": "高端消费与艺术收藏"
+      "industry": "高端消费与艺术收藏",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "保证增值",
       "severity": "不能发",
-      "industry": "高端消费与艺术收藏"
+      "industry": "高端消费与艺术收藏",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "保证拍卖成交",
       "severity": "不能发",
-      "industry": "高端消费与艺术收藏"
+      "industry": "高端消费与艺术收藏",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -2194,7 +2366,8 @@
       "libraryId": "banned",
       "text": "完美无瑕",
       "severity": "不能发",
-      "industry": "高端消费与艺术收藏"
+      "industry": "高端消费与艺术收藏",
+      "replacement": "更贴合需求的"
     },
     {
       "libraryId": "banned",
@@ -2212,7 +2385,8 @@
       "libraryId": "banned",
       "text": "招财",
       "severity": "不能发",
-      "industry": "高端消费与艺术收藏"
+      "industry": "高端消费与艺术收藏",
+      "replacement": "介绍传统文化中的艺术寓意"
     },
     {
       "libraryId": "banned",
@@ -2230,7 +2404,8 @@
       "libraryId": "banned",
       "text": "旺财",
       "severity": "不能发",
-      "industry": "高端消费与艺术收藏"
+      "industry": "高端消费与艺术收藏",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -2248,7 +2423,8 @@
       "libraryId": "banned",
       "text": "永不掉色",
       "severity": "不能发",
-      "industry": "高端消费与艺术收藏"
+      "industry": "高端消费与艺术收藏",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -2260,13 +2436,15 @@
       "libraryId": "banned",
       "text": "永久保值",
       "severity": "不能发",
-      "industry": "高端消费与艺术收藏"
+      "industry": "高端消费与艺术收藏",
+      "replacement": "介绍材质、工艺及收藏特点"
     },
     {
       "libraryId": "banned",
       "text": "永久增值",
       "severity": "不能发",
-      "industry": "高端消费与艺术收藏"
+      "industry": "高端消费与艺术收藏",
+      "replacement": "在约定条件下长期有效"
     },
     {
       "libraryId": "banned",
@@ -2291,7 +2469,8 @@
       "libraryId": "banned",
       "text": "百分百纯金",
       "severity": "不能发",
-      "industry": "高端消费与艺术收藏"
+      "industry": "高端消费与艺术收藏",
+      "replacement": "尽量"
     },
     {
       "libraryId": "banned",
@@ -2303,7 +2482,8 @@
       "libraryId": "banned",
       "text": "稳赚不赔",
       "severity": "不能发",
-      "industry": "高端消费与艺术收藏"
+      "industry": "高端消费与艺术收藏",
+      "replacement": "介绍投资逻辑及风险因素"
     },
     {
       "libraryId": "banned",
@@ -2327,7 +2507,8 @@
       "libraryId": "banned",
       "text": "绝对保真",
       "severity": "不能发",
-      "industry": "高端消费与艺术收藏"
+      "industry": "高端消费与艺术收藏",
+      "replacement": "相对更稳妥的"
     },
     {
       "libraryId": "banned",
@@ -2346,13 +2527,15 @@
       "libraryId": "banned",
       "text": "转运",
       "severity": "不能发",
-      "industry": "高端消费与艺术收藏"
+      "industry": "高端消费与艺术收藏",
+      "replacement": "介绍传统文化中的艺术寓意"
     },
     {
       "libraryId": "banned",
       "text": "辟邪",
       "severity": "不能发",
-      "industry": "高端消费与艺术收藏"
+      "industry": "高端消费与艺术收藏",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -2376,13 +2559,15 @@
       "libraryId": "banned",
       "text": "保证减肥",
       "severity": "不能发",
-      "industry": "高端运动与休闲社交"
+      "industry": "高端运动与休闲社交",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "保证增高",
       "severity": "不能发",
-      "industry": "高端运动与休闲社交"
+      "industry": "高端运动与休闲社交",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -2433,13 +2618,15 @@
       "libraryId": "banned",
       "text": "快速瘦身",
       "severity": "不能发",
-      "industry": "高端运动与休闲社交"
+      "industry": "高端运动与休闲社交",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "无风险训练",
       "severity": "不能发",
-      "industry": "高端运动与休闲社交"
+      "industry": "高端运动与休闲社交",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -2451,13 +2638,15 @@
       "libraryId": "banned",
       "text": "根治运动损伤",
       "severity": "不能发",
-      "industry": "高端运动与休闲社交"
+      "industry": "高端运动与休闲社交",
+      "replacement": "具体医疗方案及适用条件"
     },
     {
       "libraryId": "banned",
       "text": "永久不反弹",
       "severity": "不能发",
-      "industry": "高端运动与休闲社交"
+      "industry": "高端运动与休闲社交",
+      "replacement": "在约定条件下长期有效"
     },
     {
       "libraryId": "banned",
@@ -2469,7 +2658,8 @@
       "libraryId": "banned",
       "text": "百分百塑形",
       "severity": "不能发",
-      "industry": "高端运动与休闲社交"
+      "industry": "高端运动与休闲社交",
+      "replacement": "尽量"
     },
     {
       "libraryId": "banned",
@@ -2524,13 +2714,15 @@
       "libraryId": "banned",
       "text": "保证娶到富豪",
       "severity": "不能发",
-      "industry": "高端婚恋与婚礼服务"
+      "industry": "高端婚恋与婚礼服务",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "保证嫁入豪门",
       "severity": "不能发",
-      "industry": "高端婚恋与婚礼服务"
+      "industry": "高端婚恋与婚礼服务",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -2543,7 +2735,8 @@
       "libraryId": "banned",
       "text": "保证找到对象",
       "severity": "不能发",
-      "industry": "高端婚恋与婚礼服务"
+      "industry": "高端婚恋与婚礼服务",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -2555,7 +2748,8 @@
       "libraryId": "banned",
       "text": "保证结婚",
       "severity": "不能发",
-      "industry": "高端婚恋与婚礼服务"
+      "industry": "高端婚恋与婚礼服务",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -2592,7 +2786,8 @@
       "libraryId": "banned",
       "text": "包成功",
       "severity": "不能发",
-      "industry": "高端婚恋与婚礼服务"
+      "industry": "高端婚恋与婚礼服务",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -2636,7 +2831,8 @@
       "libraryId": "banned",
       "text": "百分百脱单",
       "severity": "不能发",
-      "industry": "高端婚恋与婚礼服务"
+      "industry": "高端婚恋与婚礼服务",
+      "replacement": "尽量"
     },
     {
       "libraryId": "banned",
@@ -2666,7 +2862,8 @@
       "libraryId": "banned",
       "text": "绝对靠谱",
       "severity": "不能发",
-      "industry": "高端婚恋与婚礼服务"
+      "industry": "高端婚恋与婚礼服务",
+      "replacement": "相对更稳妥的"
     },
     {
       "libraryId": "banned",
@@ -2696,7 +2893,8 @@
       "libraryId": "banned",
       "text": "买卖发票",
       "severity": "不能发",
-      "industry": "企业家商业发展服务"
+      "industry": "企业家商业发展服务",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -2709,13 +2907,15 @@
       "libraryId": "banned",
       "text": "保证不被查",
       "severity": "不能发",
-      "industry": "企业家商业发展服务"
+      "industry": "企业家商业发展服务",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "保证增长",
       "severity": "不能发",
-      "industry": "企业家商业发展服务"
+      "industry": "企业家商业发展服务",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -2740,13 +2940,15 @@
       "libraryId": "banned",
       "text": "保证签单",
       "severity": "不能发",
-      "industry": "企业家商业发展服务"
+      "industry": "企业家商业发展服务",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "保证获得政策扶持",
       "severity": "不能发",
-      "industry": "企业家商业发展服务"
+      "industry": "企业家商业发展服务",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -2759,19 +2961,22 @@
       "libraryId": "banned",
       "text": "保证贷款审批",
       "severity": "不能发",
-      "industry": "企业家商业发展服务"
+      "industry": "企业家商业发展服务",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "保证避税",
       "severity": "不能发",
-      "industry": "企业家商业发展服务"
+      "industry": "企业家商业发展服务",
+      "replacement": "合规税务规划"
     },
     {
       "libraryId": "banned",
       "text": "偷税",
       "severity": "不能发",
-      "industry": "企业家商业发展服务"
+      "industry": "企业家商业发展服务",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -2807,13 +3012,15 @@
       "libraryId": "banned",
       "text": "包拿政府补贴",
       "severity": "不能发",
-      "industry": "企业家商业发展服务"
+      "industry": "企业家商业发展服务",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "包过税务稽查",
       "severity": "不能发",
-      "industry": "企业家商业发展服务"
+      "industry": "企业家商业发展服务",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -2874,7 +3081,8 @@
       "libraryId": "banned",
       "text": "百分百成功",
       "severity": "不能发",
-      "industry": "企业家商业发展服务"
+      "industry": "企业家商业发展服务",
+      "replacement": "尽量"
     },
     {
       "libraryId": "banned",
@@ -2892,7 +3100,8 @@
       "libraryId": "banned",
       "text": "税务洗白",
       "severity": "不能发",
-      "industry": "企业家商业发展服务"
+      "industry": "企业家商业发展服务",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -2904,7 +3113,8 @@
       "libraryId": "banned",
       "text": "虚开发票",
       "severity": "不能发",
-      "industry": "企业家商业发展服务"
+      "industry": "企业家商业发展服务",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -2929,7 +3139,8 @@
       "libraryId": "banned",
       "text": "逃税",
       "severity": "不能发",
-      "industry": "企业家商业发展服务"
+      "industry": "企业家商业发展服务",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -2948,7 +3159,8 @@
       "libraryId": "banned",
       "text": "零风险创业",
       "severity": "不能发",
-      "industry": "企业家商业发展服务"
+      "industry": "企业家商业发展服务",
+      "replacement": "如实说明可能存在的风险"
     },
     {
       "libraryId": "banned",
@@ -2960,7 +3172,8 @@
       "libraryId": "banned",
       "text": "保证人员背景",
       "severity": "不能发",
-      "industry": "私人家庭服务与生活管家"
+      "industry": "私人家庭服务与生活管家",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -2972,7 +3185,8 @@
       "libraryId": "banned",
       "text": "保证服务效果",
       "severity": "不能发",
-      "industry": "私人家庭服务与生活管家"
+      "industry": "私人家庭服务与生活管家",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
@@ -3016,13 +3230,15 @@
       "libraryId": "banned",
       "text": "无条件赔偿",
       "severity": "不能发",
-      "industry": "私人家庭服务与生活管家"
+      "industry": "私人家庭服务与生活管家",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "永久保障",
       "severity": "不能发",
-      "industry": "私人家庭服务与生活管家"
+      "industry": "私人家庭服务与生活管家",
+      "replacement": "在约定条件下长期有效"
     },
     {
       "libraryId": "banned",
@@ -3053,7 +3269,8 @@
       "libraryId": "banned",
       "text": "百分百放心",
       "severity": "不能发",
-      "industry": "私人家庭服务与生活管家"
+      "industry": "私人家庭服务与生活管家",
+      "replacement": "尽量"
     },
     {
       "libraryId": "banned",
@@ -3090,7 +3307,8 @@
       "libraryId": "banned",
       "text": "零风险服务",
       "severity": "不能发",
-      "industry": "私人家庭服务与生活管家"
+      "industry": "私人家庭服务与生活管家",
+      "replacement": "如实说明可能存在的风险"
     },
     {
       "libraryId": "banned",
@@ -3103,19 +3321,22 @@
       "libraryId": "ad_extreme",
       "text": "全网首发",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "新近上线的"
     },
     {
       "libraryId": "ad_extreme",
       "text": "万能",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "用途较广的"
     },
     {
       "libraryId": "offsite_traffic",
       "text": "截流",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "内容传播与站内承接"
     },
     {
       "libraryId": "offsite_traffic",
@@ -3128,115 +3349,134 @@
       "libraryId": "offsite_traffic",
       "text": "矩阵运营",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "多账号内容排期复盘"
     },
     {
       "libraryId": "offsite_traffic",
       "text": "多账号导流",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "站内内容互相补充说明"
     },
     {
       "libraryId": "banned",
       "text": "非正规",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "合规可用的"
     },
     {
       "libraryId": "banned",
       "text": "破解",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "正式授权的"
     },
     {
       "libraryId": "banned",
       "text": "免费看",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "串流",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "机顶盒",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "外挂",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除相关表述"
     },
     {
       "libraryId": "banned",
       "text": "翻墙",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除相关表述"
     },
     {
       "libraryId": "banned",
       "text": "模拟器",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "删除相关表述"
     },
     {
       "libraryId": "banned",
       "text": "自动化脚本",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "手动整理与人工复核"
     },
     {
       "libraryId": "banned",
       "text": "自动采集",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "人工整理公开资料"
     },
     {
       "libraryId": "banned",
       "text": "批量抓取",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "人工整理公开资料"
     },
     {
       "libraryId": "banned",
       "text": "脚本私信",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "接住用户主动咨询"
     },
     {
       "libraryId": "banned",
       "text": "自动发笔记",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "自动回私信",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "脚本托管",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "批量铺量",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     },
     {
       "libraryId": "banned",
       "text": "AI批量运营",
       "severity": "不能发",
-      "industry": "通用"
+      "industry": "通用",
+      "replacement": "改成合规、可公开发布的说法"
     }
   ]
 }

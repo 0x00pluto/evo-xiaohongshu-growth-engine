@@ -157,3 +157,27 @@ test('飞书备忘新增词：命中长词不拆、合规说法不误伤', () =>
   assert.equal(jieLiu.severity, '不能发');
   assert.equal(jieLiu.replacement, '内容运营复盘');
 });
+
+test('出厂不能发每条都有非空 replacement（prd-00021）', () => {
+  const cannot = factoryRaw.words.filter((row) => row && row.severity === '不能发');
+  assert.ok(cannot.length > 0);
+  const missing = cannot.filter((row) => !String(row.replacement || '').trim());
+  assert.equal(missing.length, 0, missing.slice(0, 5).map((row) => row.text).join(','));
+});
+
+test('不能发命中带出词库替换句', () => {
+  const result = checkRiskText({
+    fields: [{ id: 'body', text: '这套是全网第一的唯一档位，加微信领国家级攻略。' }],
+    libraryIds: ['ad_extreme', 'offsite_traffic', 'banned'],
+    factoryWords: factory.words,
+    libraries: factory.libraries,
+  });
+  assert.equal(result.status, 'hits');
+  const texts = ['全网第一', '唯一', '加微信', '国家级'];
+  for (const text of texts) {
+    const hit = result.hits.find((item) => item.text === text);
+    assert.ok(hit, text);
+    assert.equal(hit.severity, '不能发');
+    assert.ok(String(hit.replacement || '').trim(), text);
+  }
+});

@@ -13,6 +13,7 @@
    *   reason: string;
    *   replacement: string;
    *   badge: string;
+   *   severity?: string;
    *   status?: string;
    *   uiState?: RiskMarkUiState;
    * }} RiskInlineMark
@@ -308,6 +309,7 @@
         reason: `${libraryName} · ${severity}`,
         replacement,
         badge: `词库 · ${severity}`,
+        severity,
         uiState,
       };
       if (fieldId === 'title') {
@@ -338,6 +340,7 @@
         : text;
       const reason = typeof item.reason === 'string' ? item.reason : '';
       const replacement = typeof item.replacement === 'string' ? item.replacement : '';
+      const severityAi = typeof item.severity === 'string' ? item.severity : '要改口';
       const base = {
         id,
         source: /** @type {'ai'} */ ('ai'),
@@ -347,6 +350,7 @@
         reason,
         replacement,
         badge: 'AI 建议',
+        severity: severityAi,
         status,
         uiState,
       };

@@ -121,8 +121,10 @@
         open: false,
         markId: '',
         style: '',
+        draftReplacement: '',
       },
       riskPopoverScrollBound: false,
+      riskPasteDrafts: {},
       riskAiOpenId: '',
 
       riskScopeText() {
@@ -238,6 +240,7 @@
         this.riskBindPopoverScrollClose();
         this.riskPopover.markId = id;
         this.riskPopover.open = true;
+        this.riskPopover.draftReplacement = String(mark.replacement || '');
         if (anchor && typeof anchor.getBoundingClientRect === 'function') {
           const box = anchor.getBoundingClientRect();
           const left = Math.min(window.innerWidth - 288, Math.max(8, box.left));
@@ -252,6 +255,23 @@
         this.riskPopover.open = false;
         this.riskPopover.markId = '';
         this.riskPopover.style = '';
+        this.riskPopover.draftReplacement = '';
+      },
+
+      riskMarkIsCannotSend(mark) {
+        if (!mark) return false;
+        if (mark.severity === '不能发') return true;
+        const reason = String(mark.reason || '');
+        return reason.includes('不能发') || String(mark.badge || '').includes('不能发');
+      },
+
+      riskPopoverCanReplace() {
+        const mark = this.riskActiveMark();
+        if (!mark || mark.uiState === 'applied') return false;
+        if (this.riskMarkIsCannotSend(mark)) {
+          return Boolean(String(this.riskPopover.draftReplacement || '').trim());
+        }
+        return Boolean(String(mark.replacement || '').trim());
       },
 
       riskActiveMark() {
@@ -287,11 +307,37 @@
         if (mark.source === 'ai') {
           const item = (this.riskAiSuggestions || []).find((row) => row.id === mark.id);
           if (item) this.riskApplyAiSuggestion(item);
+          this.riskCloseMarkPopover();
+          return;
+        }
+        const hit = (this.riskHits || []).find((row) => row.id === mark.id);
+        if (!hit) {
+          this.riskCloseMarkPopover();
+          return;
+        }
+        const draft = String(this.riskPopover.draftReplacement || '').trim();
+        if (this.riskMarkIsCannotSend(mark)) {
+          if (!draft) {
+            if (this.showToast) this.showToast('先写一句替换');
+            return;
+          }
+          this.riskApplyReplacement(hit, draft);
         } else {
-          const hit = (this.riskHits || []).find((row) => row.id === mark.id);
-          if (hit) this.riskApplyReplacement(hit);
+          if (!String(hit.replacement || '').trim()) return;
+          this.riskApplyReplacement(hit);
         }
         this.riskCloseMarkPopover();
+      },
+
+      riskPopoverReplaceOnEnter(event) {
+        if (!event || event.key !== 'Enter') return;
+        if (event.isComposing || event.keyCode === 229) return;
+        event.preventDefault();
+        if (!this.riskPopoverCanReplace()) {
+          if (this.showToast) this.showToast('先写一句替换');
+          return;
+        }
+        this.riskApplyActiveMark();
       },
 
       riskDiscardActiveMark() {
@@ -299,6 +345,8 @@
         if (!id) return;
         const mark = this.riskActiveMark();
         if (!mark || mark.uiState === 'applied') return;
+        // 不能发不允许放弃（假解决）
+        if (this.riskMarkIsCannotSend(mark) && mark.source !== 'ai') return;
         if (mark.source === 'ai') {
           this.riskAiSuggestions = (this.riskAiSuggestions || []).map((row) => (
             row.id === id ? { ...row, uiState: 'discarded', status: row.status || '还没改' } : row
@@ -310,6 +358,40 @@
         }
         if (this.riskUndo && this.riskUndo.hitId === id) this.riskUndo = null;
         this.riskCloseMarkPopover();
+      },
+
+      riskPasteDraftFor(hit) {
+        if (!hit || !hit.id) return '';
+        const bag = this.riskPasteDrafts && typeof this.riskPasteDrafts === 'object'
+          ? this.riskPasteDrafts
+          : {};
+        if (Object.prototype.hasOwnProperty.call(bag, hit.id)) {
+          return String(bag[hit.id] || '');
+        }
+        return String(hit.replacement || '');
+      },
+
+      riskSetPasteDraft(hit, value) {
+        if (!hit || !hit.id) return;
+        this.riskPasteDrafts = {
+          ...(this.riskPasteDrafts || {}),
+          [hit.id]: String(value == null ? '' : value),
+        };
+      },
+
+      riskApplyPasteHit(hit) {
+        if (!hit || hit.uiState === 'applied') return;
+        if (hit.severity === '不能发') {
+          const draft = String(this.riskPasteDraftFor(hit) || '').trim();
+          if (!draft) {
+            if (this.showToast) this.showToast('先写一句替换');
+            return;
+          }
+          this.riskApplyReplacement(hit, draft);
+          return;
+        }
+        if (!String(hit.replacement || '').trim()) return;
+        this.riskApplyReplacement(hit);
       },
 
       riskUndoActiveMark() {
@@ -605,6 +687,7 @@
         this.riskHits = api && typeof api.mergeHitUiState === 'function'
           ? api.mergeHitUiState(prevHits, nextHits)
           : nextHits.map((hit) => ({ ...hit, uiState: hit.uiState || 'pending' }));
+        this.riskPasteDrafts = {};
         this.riskSelectedHitId = '';
         if (fingerprint != null) this.riskLastFingerprint = fingerprint;
         else if (typeof data.fingerprint === 'string') this.riskLastFingerprint = data.fingerprint;
@@ -764,8 +847,12 @@
         }
       },
 
-      riskApplyReplacement(hit) {
-        if (!hit || !hit.replacement || hit.uiState === 'applied') return;
+      riskApplyReplacement(hit, replacementOverride) {
+        if (!hit || hit.uiState === 'applied') return;
+        const replacement = String(
+          replacementOverride != null ? replacementOverride : hit.replacement || ''
+        ).trim();
+        if (!replacement) return;
         const fieldId = hit.fieldId;
         const current = typeof this.riskReadField === 'function' ? this.riskReadField(fieldId) : '';
         const api = window.riskInlineMark;
@@ -778,15 +865,15 @@
           if (this.showToast) this.showToast('这处已经变了');
           return;
         }
-        const next = String(current).slice(0, range.start) + hit.replacement + String(current).slice(range.end);
-        const endAfter = range.start + String(hit.replacement).length;
+        const next = String(current).slice(0, range.start) + replacement + String(current).slice(range.end);
+        const endAfter = range.start + replacement.length;
         this.riskUndo = {
           kind: 'lexicon',
           hitId: hit.id,
           fieldId,
           start: range.start,
           before: hit.text,
-          after: hit.replacement,
+          after: replacement,
           endAfter,
         };
         if (typeof this.riskWriteField === 'function') this.riskWriteField(fieldId, next);
@@ -795,6 +882,7 @@
             ? {
               ...row,
               uiState: 'applied',
+              replacement,
               originalText: row.originalText || hit.text,
               start: range.start,
               end: endAfter,
