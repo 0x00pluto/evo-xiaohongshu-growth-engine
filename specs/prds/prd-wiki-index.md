@@ -25,3 +25,4 @@
 | 00019 | `specs/prds/prd-00019-danger-word-check.md` | 发之前本机查危险词；笔记旁与危险词页同一套规则；人自己改或点一条才写入；有命中也不锁复制。Release 1 才用 AI 再看一遍；工程 accepted |
 | 00020 | `specs/prds/prd-00020-album-switch-missing-prompt.md` | 换风格后再画这一张要先定出画面内容；拒绝或失败不得先把已有画面内容写成空。来源飞书 20261117_0022；工程 accepted |
 | 00021 | `specs/prds/prd-00021-block-word-dismiss.md` | 不能发必须可替换（词库默认句 + 浮窗可改），去掉放弃；出厂补齐替换；飞书规则镜像进 docs 且不进插件包；工程 accepted |
+| 00022 | `specs/prds/prd-00022-note-preview-mode.md` | 写笔记预览须声明 previewMode；打开插件白屏同源；来源飞书 20261120_0027；工程 accepted |

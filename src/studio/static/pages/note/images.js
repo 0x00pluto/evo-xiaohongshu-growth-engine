@@ -9,6 +9,7 @@ window.createNoteImages = function createNoteImages() {
     slots: [],
     promptOpen: {},
     activeKey: 'cover-0',
+    previewMode: 'note',
     copyFeedbackKey: '',
     copyFeedbackOk: null,
     copyFeedbackTimer: null,
