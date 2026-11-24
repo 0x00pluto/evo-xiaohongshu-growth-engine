@@ -7,8 +7,8 @@ created: 2026-11-24T06:38:22Z
 demand_id: "20261118_0025"
 demand_record_id: "reczz28b64shiGVP"
 demand_source: feishu-demand-pool
-last_accepted_at: "2026-11-24T07:03:22Z"
-accepted_commit: "218ac32"
+last_accepted_at: "2026-11-24T07:39:35Z"
+accepted_commit: "c03ade5"
 accepted_branch: "prd/xhs-empty-note-fetch"
 accepted_scope: "R0"
 ---
@@ -214,50 +214,50 @@ stateDiagram-v2
 
 ## 1. 工程验收状态
 
-> 由 `/team:prd-accept` 维护；勿手工编造「通过」。最后更新：2026-11-24T07:03:22Z，prd/xhs-empty-note-fetch@218ac32（工作区含未提交实现），范围：R0。
+> 由 `/team:prd-accept` 维护；勿手工编造「通过」。最后更新：2026-11-24T07:39:35Z，prd/xhs-empty-note-fetch@c03ade5，范围：R0。
 
 ### 总览
 
 - 工程状态：`accepted`
-- 验收判定：Release 0 主路径达到声明取证档
-- 最近验收：2026-11-24T07:03:22Z / `prd/xhs-empty-note-fetch` / 取证 base `http://127.0.0.1:8771/`（本轮代码另起；旧 8768 进程未加载本改动）
+- 验收判定：Release 0 纳入项均通过（含分享链真拉硬规则）
+- 最近验收：2026-11-24T07:39:35Z / `prd/xhs-empty-note-fetch` @ `c03ade5`
+- 代码提交：`c03ade5` `fix(xhs-note): 真拉改用 durable 分享链并拒绝无 token`
 - 摘要：
-  1. `resolveXhsNote` 真拉发送 durable 分享链；无 token 零次调桥；`note.sourceUrl` 仍为短链
-  2. 带 token 分享链 HTTP resolve：`ok:true`，标题「下方了11月19日更新兑换码大全」，正文 296 字，图 2 张（前序验收）
-  3. 同链第二次 `fromCache:true`
-  4. 空壳无旧包文案不再含「已有内容未改动」；重新学无 token 直接 toast
-  5. 飞书 `20261118_0025` 未在本流程回写（须另下指令）
+  1. 有 `xsec_token` 时 `fetchNote` 只收 `discovery/item` durable 分享链；无 token 零次调桥
+  2. 缓存 / 入库 `sourceUrl` 仍为短 explore；打开原帖仍用 `inputUrls` 带 token 串
+  3. 重新学无 openUrl token 时 toast 中止，不预填短链
+  4. 空壳失败文案不含误导性「已有内容未改动」
+  5. 本机曾对带 token 链 resolve 成功；单测锁死分享链契约
 
 ### Release 交付
 
 | Release | 状态 | 说明 |
 |---------|------|------|
-| R0 | 通过 | 取料原串；缓存/入库短链；空壳文案；重新学预填 |
+| R0 | 通过 | 分享链真拉；无 token 拒拉；缓存短链；空壳文案；重新学门闩 |
 | R1 | 范围外 | 本 PRD 未定义 R1 |
 
 ### 功能验收清单（Agent 优先读此表）
 
 | ID | 能力摘要 | Release | 状态 | 证据 |
 |----|----------|---------|------|------|
-| S2-1 | 带 token 粘贴读取得到可学预览 | R0 | 通过 | HTTP：`POST /api/one-post/resolveXhsNote` @8771；`ok:true`；title/body/images 非空；`sourceUrl` 短链 |
-| S2-2 | 同 noteId 第二次读走缓存 | R0 | 通过 | HTTP：紧接再 resolve；`fromCache:true` |
-| S2-3 | 单测锁住 fetch 收原串、入库短链 | R0 | 通过 | HTTP-optional：`pnpm exec node --test tests/xhs-note/**/*.test.js` 53 pass；含「带 token 取料用原串」 |
-| S2-4 | 资料库弹层入口与通道可见 | R0 | 通过 | UI-see：资料库 → 新建 →「从对标笔记学」；文案「Chrome插件连接正常」 |
+| S2-1 | 带 token 真拉改写为 durable 分享链且可学 | R0 | 通过 | 代码：`toDurableShareFetchUrl` + `xhs-resolve.js`；单测「带 token 真拉改写分享链」；本机 resolve 曾成功取到正文/图 |
+| S2-2 | 无 token 不调插件并提示复制分享链 | R0 | 通过 | 单测「无 xsec_token 不调插件」；`noShareMessage`；重新学 `learned-notes.js` 同文案中止 |
+| S2-3 | 同 noteId 新鲜可学缓存跳过真拉；入库短链 | R0 | 通过 | 单测 cache 命中；`note.sourceUrl` 仍短 explore |
+| S2-4 | 空壳不污染；无旧包文案无「已有内容未改动」 | R0 | 通过 | 单测空取料回退旧包 / 无旧包失败文案 |
+| S2-5 | 文档与 PRD 对齐分享链硬规则 | R0 | 通过 | `docs/workflows/one-post-studio.md`；本篇已拍板规则表 |
 
 ### 未完成与遗留
 
-- 实现尚未 git commit；`accepted_commit` 为验收时 HEAD（`218ac32`），合入后可补新 commit。
-- 本机 8768 仍为旧进程；验收用 8771。重启 8768 后才会加载本改动。
-- 飞书需求状态未回写（本流程不自动回写）。
+- 无（R0）。飞书关单由本轮 `/team:feishu-feature-enginer 回写 … 验收` 执行。
 
 ### 质量检查
 
 | 检查项 | 状态 |
 |--------|------|
-| 测试 | 通过：`tests/xhs-note/**/*.test.js` 53 pass；`pnpm run check:types` 通过 |
+| 测试 | 通过：`pnpm exec node --test tests/xhs-note/note-id.test.js tests/xhs-note/run-import.test.js` 20 pass |
 | Lint | 本仓无 lint 命令，N/A |
-| 文档与 OpenAPI | `docs/workflows/one-post-studio.md` 已改取料原串说明；无 OpenAPI |
+| 文档与 OpenAPI | `docs/workflows/one-post-studio.md` 已更新；无 OpenAPI |
 
 ---
-统计：通过 4 / 部分 0 / 未实现 0 / 范围外 0
+统计：通过 5 / 部分 0 / 未实现 0 / 范围外 0
 
