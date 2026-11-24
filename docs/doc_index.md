@@ -27,6 +27,7 @@
 - `specs/prds/prd-00020-album-switch-missing-prompt.md`: 换风格后再画这一张要先定出画面内容再出图；拒绝或失败不得先把已有画面内容写成空；来源飞书 20261117_0022
 - `specs/prds/prd-00021-block-word-dismiss.md`: 不能发必须可替换（词库默认句 + 浮窗可改），去掉放弃；出厂补齐替换；飞书规则镜像进 docs 且不进插件包；工程 accepted
 - `specs/prds/prd-00022-note-preview-mode.md`: 写笔记预览须声明 previewMode；打开插件白屏同源；来源飞书 20261120_0027；工程 accepted
+- `specs/prds/prd-00023-xhs-empty-note-fetch.md`: 对标笔记取料用用户粘贴原串；缓存与入库仍按短 explore 链；来源飞书 20261118_0025；工程 accepted
 - `docs/references/xhs-platform-forbidden-words.md`: 飞书《小红书平台违禁词》镜像；维护出厂危险词对照用；不进插件包
 - `docs/references/xhs-violation-case-notes.md`: 飞书《实操总结违规词与违规点》镜像；维护出厂危险词与 AI 复查对照用；不进插件包
 - `docs/DESIGN.md`: 页侧视觉事实源（HTML、Alpine、daisyUI 5；配色为 Cal 色板；页头默认 text-xl / py-3；写笔记 / 以前的笔记 / 资料库同档；以前的笔记约 8 列竖卡墙与小红书式详情浮层；笔记页比例/风格/画面内容/我们的图同款展开条、预览画框跟有效比例、风格格 contain；危险词/AI 文内红标浮窗改词、查危险词勾选不立刻查与缓存 toast；笔记页 JS 按 pages/note/ mixin、宿主按 src/one-post/runner/ 分域；排版含壳与侧栏 Lucide 图标/大屏收起、间距、两屏和手机框；等待用 Lottie 浮层；错误/短反馈用 toast（感叹号 error / 绿对勾 success + 出入场），禁无图标纯字条与页顶赤裸 text-error；要发什么紧凑贴底 CTA、无人设目的说明书；对标文案/产品资料库同风格 6 列竖卡；资料库末尾对标笔记卡墙与详情浮层、反复学比较徽标；加一条产品资料卡墙选库或写新、满 5 隐藏加号；新建风格/我们的图先出虚线上传框；新建含对标笔记进料；学风格用 image-scan + 轮播人话）；改外观前先读
@@ -37,4 +38,4 @@
 - `.cursor/commands/team/front-enginer.md`: 前端工程师，`/team:front-enginer`，HTML First
 - `.cursor/commands/team/test-enginer.md`: 测试工程师，`/team:test-enginer`，手工排障
 - `.cursor/commands/team/feature-dev.md`: 自主交付工程师，`/team:feature-dev`，S1 到 S3（≥1.6.0 本会话现场验收）
-- `.cursor/commands/team/feishu-feature-enginer.md`: 飞书需求管理工程师，`/team:feishu-feature-enginer 取|回写 <需求ID>`，提取交接简报或只改需求状态
+- `.cursor/commands/team/feishu-feature-enginer.md`: 飞书需求管理工程师，`/team:feishu-feature-enginer 取|回写 <需求ID>`；提取交接简报或回写需求状态；≥1.5 验收可从待评估/空直接关单，成功后按短模板私信提出人

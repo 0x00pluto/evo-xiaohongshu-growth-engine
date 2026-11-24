@@ -222,11 +222,9 @@ function attachXhsResolve(ctx, gate) {
 
     const pastedNoteId = xhsNoteId.extractXhsNoteId(resolveUrl)
       || (known ? known.noteId : '');
-    // 有 noteId 时取料用无 query 的 explore 链，避免 xsec_token 触发风控；短链抽不出 ID 仍用原串
-    const fetchUrl = pastedNoteId
-      ? (xhsNoteId.canonicalExploreUrl(resolveUrl)
-        || `https://www.xiaohongshu.com/explore/${pastedNoteId}`)
-      : resolveUrl;
+    // 真拉只传 durable 分享链；无 token 不调桥。noteId 只用于缓存与入库短链身份
+    const shareFetchUrl = xhsNoteId.toDurableShareFetchUrl(resolveUrl);
+    const noShareMessage = '没有可用的分享链接（缺 xsec_token），请到小红书复制分享链接后再学';
     const innerIndex = Number.isInteger(payload.innerIndex)
       ? /** @type {number} */ (payload.innerIndex)
       : 0;
@@ -278,7 +276,7 @@ function attachXhsResolve(ctx, gate) {
         ok: false,
         code: fail.code || 'INTERNAL',
         message: fail.message
-          || '取到的笔记没有正文也没有图，没法学。已有内容未改动。',
+          || '取到的笔记没有正文也没有图，没法学。',
       };
     }
 
@@ -299,9 +297,17 @@ function attachXhsResolve(ctx, gate) {
       // 新鲜但不可学（空壳污染）：当 miss，继续取料
     }
 
+    if (!shareFetchUrl) {
+      return await finishFetchMiss(pastedNoteId, {
+        ok: false,
+        code: 'INVALID_URL',
+        message: noShareMessage,
+      });
+    }
+
     gate.busyKey = pastedNoteId || resolveUrl;
     try {
-      const fetched = await fetchNoteByUrl(fetchUrl);
+      const fetched = await fetchNoteByUrl(shareFetchUrl);
       if (!fetched.ok) {
         return await finishFetchMiss(pastedNoteId, {
           ok: false,
@@ -333,7 +339,7 @@ function attachXhsResolve(ctx, gate) {
         return await finishFetchMiss(noteId, {
           ok: false,
           code: 'INTERNAL',
-          message: '取到的笔记没有正文也没有图，没法学。已有内容未改动。',
+          message: '取到的笔记没有正文也没有图，没法学。',
         });
       }
       if (userXhsNotesCacheDir) {

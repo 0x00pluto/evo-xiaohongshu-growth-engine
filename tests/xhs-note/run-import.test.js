@@ -18,6 +18,7 @@ const {
 const { listArticleSamples, readArticleSample } = require('../../src/article-samples/store');
 const { readNotePayload, writeNotePayload } = require('../../src/xhs-note/cache');
 const { articleTextHash, contentMd5FromDataUrl } = require('../../src/xhs-note/fingerprint');
+const { toDurableShareFetchUrl } = require('../../src/xhs-note/note-id');
 
 const ROOT = path.resolve(__dirname, '../..');
 const PROMPTS = path.join(ROOT, 'assets', 'prompts', 'one-post');
@@ -43,7 +44,8 @@ test('首次 import 写链接与 cache；再 resolve 比较而非 ALREADY；30 �
   const notesDir = path.join(root, 'xhs-notes');
   const cacheDir = path.join(root, 'cache', 'xhs-notes');
   const samplesDir = path.join(root, 'article-samples');
-  let fetchCalls = 0;
+  /** @type {string[]} */
+  const fetchUrls = [];
   const runner = createRunner({
     postsDir: path.join(root, 'posts'),
     promptsDir: PROMPTS,
@@ -51,8 +53,8 @@ test('首次 import 写链接与 cache；再 resolve 比较而非 ALREADY；30 �
     userArticleSamplesDir: samplesDir,
     userXhsNotesDir: notesDir,
     userXhsNotesCacheDir: cacheDir,
-    fetchNoteByUrl: async () => {
-      fetchCalls += 1;
+    fetchNoteByUrl: async (url) => {
+      fetchUrls.push(String(url || ''));
       return { ok: true, note: { ...NOTE, sourceUrl: NOTE.sourceUrl } };
     },
     fetch: async () => {
@@ -60,15 +62,17 @@ test('首次 import 写链接与 cache；再 resolve 比较而非 ALREADY；30 �
     },
   });
 
-  const shortUrl = 'https://xhslink.com/abcTest1';
-  const first = await runner.resolveXhsNote({ url: shortUrl });
+  const noteId = 'testdelete000000000001';
+  const tokenUrl = `https://www.xiaohongshu.com/explore/${noteId}?xsec_token=AB9U&xsec_source=pc_feed`;
+  const shortUrl = `https://www.xiaohongshu.com/explore/${noteId}`;
+  const first = await runner.resolveXhsNote({ url: tokenUrl });
   assert.equal(first.ok, true, first.message);
   assert.equal(first.parts.hasCover, true);
   assert.equal(first.parts.innerCount, 1);
-  assert.equal(fetchCalls, 1);
+  assert.deepEqual(fetchUrls, [toDurableShareFetchUrl(tokenUrl)]);
   assert.equal(first.fromCache, false);
   // 取料成功立刻落 cache，不必等 import
-  assert.ok(readNotePayload(cacheDir, 'testdelete000000000001'));
+  assert.ok(readNotePayload(cacheDir, noteId));
 
   const imported = await runner.importXhsNote({
     url: shortUrl,
@@ -80,9 +84,9 @@ test('首次 import 写链接与 cache；再 resolve 比较而非 ALREADY；30 �
   assert.equal(imported.ok, true, imported.message);
   assert.equal(imported.wantArticle, true);
   assert.ok(imported.link?.id);
-  assert.equal(imported.link.noteId, 'testdelete000000000001');
+  assert.equal(imported.link.noteId, noteId);
   assert.equal(listXhsNoteLinks(notesDir).length, 1);
-  assert.ok(readNotePayload(cacheDir, 'testdelete000000000001'));
+  assert.ok(readNotePayload(cacheDir, noteId));
   assert.equal(listArticleSamples(samplesDir).length, 0);
 
   const article = runner.saveXhsNoteArticle({
@@ -94,7 +98,7 @@ test('首次 import 写链接与 cache；再 resolve 比较而非 ALREADY；30 �
   assert.equal(listArticleSamples(samplesDir).length, 1);
   const sample = readArticleSample(samplesDir, article.articleSample.id);
   assert.equal(sample?.source?.kind, 'xhs-note');
-  assert.equal(sample?.source?.noteId, 'testdelete000000000001');
+  assert.equal(sample?.source?.noteId, noteId);
   const linkMeta = readXhsNoteLink(notesDir, imported.link.id);
   assert.equal(linkMeta?.learned.articleSampleId, article.articleSample.id);
   assert.ok(linkMeta?.learned.articleTextHash);
@@ -109,7 +113,7 @@ test('首次 import 写链接与 cache；再 resolve 比较而非 ALREADY；30 �
   assert.ok(again.compare);
   assert.equal(again.compare.article.status, 'unchanged');
   assert.equal(again.compare.cover.status, 'new');
-  assert.equal(fetchCalls, 1);
+  assert.equal(fetchUrls.length, 1);
 
   const exploreAgain = await runner.resolveXhsNote({
     url: `${NOTE.sourceUrl}?xsec_token=changed`,
@@ -117,7 +121,7 @@ test('首次 import 写链接与 cache；再 resolve 比较而非 ALREADY；30 �
   assert.equal(exploreAgain.ok, true, exploreAgain.message);
   assert.equal(exploreAgain.fromCache, true);
   assert.ok(exploreAgain.compare);
-  assert.equal(fetchCalls, 1);
+  assert.equal(fetchUrls.length, 1);
 });
 
 test('多内页 resolve 预下载 previewUrl；不下图失败不整次失败', async () => {
@@ -161,7 +165,9 @@ test('多内页 resolve 预下载 previewUrl；不下图失败不整次失败', 
     },
   });
 
-  const resolved = await runner.resolveXhsNote({ url: 'https://xhslink.com/multiInner' });
+  const resolved = await runner.resolveXhsNote({
+    url: 'https://www.xiaohongshu.com/explore/previewinners00000001?xsec_token=AB9U&xsec_source=pc_feed',
+  });
   assert.equal(resolved.ok, true, resolved.message);
   assert.equal(resolved.parts.hasCover, true);
   assert.equal(resolved.parts.coverUrl, 'https://example.com/cover.jpg');
@@ -175,7 +181,7 @@ test('多内页 resolve 预下载 previewUrl；不下图失败不整次失败', 
   assert.equal(resolved.parts.inners[0].url, 'https://example.com/a.jpg');
 });
 
-test('短链二次解析到同一 sourceUrl 时补 inputUrls 并返回比较', async () => {
+test('同 noteId 二次解析带 token 时补 inputUrls 并返回比较', async () => {
   const root = tempDir();
   const notesDir = path.join(root, 'xhs-notes');
   const cacheDir = path.join(root, 'cache', 'xhs-notes');
@@ -190,19 +196,20 @@ test('短链二次解析到同一 sourceUrl 时补 inputUrls 并返回比较', a
   });
 
   await runner.importXhsNote({
-    url: 'https://xhslink.com/first',
+    url: 'https://www.xiaohongshu.com/explore/testdelete000000000001?xsec_token=old',
     note: NOTE,
     learnArticle: true,
     learnCover: false,
     learnInner: false,
   });
 
-  const second = await runner.resolveXhsNote({ url: 'https://xhslink.com/second' });
+  const secondUrl = 'https://www.xiaohongshu.com/explore/testdelete000000000001?xsec_token=new&xsec_source=pc_feed';
+  const second = await runner.resolveXhsNote({ url: secondUrl });
   assert.equal(second.ok, true, second.message);
   assert.ok(second.compare);
   assert.equal(second.link?.noteId, 'testdelete000000000001');
   const link = findXhsNoteLinkByUrl(notesDir, NOTE.sourceUrl);
-  assert.ok(link?.inputUrls.includes('https://xhslink.com/second'));
+  assert.ok(link?.inputUrls.includes(secondUrl));
 });
 
 test('resolve：cache 已有 payload 时不调插件', async () => {
@@ -240,7 +247,7 @@ test('resolve：cache 已有 payload 时不调插件', async () => {
   assert.equal(resolved.note.sourceUrl, `https://www.xiaohongshu.com/explore/${noteId}`);
 });
 
-test('resolve：带 token 取料走规范链；同 noteId 无 query 再取命中 cache', async () => {
+test('resolve：带 token 真拉改写分享链；入库短链；同 noteId 再取命中 cache', async () => {
   const root = tempDir();
   const cacheDir = path.join(root, 'cache', 'xhs-notes');
   const noteId = 'tokencanon00000000001';
@@ -272,7 +279,9 @@ test('resolve：带 token 取料走规范链；同 noteId 无 query 再取命中
   const first = await runner.resolveXhsNote({ url: dirty });
   assert.equal(first.ok, true, first.message);
   assert.equal(first.fromCache, false);
-  assert.deepEqual(fetchUrls, [`https://www.xiaohongshu.com/explore/${noteId}`]);
+  assert.deepEqual(fetchUrls, [toDurableShareFetchUrl(dirty)]);
+  assert.match(fetchUrls[0], /\/discovery\/item\//);
+  assert.match(fetchUrls[0], /xsec_source=pc_share/);
   assert.equal(first.note.sourceUrl, `https://www.xiaohongshu.com/explore/${noteId}`);
 
   const second = await runner.resolveXhsNote({
@@ -281,6 +290,30 @@ test('resolve：带 token 取料走规范链；同 noteId 无 query 再取命中
   assert.equal(second.ok, true, second.message);
   assert.equal(second.fromCache, true);
   assert.equal(fetchUrls.length, 1);
+});
+
+test('resolve：无 xsec_token 不调插件', async () => {
+  const root = tempDir();
+  let fetchCalls = 0;
+  const runner = createRunner({
+    postsDir: path.join(root, 'posts'),
+    promptsDir: PROMPTS,
+    userAlbumsDir: path.join(root, 'albums'),
+    userArticleSamplesDir: path.join(root, 'article-samples'),
+    userXhsNotesDir: path.join(root, 'xhs-notes'),
+    userXhsNotesCacheDir: path.join(root, 'cache', 'xhs-notes'),
+    fetchNoteByUrl: async () => {
+      fetchCalls += 1;
+      return { ok: true, note: { ...NOTE } };
+    },
+  });
+
+  const resolved = await runner.resolveXhsNote({
+    url: 'https://www.xiaohongshu.com/explore/notokennote0000000001',
+  });
+  assert.equal(resolved.ok, false);
+  assert.equal(fetchCalls, 0);
+  assert.match(String(resolved.message || ''), /分享链接/);
 });
 
 test('resolve：linkId + 短链在 cache 新鲜时不真拉', async () => {
@@ -330,7 +363,8 @@ test('resolve：无 cache 才调插件并落盘；同 noteId 再取走 cache', a
   const root = tempDir();
   const cacheDir = path.join(root, 'cache', 'xhs-notes');
   const noteId = 'secondtake00000000001';
-  let fetchCalls = 0;
+  /** @type {string[]} */
+  const fetchUrls = [];
   const runner = createRunner({
     postsDir: path.join(root, 'posts'),
     promptsDir: PROMPTS,
@@ -338,8 +372,8 @@ test('resolve：无 cache 才调插件并落盘；同 noteId 再取走 cache', a
     userArticleSamplesDir: path.join(root, 'article-samples'),
     userXhsNotesDir: path.join(root, 'xhs-notes'),
     userXhsNotesCacheDir: cacheDir,
-    fetchNoteByUrl: async () => {
-      fetchCalls += 1;
+    fetchNoteByUrl: async (url) => {
+      fetchUrls.push(String(url || ''));
       return {
         ok: true,
         note: {
@@ -356,10 +390,11 @@ test('resolve：无 cache 才调插件并落盘；同 noteId 再取走 cache', a
     }),
   });
 
-  const first = await runner.resolveXhsNote({ url: 'https://xhslink.com/once' });
+  const firstUrl = `https://www.xiaohongshu.com/explore/${noteId}?xsec_token=AB9U&xsec_source=pc_feed`;
+  const first = await runner.resolveXhsNote({ url: firstUrl });
   assert.equal(first.ok, true, first.message);
   assert.equal(first.fromCache, false);
-  assert.equal(fetchCalls, 1);
+  assert.deepEqual(fetchUrls, [toDurableShareFetchUrl(firstUrl)]);
   assert.ok(readNotePayload(cacheDir, noteId));
 
   const second = await runner.resolveXhsNote({
@@ -367,7 +402,7 @@ test('resolve：无 cache 才调插件并落盘；同 noteId 再取走 cache', a
   });
   assert.equal(second.ok, true, second.message);
   assert.equal(second.fromCache, true);
-  assert.equal(fetchCalls, 1);
+  assert.equal(fetchUrls.length, 1);
 });
 
 test('import 优先用 coverDataUrl，不再二次拉 CDN', async () => {
@@ -612,6 +647,7 @@ test('空取料不覆盖已有可学 cache；回退旧包', async () => {
   const cacheDir = path.join(root, 'cache', 'xhs-notes');
   const noteId = 'emptyfetch00000000001';
   const sourceUrl = `https://www.xiaohongshu.com/explore/${noteId}`;
+  const tokenUrl = `${sourceUrl}?xsec_token=AB9U&xsec_source=pc_feed`;
   const good = {
     ...NOTE,
     sourceUrl,
@@ -620,7 +656,8 @@ test('空取料不覆盖已有可学 cache；回退旧包', async () => {
   };
   writeNotePayload(cacheDir, noteId, good);
   const before = readNotePayload(cacheDir, noteId);
-  let fetchCalls = 0;
+  /** @type {string[]} */
+  const fetchUrls = [];
   const runner = createRunner({
     postsDir: path.join(root, 'posts'),
     promptsDir: PROMPTS,
@@ -628,8 +665,8 @@ test('空取料不覆盖已有可学 cache；回退旧包', async () => {
     userArticleSamplesDir: path.join(root, 'article-samples'),
     userXhsNotesDir: path.join(root, 'xhs-notes'),
     userXhsNotesCacheDir: cacheDir,
-    fetchNoteByUrl: async () => {
-      fetchCalls += 1;
+    fetchNoteByUrl: async (url) => {
+      fetchUrls.push(String(url || ''));
       return {
         ok: true,
         note: {
@@ -648,10 +685,10 @@ test('空取料不覆盖已有可学 cache；回退旧包', async () => {
   const metaPath = path.join(cacheDir, noteId, 'cache-meta.json');
   fs.writeFileSync(metaPath, `${JSON.stringify({ fetchedAtMs: Date.now() - 60 * 60 * 1000 }, null, 2)}\n`);
 
-  const resolved = await runner.resolveXhsNote({ url: sourceUrl });
+  const resolved = await runner.resolveXhsNote({ url: tokenUrl });
   assert.equal(resolved.ok, true, resolved.message);
   assert.equal(resolved.fromCache, true);
-  assert.equal(fetchCalls, 1);
+  assert.deepEqual(fetchUrls, [toDurableShareFetchUrl(tokenUrl)]);
   assert.equal(resolved.parts.title, '旧的好内容');
   const after = readNotePayload(cacheDir, noteId);
   assert.equal(after && after.body, before && before.body);
@@ -663,6 +700,7 @@ test('新鲜空壳 cache 当 miss：再取可学内容并覆盖', async () => {
   const cacheDir = path.join(root, 'cache', 'xhs-notes');
   const noteId = 'emptyshell00000000001';
   const sourceUrl = `https://www.xiaohongshu.com/explore/${noteId}`;
+  const tokenUrl = `${sourceUrl}?xsec_token=AB9U&xsec_source=pc_feed`;
   writeNotePayload(cacheDir, noteId, {
     sourceUrl,
     title: '',
@@ -671,7 +709,8 @@ test('新鲜空壳 cache 当 miss：再取可学内容并覆盖', async () => {
     images: [],
     fetchedAt: '',
   });
-  let fetchCalls = 0;
+  /** @type {string[]} */
+  const fetchUrls = [];
   const runner = createRunner({
     postsDir: path.join(root, 'posts'),
     promptsDir: PROMPTS,
@@ -679,8 +718,8 @@ test('新鲜空壳 cache 当 miss：再取可学内容并覆盖', async () => {
     userArticleSamplesDir: path.join(root, 'article-samples'),
     userXhsNotesDir: path.join(root, 'xhs-notes'),
     userXhsNotesCacheDir: cacheDir,
-    fetchNoteByUrl: async () => {
-      fetchCalls += 1;
+    fetchNoteByUrl: async (url) => {
+      fetchUrls.push(String(url || ''));
       return {
         ok: true,
         note: {
@@ -699,10 +738,10 @@ test('新鲜空壳 cache 当 miss：再取可学内容并覆盖', async () => {
     }),
   });
 
-  const resolved = await runner.resolveXhsNote({ url: sourceUrl });
+  const resolved = await runner.resolveXhsNote({ url: tokenUrl });
   assert.equal(resolved.ok, true, resolved.message);
   assert.equal(resolved.fromCache, false);
-  assert.equal(fetchCalls, 1);
+  assert.deepEqual(fetchUrls, [toDurableShareFetchUrl(tokenUrl)]);
   assert.equal(resolved.parts.title, '补回正文');
   const saved = readNotePayload(cacheDir, noteId);
   assert.equal(saved && saved.body, '新取到的正文。');
@@ -713,6 +752,7 @@ test('空取料且无旧包：失败且不落盘', async () => {
   const cacheDir = path.join(root, 'cache', 'xhs-notes');
   const noteId = 'noopayload0000000001';
   const sourceUrl = `https://www.xiaohongshu.com/explore/${noteId}`;
+  const tokenUrl = `${sourceUrl}?xsec_token=AB9U&xsec_source=pc_feed`;
   const runner = createRunner({
     postsDir: path.join(root, 'posts'),
     promptsDir: PROMPTS,
@@ -733,8 +773,9 @@ test('空取料且无旧包：失败且不落盘', async () => {
     }),
   });
 
-  const resolved = await runner.resolveXhsNote({ url: sourceUrl });
+  const resolved = await runner.resolveXhsNote({ url: tokenUrl });
   assert.equal(resolved.ok, false);
   assert.match(String(resolved.message || ''), /没有正文也没有图/);
+  assert.doesNotMatch(String(resolved.message || ''), /已有内容未改动/);
   assert.equal(readNotePayload(cacheDir, noteId), null);
 });

@@ -89,9 +89,10 @@ node scripts/run-studio.js --open
 | 学习失败 / 参考图不合格 | 资料库「风格」Tab 停在选择或卡片墙，人话错误可见；`runtime/albums/` 与出厂 `assets/.../albums|samples` 文件集合不变。可换图再试 |
 | 连不上本机取料通道 / host not found / 扩展版本过低 | 进料弹层会先探测通道与扩展 ≥0.9.0，未通过则禁用粘贴；先启动操作台或加载插件（静默写清单），重载内部特供版，看 18769，打开「允许连接」。Windows 用户名含中文时 Host 写在 `C:\ProgramData\DexBuddy\native-host`（Mac 仍用 Application Support）。详见 faqs/how-to-native-host-silent-register |
 | 这篇没变 | 已知笔记指纹全同：toast 提示，不进导入；有更新或需确认时勾选后写回原柜子；删「对标笔记」会级联名下图册与对标文案 |
-| 正在学这篇 / 连点无效 | 同笔记进行中 busy 忽略连点；30 分钟内新鲜 cache 按 **noteId** 复用（带 token / 无 query / 重学带 linkId 的短链同 ID 可命中）；抽不出 ID 的裸短链才真拉 |
-| 取到空笔记 / 没法学 | 无正文且无图的取料不写、不刷新 30 分钟缓存；有旧可学包则回退旧包；空壳新鲜 cache 当 miss 再取 |
-| 对标笔记删后浮层仍在 / 学笔记跳 Tab / 长链带 token | 删除成功立刻关详情；打开学笔记弹层不抢 Tab；开始学图时切到对标笔记，扫图 loading 与风格草稿为全局浮层（不跳风格）；入库与取料用无 query 的 explore 链，判重与缓存均按 noteId；详情文案显示规范链；仅当 inputUrls 有带 xsec_token 的原粘贴串才可点跳转，否则纯展示不可点 |
+| 正在学这篇 / 连点无效 | 同笔记进行中 busy 忽略连点；30 分钟内新鲜 cache 按 **noteId** 复用（带 token / 无 query / 重学带 linkId 的短链同 ID 可命中）；无 token 不真拉 |
+| 取到空笔记 / 没法学 | 无正文且无图的取料不写、不刷新 30 分钟缓存；有旧可学包则回退旧包；空壳新鲜 cache 当 miss 再取；无旧包时 toast 不含「已有内容未改动」 |
+| 缺分享链 / 无 xsec_token | 真拉与重新学都不调插件；toast「没有可用的分享链接（缺 xsec_token），请到小红书复制分享链接后再学」 |
+| 对标笔记删后浮层仍在 / 学笔记跳 Tab / 长链带 token | 删除成功立刻关详情；打开学笔记弹层不抢 Tab；开始学图时切到对标笔记，扫图 loading 与风格草稿为全局浮层（不跳风格）；真拉把带 token 的粘贴改写成 discovery/item 分享链再交给插件；入库与缓存按 noteId 短链；详情文案显示规范链；仅当 inputUrls 有带 xsec_token 的原粘贴串才可点跳转；重新学仅在有 openUrl token 时预填，否则 toast 中止 |
 | 保存怎么画失败 / 出厂不能改 | 用户册须保留 11 槽（v2）与占位符；出厂详情无保存。接口会拒绝改 assets |
 | 出厂图册不能删除 | 出厂五本无删除按钮；接口也会拒绝 |
 | 这本图册正在用于生成 | 等当前笔记的提示词或生图这一轮结束再删 |

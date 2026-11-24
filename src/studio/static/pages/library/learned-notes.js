@@ -200,14 +200,19 @@ function libraryLearnedNotes() {
     relearn() {
       if (!this.detail || !this.detail.link) return;
       const link = this.detail.link;
-      const noteId = typeof link.noteId === 'string' ? link.noteId.trim() : '';
-      const url = noteId
-        ? `https://www.xiaohongshu.com/explore/${noteId}`
-        : this.canonicalNoteUrl(link.sourceUrl || '');
+      const openUrl = typeof link.openUrl === 'string' ? link.openUrl.trim() : '';
+      // 无 token 必空壳：不预填短链、不发起读取
+      if (!(openUrl && /[?&]xsec_token=/i.test(openUrl))) {
+        this.$dispatch(
+          'library-toast',
+          '没有可用的分享链接（缺 xsec_token），请到小红书复制分享链接后再学',
+        );
+        return;
+      }
       this.closeDetail();
       this.$dispatch('library-relearn-xhs-note', {
         linkId: link.id,
-        url,
+        url: openUrl,
       });
     },
 
